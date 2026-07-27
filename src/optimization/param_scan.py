@@ -36,6 +36,10 @@ class ScanPoint:
     use_smart_money: bool = True
     liquidity_grab_buffer: float = 0.005
     use_trend_following: bool = False
+    require_structure_resonance: bool = False
+    structure_resonance_buffer: float = 0.03
+    use_market_regime_filter: bool = False
+    market_regime_confirmations: int = 4
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -48,6 +52,10 @@ class ScanPoint:
             "use_smart_money": self.use_smart_money,
             "liquidity_grab_buffer": self.liquidity_grab_buffer,
             "use_trend_following": self.use_trend_following,
+            "require_structure_resonance": self.require_structure_resonance,
+            "structure_resonance_buffer": self.structure_resonance_buffer,
+            "use_market_regime_filter": self.use_market_regime_filter,
+            "market_regime_confirmations": self.market_regime_confirmations,
         }
 
 
@@ -95,19 +103,24 @@ def default_grid() -> list[ScanPoint]:
         # Skip redundant buffer variations when Smart Money is disabled.
         if not use_smart_money and liquidity_grab_buffer != liquidity_grab_buffers[0]:
             continue
-        points.append(
-            ScanPoint(
-                swing_order=swing_order,
-                fib_tolerance=fib_tolerance,
-                confirmations=confirmations,
-                target_levels=target_levels,
-                tp_target=tp_target,
-                stop_loss_buffer=stop_loss_buffer,
-                use_smart_money=use_smart_money,
-                liquidity_grab_buffer=liquidity_grab_buffer,
-                use_trend_following=use_trend_following,
+        for require_structure_resonance in (False, True):
+            # Structure resonance only applies when Smart Money is active.
+            if require_structure_resonance and not use_smart_money:
+                continue
+            points.append(
+                ScanPoint(
+                    swing_order=swing_order,
+                    fib_tolerance=fib_tolerance,
+                    confirmations=confirmations,
+                    target_levels=target_levels,
+                    tp_target=tp_target,
+                    stop_loss_buffer=stop_loss_buffer,
+                    use_smart_money=use_smart_money,
+                    liquidity_grab_buffer=liquidity_grab_buffer,
+                    use_trend_following=use_trend_following,
+                    require_structure_resonance=require_structure_resonance,
+                )
             )
-        )
     return points
 
 
@@ -120,6 +133,10 @@ def _signal_params(point: ScanPoint) -> SignalParams:
         use_smart_money=point.use_smart_money,
         liquidity_grab_buffer=point.liquidity_grab_buffer,
         use_trend_following=point.use_trend_following,
+        require_structure_resonance=point.require_structure_resonance,
+        structure_resonance_buffer=point.structure_resonance_buffer,
+        use_market_regime_filter=point.use_market_regime_filter,
+        market_regime_confirmations=point.market_regime_confirmations,
     )
 
 

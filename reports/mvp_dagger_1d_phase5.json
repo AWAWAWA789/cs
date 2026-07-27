@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-07-27T15:47:34.124965+00:00",
+  "sub_index_name": "匕首",
+  "sub_index_id": "resolved",
+  "period": "1day",
+  "higher_period": null,
+  "bars": 938,
+  "date_range": {
+    "start": "2024-01-01 16:00:00+00:00",
+    "end": "2026-07-26 16:00:00+00:00"
+  },
+  "strategy": {
+    "initial_capital": 10000.0,
+    "final_equity": 9445.681212492504,
+    "total_return": -0.05543187875074962,
+    "max_drawdown": -0.18207872287440915,
+    "sharpe_ratio": -0.45371916444381316,
+    "total_trades": 40,
+    "win_rate": 0.3,
+    "profit_factor": 0.8545363700533275,
+    "avg_trade_return": -0.007920407132231376
+  },
+  "benchmark": {
+    "start_price": 751.76,
+    "end_price": 544.69,
+    "total_return": -0.27544695115462375
+  }
+}
