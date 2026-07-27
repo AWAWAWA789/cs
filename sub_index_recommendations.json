@@ -1,0 +1,127 @@
+{
+  "generated_at": "2026-07-27T16:09:35.147420+00:00",
+  "period": "1day",
+  "grid_size": 16,
+  "sub_indices": {
+    "手套": {
+      "params": {
+        "swing_order": 2,
+        "fib_tolerance": 0.03,
+        "confirmations": 1,
+        "target_levels": [
+          "0.5",
+          "0.618"
+        ],
+        "tp_target": "1.618",
+        "stop_loss_buffer": 0.002,
+        "use_smart_money": true,
+        "liquidity_grab_buffer": 0.005,
+        "use_trend_following": false,
+        "require_structure_resonance": false,
+        "structure_resonance_buffer": 0.03,
+        "use_market_regime_filter": false,
+        "market_regime_confirmations": 4,
+        "ensemble_mode": "union",
+        "ensemble_adx_threshold": 25.0,
+        "ensemble_regime_confirmations": 4,
+        "ensemble_trend_strength_threshold": 25.0
+      },
+      "signal_count": 175,
+      "total_return": 0.5301321484210917,
+      "max_drawdown": -0.08917526398007587,
+      "sharpe_ratio": 2.7536864868266133,
+      "total_trades": 30,
+      "win_rate": 0.43333333333333335
+    },
+    "匕首": {
+      "params": {
+        "swing_order": 1,
+        "fib_tolerance": 0.03,
+        "confirmations": 1,
+        "target_levels": [
+          "0.5",
+          "0.618"
+        ],
+        "tp_target": "1.618",
+        "stop_loss_buffer": 0.002,
+        "use_smart_money": true,
+        "liquidity_grab_buffer": 0.005,
+        "use_trend_following": false,
+        "require_structure_resonance": false,
+        "structure_resonance_buffer": 0.03,
+        "use_market_regime_filter": false,
+        "market_regime_confirmations": 4,
+        "ensemble_mode": null,
+        "ensemble_adx_threshold": 25.0,
+        "ensemble_regime_confirmations": 4,
+        "ensemble_trend_strength_threshold": 25.0
+      },
+      "signal_count": 157,
+      "total_return": 0.19181724800740252,
+      "max_drawdown": -0.08923204165967609,
+      "sharpe_ratio": 1.5373647422288252,
+      "total_trades": 33,
+      "win_rate": 0.36363636363636365
+    },
+    "百元主战": {
+      "params": {
+        "swing_order": 2,
+        "fib_tolerance": 0.03,
+        "confirmations": 1,
+        "target_levels": [
+          "0.5",
+          "0.618"
+        ],
+        "tp_target": "1.272",
+        "stop_loss_buffer": 0.002,
+        "use_smart_money": true,
+        "liquidity_grab_buffer": 0.005,
+        "use_trend_following": false,
+        "require_structure_resonance": false,
+        "structure_resonance_buffer": 0.03,
+        "use_market_regime_filter": false,
+        "market_regime_confirmations": 4,
+        "ensemble_mode": null,
+        "ensemble_adx_threshold": 25.0,
+        "ensemble_regime_confirmations": 4,
+        "ensemble_trend_strength_threshold": 25.0
+      },
+      "signal_count": 134,
+      "total_return": 0.4916205948699206,
+      "max_drawdown": -0.12105256632862185,
+      "sharpe_ratio": 2.065401541170573,
+      "total_trades": 42,
+      "win_rate": 0.42857142857142855
+    },
+    "贴纸": {
+      "params": {
+        "swing_order": 1,
+        "fib_tolerance": 0.03,
+        "confirmations": 1,
+        "target_levels": [
+          "0.5",
+          "0.618"
+        ],
+        "tp_target": "1.618",
+        "stop_loss_buffer": 0.002,
+        "use_smart_money": true,
+        "liquidity_grab_buffer": 0.005,
+        "use_trend_following": false,
+        "require_structure_resonance": false,
+        "structure_resonance_buffer": 0.03,
+        "use_market_regime_filter": false,
+        "market_regime_confirmations": 4,
+        "ensemble_mode": null,
+        "ensemble_adx_threshold": 25.0,
+        "ensemble_regime_confirmations": 4,
+        "ensemble_trend_strength_threshold": 25.0
+      },
+      "signal_count": 131,
+      "total_return": 2.6568273107525155,
+      "max_drawdown": -0.16000613203634573,
+      "sharpe_ratio": 2.552994100482231,
+      "total_trades": 42,
+      "win_rate": 0.42857142857142855
+    }
+  }
+}
