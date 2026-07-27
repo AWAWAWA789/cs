@@ -30,7 +30,7 @@ def client(settings):
     return CSQAQClient(settings)
 
 
-def test_normalize_kline_converts_timestamp_and_columns():
+def test_normalize_kline_converts_dict_of_arrays():
     raw = {
         "t": [1704067200000, 1704153600000],  # 2024-01-01, 2024-01-02 UTC
         "o": [100.0, 101.0],
@@ -39,6 +39,19 @@ def test_normalize_kline_converts_timestamp_and_columns():
         "l": [99.0, 100.0],
         "v": [0, 0],
     }
+
+    df = normalize_kline(raw)
+
+    assert list(df.columns) == ["timestamp", "open", "high", "low", "close"]
+    assert df["timestamp"].iloc[0] == pd.Timestamp("2024-01-01", tz="UTC")
+    assert df["close"].iloc[1] == 102.0
+
+
+def test_normalize_kline_converts_list_of_records():
+    raw = [
+        {"t": "1704067200000", "o": 100.0, "c": 101.0, "h": 102.0, "l": 99.0, "v": 0},
+        {"t": "1704153600000", "o": 101.0, "c": 102.0, "h": 103.0, "l": 100.0, "v": 0},
+    ]
 
     df = normalize_kline(raw)
 
@@ -80,8 +93,28 @@ def test_resolve_sub_index_id(client):
         status=200,
     )
 
-    assert resolve_sub_index_id(client, "手套") == "1"
-    assert resolve_sub_index_id(client, "匕首") == "2"
+    assert resolve_sub_index_id(client, "手套", skip_rate_limit=True) == "1"
+    assert resolve_sub_index_id(client, "匕首", skip_rate_limit=True) == "2"
+
+
+@responses.activate
+def test_resolve_sub_index_id_falls_back_to_substring_match(client):
+    responses.get(
+        "https://api.csqaq.com/api/v1/current_data?type=init",
+        json={
+            "code": 200,
+            "msg": "Success",
+            "data": {
+                "sub_index_data": [
+                    {"id": "8", "name": "手套指数"},
+                    {"id": "2", "name": "匕首指数"},
+                ]
+            },
+        },
+        status=200,
+    )
+
+    assert resolve_sub_index_id(client, "手套", skip_rate_limit=True) == "8"
 
 
 @responses.activate
@@ -97,7 +130,7 @@ def test_resolve_sub_index_id_raises_when_not_found(client):
     )
 
     with pytest.raises(ValueError, match="Sub-index name not found"):
-        resolve_sub_index_id(client, "步枪")
+        resolve_sub_index_id(client, "步枪", skip_rate_limit=True)
 
 
 @responses.activate
@@ -119,7 +152,7 @@ def test_fetch_ohlc(client):
         status=200,
     )
 
-    df = fetch_ohlc(client, "1", "4hour")
+    df = fetch_ohlc(client, "1", "4hour", skip_rate_limit=True)
 
     assert len(df) == 1
     assert df["close"].iloc[0] == 101.0
@@ -175,7 +208,7 @@ def test_load_or_fetch_fetches_and_caches_when_missing(settings, client):
         status=200,
     )
 
-    df = load_or_fetch(settings, client)
+    df = load_or_fetch(settings, client, skip_rate_limit=True)
 
     assert len(df) == 2
     assert df["close"].iloc[-1] == 102.0
