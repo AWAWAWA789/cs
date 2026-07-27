@@ -170,6 +170,11 @@ def run_backtest(
     # If a position is still open at the end, close it at the final close price.
     if open_trade is not None:
         final_close = float(df["close"].iloc[-1])
+        # The loop already appended an equity value for the final bar while the
+        # position was still open. Remove that stale value so the close value
+        # replaces it and the curve length matches the number of bars.
+        if len(equity_values) == len(df):
+            equity_values.pop()
         _close_trade(
             open_trade,
             final_close,

@@ -47,7 +47,30 @@ def test_no_signal_without_pattern():
     df = _make_uptrend_with_pullback()
     # Remove the pin bar / engulfing on the last bar by making it a doji.
     df.iloc[-1] = [2.55, 2.65, 2.45, 2.55]
-    params = SignalParams(swing_order=1, fib_tolerance=0.05)
+    params = SignalParams(swing_order=1, fib_tolerance=0.05, use_smart_money=False)
     result = generate_signals(df, params)
 
     assert not result["signal_long"].iloc[-1]
+
+
+def _make_clear_uptrend():
+    """Create a DataFrame with a clear higher-highs/higher-lows uptrend."""
+    return pd.DataFrame(
+        {
+            "open": [1.0, 2.0, 1.5, 3.0, 2.5, 4.0, 3.5, 5.0, 4.5, 5.5],
+            "high": [2.0, 2.5, 2.0, 3.5, 3.0, 4.5, 4.0, 5.5, 5.0, 5.6],
+            "low": [0.5, 1.5, 1.0, 2.5, 2.0, 3.5, 3.0, 4.5, 4.0, 4.5],
+            "close": [2.0, 2.0, 1.5, 3.0, 2.5, 4.0, 3.5, 5.0, 4.5, 5.5],
+        }
+    )
+
+
+def test_smart_money_signal_reason():
+    df = _make_clear_uptrend()
+    # Force a liquidity grab on the last bar: break the recent swing low and recover.
+    df.iloc[-1] = [5.0, 5.1, 2.9, 5.1]
+    params = SignalParams(swing_order=1, fib_tolerance=0.05, confirmations=1)
+    result = generate_signals(df, params)
+
+    assert result["signal_long"].iloc[-1]
+    assert "smart_money_liquidity_grab" in result["signal_reason"].iloc[-1]
