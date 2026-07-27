@@ -148,3 +148,61 @@ def test_backtest_integration():
     signal_df = generate_ensemble_signals(df, params)
     result = run_backtest(signal_df, BacktestParams())
     assert len(result.trades) > 0
+
+
+def test_dynamic_weight_mode_prefers_trend_in_strong_uptrend():
+    df = _make_long_uptrend_with_breakout()
+    params = EnsembleParams(
+        trend_params=TrendFollowingParams(
+            swing_order=1,
+            confirmations=1,
+            trend_strength_threshold=None,
+        ),
+        pullback_params=SignalParams(swing_order=1, confirmations=1),
+        mode="dynamic_weight",
+        dynamic_weight_adx_scale=1.0,
+        dynamic_weight_min=0.2,
+        dynamic_weight_max=0.8,
+        regime_confirmations=1,
+    )
+    result = generate_ensemble_signals(df, params)
+    assert "ensemble_trend_weight" in result.columns
+    assert result["signal_long"].iloc[38]
+    assert "ensemble_trend" in result["signal_reason"].iloc[38]
+
+
+def test_dynamic_weight_mode_prefers_pullback_in_weak_trend():
+    df = _make_uptrend_with_pullback()
+    params = EnsembleParams(
+        trend_params=TrendFollowingParams(
+            swing_order=1,
+            confirmations=1,
+            trend_strength_threshold=None,
+        ),
+        pullback_params=SignalParams(swing_order=1, fib_tolerance=0.05),
+        mode="dynamic_weight",
+        dynamic_weight_adx_scale=100.0,
+        dynamic_weight_min=0.2,
+        dynamic_weight_max=0.8,
+        regime_confirmations=1,
+    )
+    result = generate_ensemble_signals(df, params)
+    assert result["signal_long"].iloc[-1]
+    assert "ensemble_pullback" in result["signal_reason"].iloc[-1]
+
+
+def test_signal_quality_filter_in_ensemble():
+    df = _make_uptrend_with_pullback()
+    params = EnsembleParams(
+        pullback_params=SignalParams(
+            swing_order=1,
+            fib_tolerance=0.05,
+            use_signal_quality=True,
+        ),
+        mode="union",
+        use_signal_quality=True,
+        min_signal_quality=0.0,
+    )
+    result = generate_ensemble_signals(df, params)
+    assert "signal_quality" in result.columns
+    assert result["signal_long"].iloc[-1]

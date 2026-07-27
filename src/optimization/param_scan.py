@@ -46,6 +46,20 @@ class ScanPoint:
     ensemble_adx_threshold: float = 25.0
     ensemble_regime_confirmations: int = 4
     ensemble_trend_strength_threshold: float = 25.0
+    ensemble_dynamic_weight_min: float = 0.2
+    ensemble_dynamic_weight_max: float = 0.8
+    ensemble_dynamic_weight_adx_scale: float = 25.0
+    ensemble_use_signal_quality: bool = False
+    ensemble_min_signal_quality: float = 0.0
+    ensemble_quality_trend_weight: float = 0.4
+    ensemble_quality_structure_weight: float = 0.4
+    ensemble_quality_confluence_weight: float = 0.2
+    trend_use_di_filter: bool = False
+    trend_use_volatility_filter: bool = False
+    trend_volatility_atr_multiplier: float = 0.5
+    trend_use_pullback_confirmation: bool = False
+    trend_pullback_lookback: int = 5
+    trend_pullback_buffer: float = 0.005
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -66,6 +80,20 @@ class ScanPoint:
             "ensemble_adx_threshold": self.ensemble_adx_threshold,
             "ensemble_regime_confirmations": self.ensemble_regime_confirmations,
             "ensemble_trend_strength_threshold": self.ensemble_trend_strength_threshold,
+            "ensemble_dynamic_weight_min": self.ensemble_dynamic_weight_min,
+            "ensemble_dynamic_weight_max": self.ensemble_dynamic_weight_max,
+            "ensemble_dynamic_weight_adx_scale": self.ensemble_dynamic_weight_adx_scale,
+            "ensemble_use_signal_quality": self.ensemble_use_signal_quality,
+            "ensemble_min_signal_quality": self.ensemble_min_signal_quality,
+            "ensemble_quality_trend_weight": self.ensemble_quality_trend_weight,
+            "ensemble_quality_structure_weight": self.ensemble_quality_structure_weight,
+            "ensemble_quality_confluence_weight": self.ensemble_quality_confluence_weight,
+            "trend_use_di_filter": self.trend_use_di_filter,
+            "trend_use_volatility_filter": self.trend_use_volatility_filter,
+            "trend_volatility_atr_multiplier": self.trend_volatility_atr_multiplier,
+            "trend_use_pullback_confirmation": self.trend_use_pullback_confirmation,
+            "trend_pullback_lookback": self.trend_pullback_lookback,
+            "trend_pullback_buffer": self.trend_pullback_buffer,
         }
 
 
@@ -147,6 +175,11 @@ def _signal_params(point: ScanPoint) -> SignalParams:
         structure_resonance_buffer=point.structure_resonance_buffer,
         use_market_regime_filter=point.use_market_regime_filter,
         market_regime_confirmations=point.market_regime_confirmations,
+        use_signal_quality=point.ensemble_use_signal_quality,
+        min_signal_quality=point.ensemble_min_signal_quality,
+        quality_trend_weight=point.ensemble_quality_trend_weight,
+        quality_structure_weight=point.ensemble_quality_structure_weight,
+        quality_confluence_weight=point.ensemble_quality_confluence_weight,
     )
 
 
@@ -170,6 +203,11 @@ def _ensemble_params(point: ScanPoint) -> EnsembleParams:
         require_structure_resonance=point.require_structure_resonance,
         structure_resonance_buffer=point.structure_resonance_buffer,
         use_market_regime_filter=False,
+        use_signal_quality=point.ensemble_use_signal_quality,
+        min_signal_quality=point.ensemble_min_signal_quality,
+        quality_trend_weight=point.ensemble_quality_trend_weight,
+        quality_structure_weight=point.ensemble_quality_structure_weight,
+        quality_confluence_weight=point.ensemble_quality_confluence_weight,
     )
     trend_params = TrendFollowingParams(
         swing_order=point.swing_order,
@@ -177,6 +215,12 @@ def _ensemble_params(point: ScanPoint) -> EnsembleParams:
         trend_strength_threshold=point.ensemble_trend_strength_threshold,
         use_higher_high_breakout=False,
         require_uptrend=True,
+        use_di_filter=point.trend_use_di_filter,
+        use_volatility_filter=point.trend_use_volatility_filter,
+        volatility_atr_multiplier=point.trend_volatility_atr_multiplier,
+        use_pullback_confirmation=point.trend_use_pullback_confirmation,
+        pullback_lookback=point.trend_pullback_lookback,
+        pullback_buffer=point.trend_pullback_buffer,
     )
     return EnsembleParams(
         pullback_params=pullback_params,
@@ -184,6 +228,14 @@ def _ensemble_params(point: ScanPoint) -> EnsembleParams:
         mode=point.ensemble_mode or "regime_switch",
         adx_threshold=point.ensemble_adx_threshold,
         regime_confirmations=point.ensemble_regime_confirmations,
+        dynamic_weight_min=point.ensemble_dynamic_weight_min,
+        dynamic_weight_max=point.ensemble_dynamic_weight_max,
+        dynamic_weight_adx_scale=point.ensemble_dynamic_weight_adx_scale,
+        use_signal_quality=point.ensemble_use_signal_quality,
+        min_signal_quality=point.ensemble_min_signal_quality,
+        quality_trend_weight=point.ensemble_quality_trend_weight,
+        quality_structure_weight=point.ensemble_quality_structure_weight,
+        quality_confluence_weight=point.ensemble_quality_confluence_weight,
     )
 
 

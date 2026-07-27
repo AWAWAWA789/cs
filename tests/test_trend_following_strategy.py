@@ -113,3 +113,45 @@ def test_backtest_integration():
     signal_df = generate_trend_following_signals(df, params)
     result = run_backtest(signal_df, BacktestParams())
     assert len(result.trades) > 0
+
+
+def test_pullback_confirmation_signal():
+    """Strategy can use breakout-pullback confirmation instead of immediate breakout."""
+    df = pd.DataFrame(
+        {
+            "open": [1.0, 2.0, 1.5, 2.5, 2.3, 2.5],
+            "high": [1.2, 2.2, 1.8, 2.7, 2.8, 2.9],
+            "low": [0.8, 1.8, 1.4, 2.2, 2.1, 2.4],
+            "close": [1.0, 2.0, 1.5, 2.6, 2.4, 2.8],
+        }
+    )
+    params = TrendFollowingParams(
+        swing_order=1,
+        confirmations=1,
+        trend_strength_threshold=None,
+        require_uptrend=False,
+        use_pullback_confirmation=True,
+        pullback_lookback=3,
+        pullback_buffer=0.01,
+    )
+    result = generate_trend_following_signals(df, params)
+    assert result["signal_long"].iloc[4]
+    assert result["signal_reason"].iloc[4] == "trend_following_breakout_pullback"
+
+
+def test_di_filter_reduces_signals():
+    df = _uptrend_with_breakout()
+    unfiltered = TrendFollowingParams(
+        swing_order=1,
+        confirmations=1,
+        trend_strength_threshold=None,
+    )
+    filtered = TrendFollowingParams(
+        swing_order=1,
+        confirmations=1,
+        trend_strength_threshold=None,
+        use_di_filter=True,
+    )
+    base = generate_trend_following_signals(df, unfiltered)
+    filt = generate_trend_following_signals(df, filtered)
+    assert base["signal_long"].sum() >= filt["signal_long"].sum()

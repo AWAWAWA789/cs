@@ -21,12 +21,12 @@ def average_directional_index(
     high_col: str = "high",
     low_col: str = "low",
     close_col: str = "close",
-) -> tuple[pd.Series, pd.Series, pd.Series]:
-    """Return ADX, +DI and -DI series.
+) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
+    """Return ADX, +DI, -DI and ATR series.
 
     The implementation follows the classic Wilder recipe but uses pandas
     ``ewm`` for the smoothing step, which is equivalent when ``alpha=1/period``.
-    Values are scaled 0-100.  The first ``period`` rows are NaN.
+    ADX/DI values are scaled 0-100.  The first ``period`` rows are NaN.
     """
     high = df[high_col]
     low = df[low_col]
@@ -55,7 +55,7 @@ def average_directional_index(
     dx = (100 * (di_plus - di_minus).abs() / (di_plus + di_minus)).fillna(0.0)
     adx = _wilder_smooth(dx, period).fillna(0.0)
 
-    return adx, di_plus, di_minus
+    return adx, di_plus, di_minus, atr
 
 
 def add_trend_strength_features(
@@ -71,12 +71,14 @@ def add_trend_strength_features(
     - ``adx``: average directional index (0-100).
     - ``di_plus``: positive directional indicator.
     - ``di_minus``: negative directional indicator.
+    - ``atr``: average true range.
     """
     result = df.copy()
-    adx, di_plus, di_minus = average_directional_index(
+    adx, di_plus, di_minus, atr = average_directional_index(
         result, period=period, high_col=high_col, low_col=low_col, close_col=close_col
     )
     result["adx"] = adx
     result["di_plus"] = di_plus
     result["di_minus"] = di_minus
+    result["atr"] = atr
     return result

@@ -26,6 +26,12 @@ class TrendFollowingParams:
         adx_period: int = 14,
         use_higher_high_breakout: bool = False,
         require_uptrend: bool = True,
+        use_di_filter: bool = False,
+        use_volatility_filter: bool = False,
+        volatility_atr_multiplier: float = 0.5,
+        use_pullback_confirmation: bool = False,
+        pullback_lookback: int = 5,
+        pullback_buffer: float = 0.005,
     ) -> None:
         self.swing_order = swing_order
         self.confirmations = confirmations
@@ -33,6 +39,12 @@ class TrendFollowingParams:
         self.adx_period = adx_period
         self.use_higher_high_breakout = use_higher_high_breakout
         self.require_uptrend = require_uptrend
+        self.use_di_filter = use_di_filter
+        self.use_volatility_filter = use_volatility_filter
+        self.volatility_atr_multiplier = volatility_atr_multiplier
+        self.use_pullback_confirmation = use_pullback_confirmation
+        self.pullback_lookback = pullback_lookback
+        self.pullback_buffer = pullback_buffer
 
 
 def _last_swing_price(
@@ -69,6 +81,12 @@ def generate_trend_following_signals(
         result,
         trend_strength_threshold=params.trend_strength_threshold,
         adx_period=params.adx_period,
+        use_di_filter=params.use_di_filter,
+        use_volatility_filter=params.use_volatility_filter,
+        volatility_atr_multiplier=params.volatility_atr_multiplier,
+        use_pullback_confirmation=params.use_pullback_confirmation,
+        pullback_lookback=params.pullback_lookback,
+        pullback_buffer=params.pullback_buffer,
     )
 
     signal_long = pd.Series(False, index=result.index)
@@ -82,7 +100,11 @@ def generate_trend_following_signals(
 
         signal = False
         reason = ""
-        if params.use_higher_high_breakout:
+        if params.use_pullback_confirmation:
+            if result["breakout_pullback"].iloc[i]:
+                signal = True
+                reason = "trend_following_breakout_pullback"
+        elif params.use_higher_high_breakout:
             if result["higher_high_breakout"].iloc[i]:
                 signal = True
                 reason = "trend_following_higher_high"
