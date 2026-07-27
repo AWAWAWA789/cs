@@ -104,6 +104,12 @@ def _scan_point_from_dict(params: dict[str, Any]) -> ScanPoint:
         structure_resonance_buffer=params.get("structure_resonance_buffer", 0.03),
         use_market_regime_filter=params.get("use_market_regime_filter", False),
         market_regime_confirmations=params.get("market_regime_confirmations", 4),
+        ensemble_mode=params.get("ensemble_mode"),
+        ensemble_adx_threshold=params.get("ensemble_adx_threshold", 25.0),
+        ensemble_regime_confirmations=params.get("ensemble_regime_confirmations", 4),
+        ensemble_trend_strength_threshold=params.get(
+            "ensemble_trend_strength_threshold", 25.0
+        ),
     )
 
 
@@ -204,27 +210,32 @@ def main() -> None:
         period=args.period,
     )
 
-    # Use a reduced grid to keep runtime reasonable.
+    # Use a reduced grid focused on market regime filtering and ensemble modes.
     grid = [
         ScanPoint(
             swing_order=swing_order,
             fib_tolerance=fib_tolerance,
-            confirmations=confirmations,
-            target_levels=target_levels,
+            confirmations=1,
+            target_levels=("0.5", "0.618"),
             tp_target=tp_target,
             stop_loss_buffer=stop_loss_buffer,
             use_smart_money=use_smart_money,
             liquidity_grab_buffer=0.005,
-            use_trend_following=use_trend_following,
+            use_trend_following=False,
+            use_market_regime_filter=use_market_regime_filter,
+            market_regime_confirmations=4,
+            ensemble_mode=ensemble_mode,
+            ensemble_adx_threshold=25.0,
+            ensemble_regime_confirmations=4,
+            ensemble_trend_strength_threshold=25.0,
         )
         for swing_order in (1, 2)
         for fib_tolerance in (0.03, 0.05)
-        for confirmations in (1, 2)
-        for target_levels in (("0.5", "0.618"), ("0.382", "0.5", "0.618"))
         for tp_target in ("1.272", "1.618")
         for stop_loss_buffer in (0.002, 0.005)
         for use_smart_money in (True, False)
-        for use_trend_following in (True, False)
+        for use_market_regime_filter in (True, False)
+        for ensemble_mode in (None, "regime_switch", "union")
     ]
 
     windows = walk_forward(
