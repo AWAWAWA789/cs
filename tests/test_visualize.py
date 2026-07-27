@@ -8,6 +8,8 @@ import pandas as pd
 import pytest
 
 from src.analysis.visualize import (
+    _signal_source_color,
+    _signal_source_label,
     generate_report_plots,
     plot_equity_curve,
     plot_price_with_trades,
@@ -109,3 +111,50 @@ def test_plot_price_with_trades_draws_swing_points(tmp_path: Path):
     fig = plot_price_with_trades(df, result, output_path=output)
     assert fig is not None
     assert output.exists()
+
+
+def test_signal_source_label_and_color():
+    assert _signal_source_label("ensemble_breakout") == "ensemble"
+    assert _signal_source_color("ensemble_breakout") == "purple"
+    assert _signal_source_label("trend_following_breakout") == "trend_following"
+    assert _signal_source_color("trend_following_breakout") == "green"
+    assert _signal_source_label("smart_money_liquidity_grab") == "smart_money"
+    assert _signal_source_color("smart_money_liquidity_grab") == "orange"
+    assert _signal_source_label("pullback_fib") == "pullback"
+    assert _signal_source_color("pullback_fib") == "blue"
+    assert _signal_source_label("") == "pullback"
+
+
+def test_plot_price_with_trades_uses_signal_source_colors(tmp_path: Path):
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2024-01-01", periods=8, freq="D"),
+            "open": [100.0] * 8,
+            "high": [102.0] * 8,
+            "low": [99.0] * 8,
+            "close": [101.0] * 8,
+            "signal_long": [True, True, True, True, False, False, False, False],
+            "signal_reason": [
+                "pullback_fib",
+                "smart_money_liquidity_grab",
+                "trend_following_breakout",
+                "ensemble_breakout",
+                "",
+                "",
+                "",
+                "",
+            ],
+        }
+    )
+    result = _make_result()
+    output = tmp_path / "trades_with_sources.png"
+    fig = plot_price_with_trades(df, result, output_path=output)
+    assert fig is not None
+    assert output.exists()
+
+    ax = fig.axes[0]
+    labels = {text.get_text() for text in ax.get_legend().get_texts()}
+    assert "pullback" in labels
+    assert "smart_money" in labels
+    assert "trend_following" in labels
+    assert "ensemble" in labels

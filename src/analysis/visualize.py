@@ -38,6 +38,28 @@ def _format_percent(value: float) -> str:
     return f"{value * 100:.2f}%"
 
 
+def _signal_source_color(reason: str) -> str:
+    """Return a color for the signal based on its source prefix."""
+    if reason.startswith("ensemble_"):
+        return "purple"
+    if reason.startswith("trend_following_"):
+        return "green"
+    if reason.startswith("smart_money_"):
+        return "orange"
+    return "blue"
+
+
+def _signal_source_label(reason: str) -> str:
+    """Return a human-readable label for the signal source."""
+    if reason.startswith("ensemble_"):
+        return "ensemble"
+    if reason.startswith("trend_following_"):
+        return "trend_following"
+    if reason.startswith("smart_money_"):
+        return "smart_money"
+    return "pullback"
+
+
 def plot_equity_curve(
     result: BacktestResult,
     title: str = "Equity Curve",
@@ -130,16 +152,25 @@ def plot_price_with_trades(
 
     n = len(df)
     signal_indices = df.index[df["signal_long"]].tolist()
+    source_positions: dict[str, list[int]] = {}
     for idx in signal_indices:
         pos = int(df.index.get_loc(idx))
+        reason = df["signal_reason"].iloc[pos] if "signal_reason" in df.columns else ""
+        label = _signal_source_label(reason)
+        source_positions.setdefault(label, []).append(pos)
+
+    for label, positions in source_positions.items():
+        if not positions:
+            continue
+        color = _signal_source_color(f"{label}_")
         ax.scatter(
-            pos,
-            df["low"].iloc[pos],
+            positions,
+            df["low"].iloc[positions],
             marker="^",
-            color="blue",
+            color=color,
             s=60,
             zorder=5,
-            label="Signal" if idx == signal_indices[0] else "",
+            label=label,
         )
 
     for trade in result.trades:
