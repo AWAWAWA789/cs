@@ -1,0 +1,69 @@
+{
+  "generated_at": "2026-07-27T16:16:26.181119+00:00",
+  "sub_index_name": "手套",
+  "sub_index_id": "resolved",
+  "period": "1day",
+  "bars": 938,
+  "date_range": {
+    "start": "2024-01-01 16:00:00+00:00",
+    "end": "2026-07-26 16:00:00+00:00"
+  },
+  "ensemble_params": {
+    "mode": "union",
+    "adx_threshold": 25.0,
+    "regime_confirmations": 4,
+    "trend_strength_threshold": 25.0
+  },
+  "strategies": [
+    {
+      "name": "Pullback",
+      "metrics": {
+        "initial_capital": 10000.0,
+        "final_equity": 12715.614077132132,
+        "total_return": 0.27156140771321313,
+        "max_drawdown": -0.11052400759824438,
+        "sharpe_ratio": 1.9877654131845872,
+        "total_trades": 35,
+        "win_rate": 0.42857142857142855,
+        "profit_factor": 1.690447894082041,
+        "avg_trade_return": -0.006899665718376782,
+        "signal_count": 168
+      }
+    },
+    {
+      "name": "Trend-Following",
+      "metrics": {
+        "initial_capital": 10000.0,
+        "final_equity": 9890.352342807548,
+        "total_return": -0.010964765719245206,
+        "max_drawdown": -0.013237731787006487,
+        "sharpe_ratio": -1.1141546744312054,
+        "total_trades": 13,
+        "win_rate": 0.5384615384615384,
+        "profit_factor": 0.5529118000893238,
+        "avg_trade_return": 0.000980337563252647,
+        "signal_count": 13
+      }
+    },
+    {
+      "name": "Ensemble",
+      "metrics": {
+        "initial_capital": 10000.0,
+        "final_equity": 12674.25663581114,
+        "total_return": 0.2674256635811141,
+        "max_drawdown": -0.1105240075982446,
+        "sharpe_ratio": 1.9626182744982834,
+        "total_trades": 39,
+        "win_rate": 0.41025641025641024,
+        "profit_factor": 1.674895183586137,
+        "avg_trade_return": -0.006238444902159124,
+        "signal_count": 175
+      }
+    }
+  ],
+  "benchmark": {
+    "start_price": 680.12,
+    "end_price": 694.74,
+    "total_return": 0.021496206551784986
+  }
+}
