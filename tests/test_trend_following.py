@@ -9,6 +9,7 @@ from src.features.trend_following import (
     breakout_with_follow_through,
     higher_high_breakout,
 )
+from src.features.trend_strength import add_trend_strength_features
 
 
 def test_breakout_with_follow_through_detects_breakout():
@@ -90,3 +91,47 @@ def test_add_trend_following_features_adds_columns():
     result = add_trend_following_features(df)
     assert "breakout_follow_through" in result.columns
     assert "higher_high_breakout" in result.columns
+
+
+def test_trend_strength_filter_removes_weak_breakout():
+    """A valid breakout is suppressed when ADX is below the threshold."""
+    df = pd.DataFrame(
+        {
+            "open": [100.0] * 20,
+            "high": [100.0] * 20,
+            "low": [100.0] * 20,
+            "close": [100.0] * 20,
+        }
+    )
+    # Mark an earlier bar as a swing high, then inject a breakout bar after a
+    # flat market (ADX ~= 0).
+    swing_highs = [False] * 20
+    swing_highs[10] = True
+    df["swing_high"] = swing_highs
+    df.loc[df.index[-1], ["open", "high", "low", "close"]] = [100.0, 105.0, 100.0, 105.0]
+
+    unfiltered = add_trend_following_features(df)
+    assert unfiltered["breakout_follow_through"].iloc[-1]
+
+    filtered = add_trend_following_features(df, trend_strength_threshold=10.0)
+    assert not filtered["breakout_follow_through"].iloc[-1]
+
+
+def test_trend_strength_filter_keeps_strong_breakout():
+    """A breakout in a trending market survives the ADX filter."""
+    df = pd.DataFrame(
+        {
+            "open": list(range(1, 31)),
+            "high": list(range(2, 32)),
+            "low": list(range(0, 30)),
+            "close": list(range(2, 32)),
+        },
+        dtype=float,
+    )
+    # Mark the second-to-last bar as a swing high; last bar breaks above it.
+    swing_highs = [False] * 30
+    swing_highs[-2] = True
+    df["swing_high"] = swing_highs
+
+    filtered = add_trend_following_features(df, trend_strength_threshold=20.0)
+    assert filtered["breakout_follow_through"].iloc[-1]
