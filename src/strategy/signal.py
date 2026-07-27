@@ -14,6 +14,7 @@ import pandas as pd
 
 from src.features.candlestick import identify_candlestick_patterns
 from src.features.fibonacci import is_near_level, retracement_levels
+from src.features.market_regime import add_market_regime_feature
 from src.features.smart_money import add_smart_money_features
 from src.features.structure import add_structure_features
 from src.features.trend_following import add_trend_following_features
@@ -30,7 +31,11 @@ class SignalParams:
         confirmations: int = 2,
         use_smart_money: bool = True,
         liquidity_grab_buffer: float = 0.005,
-        use_trend_following: bool = True,
+        use_trend_following: bool = False,
+        trend_strength_threshold: float | None = None,
+        adx_period: int = 14,
+        use_market_regime_filter: bool = False,
+        market_regime_confirmations: int = 4,
     ) -> None:
         self.swing_order = swing_order
         self.fib_tolerance = fib_tolerance
@@ -39,6 +44,10 @@ class SignalParams:
         self.use_smart_money = use_smart_money
         self.liquidity_grab_buffer = liquidity_grab_buffer
         self.use_trend_following = use_trend_following
+        self.trend_strength_threshold = trend_strength_threshold
+        self.adx_period = adx_period
+        self.use_market_regime_filter = use_market_regime_filter
+        self.market_regime_confirmations = market_regime_confirmations
 
 
 def _last_swing_price(
@@ -99,7 +108,17 @@ def generate_signals(
             result, liquidity_grab_buffer=params.liquidity_grab_buffer
         )
     if params.use_trend_following:
-        result = add_trend_following_features(result)
+        result = add_trend_following_features(
+            result,
+            trend_strength_threshold=params.trend_strength_threshold,
+            adx_period=params.adx_period,
+        )
+    if params.use_market_regime_filter:
+        result = add_market_regime_feature(
+            result,
+            swing_order=params.swing_order + 1,
+            confirmations=params.market_regime_confirmations,
+        )
 
     signal_long = pd.Series(False, index=result.index)
     signal_reason = pd.Series("", index=result.index, dtype=object)
@@ -109,6 +128,11 @@ def generate_signals(
     for i in range(len(result)):
         if result[trend_col].iloc[i] != 1:
             continue
+
+        if params.use_market_regime_filter:
+            regime = result["market_regime"].iloc[i]
+            if pd.isna(regime) or regime != "uptrend":
+                continue
 
         low_price = _last_swing_price(result["low"], result["swing_low"], i)
         high_price = _last_swing_price(result["high"], result["swing_high"], i)

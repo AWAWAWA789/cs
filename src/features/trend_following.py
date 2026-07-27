@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from src.features.trend_strength import add_trend_strength_features
+
 
 def breakout_with_follow_through(
     df: pd.DataFrame,
@@ -92,14 +94,31 @@ def higher_high_breakout(
     return result
 
 
-def add_trend_following_features(df: pd.DataFrame, **kwargs) -> pd.DataFrame:
+def add_trend_following_features(
+    df: pd.DataFrame,
+    trend_strength_threshold: float | None = None,
+    adx_period: int = 14,
+    **kwargs,
+) -> pd.DataFrame:
     """Add trend-following feature columns to ``df``.
 
     Adds:
     - ``breakout_follow_through``: basic swing-high breakout signal.
     - ``higher_high_breakout``: multi-swing-high breakout signal.
+
+    When ``trend_strength_threshold`` is provided, an ADX-style trend-strength
+    oscillator is computed and both breakout columns are AND-ed with
+    ``adx >= threshold``.  This filters out false breakouts in weak or choppy
+    markets.
     """
     result = df.copy()
     result["breakout_follow_through"] = breakout_with_follow_through(result, **kwargs)
     result["higher_high_breakout"] = higher_high_breakout(result, **kwargs)
+
+    if trend_strength_threshold is not None:
+        result = add_trend_strength_features(result, period=adx_period)
+        strength_ok = result["adx"] >= trend_strength_threshold
+        result["breakout_follow_through"] = result["breakout_follow_through"] & strength_ok
+        result["higher_high_breakout"] = result["higher_high_breakout"] & strength_ok
+
     return result

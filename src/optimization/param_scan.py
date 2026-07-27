@@ -35,7 +35,7 @@ class ScanPoint:
     stop_loss_buffer: float = 0.002
     use_smart_money: bool = True
     liquidity_grab_buffer: float = 0.005
-    use_trend_following: bool = True
+    use_trend_following: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
