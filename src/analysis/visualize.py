@@ -172,6 +172,55 @@ def plot_price_with_trades(
             alpha=0.6,
         )
 
+        # Draw stop-loss and take-profit levels across the trade duration.
+        if trade.stop_loss is not None and trade.take_profit is not None:
+            ax.plot(
+                [entry_pos, exit_pos],
+                [trade.stop_loss, trade.stop_loss],
+                color="red",
+                linestyle="--",
+                linewidth=0.8,
+                alpha=0.5,
+                label="SL" if trade == result.trades[0] else "",
+            )
+            ax.plot(
+                [entry_pos, exit_pos],
+                [trade.take_profit, trade.take_profit],
+                color="green",
+                linestyle="--",
+                linewidth=0.8,
+                alpha=0.5,
+                label="TP" if trade == result.trades[0] else "",
+            )
+
+    # Mark swing highs and lows when columns are present.
+    if "swing_high" in df.columns:
+        swing_high_indices = df.index[df["swing_high"]].tolist()
+        for idx in swing_high_indices:
+            pos = int(df.index.get_loc(idx))
+            ax.scatter(
+                pos,
+                df["high"].iloc[pos],
+                marker="*",
+                color="orange",
+                s=40,
+                zorder=4,
+                label="Swing High" if idx == swing_high_indices[0] else "",
+            )
+    if "swing_low" in df.columns:
+        swing_low_indices = df.index[df["swing_low"]].tolist()
+        for idx in swing_low_indices:
+            pos = int(df.index.get_loc(idx))
+            ax.scatter(
+                pos,
+                df["low"].iloc[pos],
+                marker="*",
+                color="purple",
+                s=40,
+                zorder=4,
+                label="Swing Low" if idx == swing_low_indices[0] else "",
+            )
+
     ax.set_title(title)
     ax.set_xlabel("Bar")
     ax.grid(True, alpha=0.3)
