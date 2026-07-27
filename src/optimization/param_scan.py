@@ -29,7 +29,7 @@ class ScanPoint:
 
     swing_order: int = 2
     fib_tolerance: float = 0.03
-    confirmations: int = 2
+    confirmations: int = 1
     target_levels: tuple[str, ...] = ("0.5", "0.618")
     tp_target: str = "1.272"
     stop_loss_buffer: float = 0.002
