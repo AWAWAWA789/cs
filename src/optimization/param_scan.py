@@ -20,7 +20,9 @@ from src.api.client import CSQAQClient
 from src.backtest.engine import BacktestParams, run_backtest
 from src.config import Settings
 from src.data.pipeline import load_or_fetch
+from src.strategy.ensemble import EnsembleParams, generate_ensemble_signals
 from src.strategy.signal import SignalParams, generate_signals
+from src.strategy.trend_following_strategy import TrendFollowingParams
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,10 @@ class ScanPoint:
     structure_resonance_buffer: float = 0.03
     use_market_regime_filter: bool = False
     market_regime_confirmations: int = 4
+    ensemble_mode: str | None = None
+    ensemble_adx_threshold: float = 25.0
+    ensemble_regime_confirmations: int = 4
+    ensemble_trend_strength_threshold: float = 25.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -56,6 +62,10 @@ class ScanPoint:
             "structure_resonance_buffer": self.structure_resonance_buffer,
             "use_market_regime_filter": self.use_market_regime_filter,
             "market_regime_confirmations": self.market_regime_confirmations,
+            "ensemble_mode": self.ensemble_mode,
+            "ensemble_adx_threshold": self.ensemble_adx_threshold,
+            "ensemble_regime_confirmations": self.ensemble_regime_confirmations,
+            "ensemble_trend_strength_threshold": self.ensemble_trend_strength_threshold,
         }
 
 
@@ -147,12 +157,45 @@ def _backtest_params(point: ScanPoint) -> BacktestParams:
     )
 
 
+def _ensemble_params(point: ScanPoint) -> EnsembleParams:
+    """Build ensemble parameters from a scan point."""
+    pullback_params = SignalParams(
+        swing_order=point.swing_order,
+        fib_tolerance=point.fib_tolerance,
+        target_levels=point.target_levels,
+        confirmations=point.confirmations,
+        use_smart_money=point.use_smart_money,
+        liquidity_grab_buffer=point.liquidity_grab_buffer,
+        use_trend_following=False,
+        require_structure_resonance=point.require_structure_resonance,
+        structure_resonance_buffer=point.structure_resonance_buffer,
+        use_market_regime_filter=False,
+    )
+    trend_params = TrendFollowingParams(
+        swing_order=point.swing_order,
+        confirmations=point.confirmations,
+        trend_strength_threshold=point.ensemble_trend_strength_threshold,
+        use_higher_high_breakout=False,
+        require_uptrend=True,
+    )
+    return EnsembleParams(
+        pullback_params=pullback_params,
+        trend_params=trend_params,
+        mode=point.ensemble_mode or "regime_switch",
+        adx_threshold=point.ensemble_adx_threshold,
+        regime_confirmations=point.ensemble_regime_confirmations,
+    )
+
+
 def evaluate_point(
     df: pd.DataFrame,
     point: ScanPoint,
 ) -> dict[str, Any]:
     """Run signal generation and backtest for a single parameter point."""
-    signal_df = generate_signals(df, _signal_params(point))
+    if point.ensemble_mode is None:
+        signal_df = generate_signals(df, _signal_params(point))
+    else:
+        signal_df = generate_ensemble_signals(df, _ensemble_params(point))
     signal_count = int(signal_df["signal_long"].sum())
     result = run_backtest(signal_df, _backtest_params(point))
     metrics = summarize(result)
