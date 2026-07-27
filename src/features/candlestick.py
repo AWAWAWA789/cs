@@ -60,22 +60,21 @@ def identify_pin_bar(
     upper_wick = high - pd.concat([open_, close], axis=1).max(axis=1)
     lower_wick = pd.concat([open_, close], axis=1).min(axis=1) - low
 
-    # Avoid division by zero; tiny bodies are ignored.
-    body_safe = body.replace(0, pd.NA)
+    # A zero-body candle cannot be a pin bar; enforce body > 0.
+    has_body = body > 0
 
     result["pin_bar_bull"] = (
         bullish
-        & (lower_wick >= body_safe * body_to_wick_ratio)
-        & (upper_wick <= body_safe * max_opposite_wick_ratio)
+        & has_body
+        & (lower_wick >= body * body_to_wick_ratio)
+        & (upper_wick <= body * max_opposite_wick_ratio)
     )
     result["pin_bar_bear"] = (
         bearish
-        & (upper_wick >= body_safe * body_to_wick_ratio)
-        & (lower_wick <= body_safe * max_opposite_wick_ratio)
+        & has_body
+        & (upper_wick >= body * body_to_wick_ratio)
+        & (lower_wick <= body * max_opposite_wick_ratio)
     )
-
-    result["pin_bar_bull"] = result["pin_bar_bull"].fillna(False)
-    result["pin_bar_bear"] = result["pin_bar_bear"].fillna(False)
     return result
 
 
