@@ -98,3 +98,14 @@ def test_generate_report_plots_creates_files(tmp_path: Path):
     assert paths["trades"].exists()
     assert paths["equity_curve"].name == "test_equity_curve.png"
     assert paths["trades"].name == "test_trades.png"
+
+
+def test_plot_price_with_trades_draws_swing_points(tmp_path: Path):
+    df = _make_df()
+    df["swing_high"] = [False, True, False, False]
+    df["swing_low"] = [True, False, False, False]
+    result = _make_result()
+    output = tmp_path / "trades_with_swings.png"
+    fig = plot_price_with_trades(df, result, output_path=output)
+    assert fig is not None
+    assert output.exists()

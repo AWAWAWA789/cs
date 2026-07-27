@@ -1,0 +1,68 @@
+{
+  "generated_at": "2026-07-27T14:14:56.271268+00:00",
+  "sub_index_name": "手套",
+  "period": "1day",
+  "baseline_return": 0.5125388833108817,
+  "cases": [
+    {
+      "case": "full",
+      "description": "All modules enabled",
+      "signal_count": 175,
+      "total_return": 0.5125388833108817,
+      "total_trades": 26,
+      "max_drawdown": -0.07532513436556872,
+      "sharpe_ratio": 2.6450067311331735,
+      "contribution": 0.0
+    },
+    {
+      "case": "no_trend_following",
+      "description": "Trend-following features disabled",
+      "signal_count": 168,
+      "total_return": 0.49575257324396427,
+      "total_trades": 25,
+      "max_drawdown": -0.07532513436556869,
+      "sharpe_ratio": 2.580506748400386,
+      "contribution": -0.016786310066917443
+    },
+    {
+      "case": "smart_money_only",
+      "description": "Only Smart Money features",
+      "signal_count": 167,
+      "total_return": 0.4089333542360043,
+      "total_trades": 24,
+      "max_drawdown": -0.07532513436556862,
+      "sharpe_ratio": 2.2793672713561315,
+      "contribution": -0.10360552907487741
+    },
+    {
+      "case": "no_smart_money",
+      "description": "Smart Money features disabled",
+      "signal_count": 22,
+      "total_return": 0.053840364521319906,
+      "total_trades": 16,
+      "max_drawdown": -0.06166531540291086,
+      "sharpe_ratio": 1.0110725996265257,
+      "contribution": -0.4586985187895618
+    },
+    {
+      "case": "fib_pattern_only",
+      "description": "Only Fibonacci + candlestick patterns",
+      "signal_count": 2,
+      "total_return": 0.04038811869418546,
+      "total_trades": 2,
+      "max_drawdown": -0.019999999999999987,
+      "sharpe_ratio": 0.9818599333102247,
+      "contribution": -0.47215076461669625
+    },
+    {
+      "case": "trend_following_only",
+      "description": "Only trend-following features",
+      "signal_count": 20,
+      "total_return": -0.007328574141025279,
+      "total_trades": 15,
+      "max_drawdown": -0.061665315402911036,
+      "sharpe_ratio": -0.14957688083843465,
+      "contribution": -0.519867457451907
+    }
+  ]
+}
