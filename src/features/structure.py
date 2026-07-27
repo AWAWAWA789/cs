@@ -25,38 +25,43 @@ def trend_direction(
     low_col: str = "low",
     confirmations: int = 2,
 ) -> pd.Series:
-    """Return a trend label for each row based on recent swing points.
+    """Return a rolling trend label for each row based on recent swing points.
 
     The label is:
-    - ``1`` (uptrend): the last two swing highs and swing lows are higher.
-    - ``-1`` (downtrend): the last two swing highs and swing lows are lower.
+    - ``1`` (uptrend): the last ``confirmations`` swing highs and lows are
+      higher.
+    - ``-1`` (downtrend): the last ``confirmations`` swing highs and lows are
+      lower.
     - ``0`` (unclear): anything else or insufficient swing points.
 
-    The value is forward-filled so every bar has a label once a trend is
-    established.
+    The trend is recomputed at every bar using only the swing points observed
+    up to that bar, making the label usable in a backtest.
     """
     high_prices = df[high_col].where(df[swing_high_col])
     low_prices = df[low_col].where(df[swing_low_col])
 
-    highs = _last_n_values(high_prices, confirmations + 1)
-    lows = _last_n_values(low_prices, confirmations + 1)
+    result = pd.Series(0, index=df.index, dtype=int)
 
-    if len(highs) < confirmations + 1 or len(lows) < confirmations + 1:
-        trend = 0
-    elif all(highs[i] < highs[i + 1] for i in range(confirmations)) and all(
-        lows[i] < lows[i + 1] for i in range(confirmations)
-    ):
-        trend = 1
-    elif all(highs[i] > highs[i + 1] for i in range(confirmations)) and all(
-        lows[i] > lows[i + 1] for i in range(confirmations)
-    ):
-        trend = -1
-    else:
-        trend = 0
+    for i in range(len(df)):
+        highs = _last_n_values(high_prices.iloc[: i + 1], confirmations + 1)
+        lows = _last_n_values(low_prices.iloc[: i + 1], confirmations + 1)
 
-    result = pd.Series(index=df.index, dtype="Int64")
-    result.iloc[-1] = trend
-    return result.ffill().fillna(0).astype(int)
+        if len(highs) < confirmations + 1 or len(lows) < confirmations + 1:
+            trend = 0
+        elif all(highs[j] < highs[j + 1] for j in range(confirmations)) and all(
+            lows[j] < lows[j + 1] for j in range(confirmations)
+        ):
+            trend = 1
+        elif all(highs[j] > highs[j + 1] for j in range(confirmations)) and all(
+            lows[j] > lows[j + 1] for j in range(confirmations)
+        ):
+            trend = -1
+        else:
+            trend = 0
+
+        result.iloc[i] = trend
+
+    return result
 
 
 def add_structure_features(
