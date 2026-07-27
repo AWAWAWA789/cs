@@ -162,6 +162,61 @@ def default_grid() -> list[ScanPoint]:
     return points
 
 
+def ensemble_grid() -> list[ScanPoint]:
+    """Return a grid focused on ensemble mode, dynamic weights and signal quality.
+
+    The grid keeps pullback parameters fixed at a sensible baseline and sweeps
+    ensemble switching logic, dynamic-weight ranges, and signal-quality
+    thresholds. This lets us calibrate the new phase-7 knobs without exploding
+    the full factorial search space.
+    """
+    base = {
+        "swing_order": 2,
+        "fib_tolerance": 0.03,
+        "confirmations": 1,
+        "target_levels": ("0.5", "0.618"),
+        "tp_target": "1.618",
+        "stop_loss_buffer": 0.002,
+        "use_smart_money": True,
+        "liquidity_grab_buffer": 0.005,
+        "use_trend_following": False,
+        "require_structure_resonance": False,
+        "structure_resonance_buffer": 0.03,
+        "use_market_regime_filter": False,
+        "market_regime_confirmations": 4,
+        "ensemble_trend_strength_threshold": 25.0,
+        "trend_use_di_filter": False,
+        "trend_use_volatility_filter": False,
+        "trend_volatility_atr_multiplier": 0.5,
+        "trend_use_pullback_confirmation": False,
+        "trend_pullback_lookback": 5,
+        "trend_pullback_buffer": 0.005,
+    }
+
+    points: list[ScanPoint] = []
+    for ensemble_mode in ("regime_switch", "union", "dynamic_weight"):
+        for adx_threshold in (20.0, 25.0, 30.0):
+            for regime_confirmations in (2, 4, 6):
+                for dynamic_weight_min, dynamic_weight_max in ((0.1, 0.5), (0.2, 0.8), (0.3, 0.7)):
+                    for dynamic_weight_adx_scale in (20.0, 25.0, 30.0):
+                        for use_signal_quality in (False, True):
+                            for min_signal_quality in (0.0, 0.3, 0.5):
+                                # Skip redundant quality variations when disabled.
+                                if not use_signal_quality and min_signal_quality != 0.0:
+                                    continue
+                                params = dict(base)
+                                params["ensemble_mode"] = ensemble_mode
+                                params["ensemble_adx_threshold"] = adx_threshold
+                                params["ensemble_regime_confirmations"] = regime_confirmations
+                                params["ensemble_dynamic_weight_min"] = dynamic_weight_min
+                                params["ensemble_dynamic_weight_max"] = dynamic_weight_max
+                                params["ensemble_dynamic_weight_adx_scale"] = dynamic_weight_adx_scale
+                                params["ensemble_use_signal_quality"] = use_signal_quality
+                                params["ensemble_min_signal_quality"] = min_signal_quality
+                                points.append(ScanPoint(**params))
+    return points
+
+
 def _signal_params(point: ScanPoint) -> SignalParams:
     return SignalParams(
         swing_order=point.swing_order,
@@ -171,6 +226,7 @@ def _signal_params(point: ScanPoint) -> SignalParams:
         use_smart_money=point.use_smart_money,
         liquidity_grab_buffer=point.liquidity_grab_buffer,
         use_trend_following=point.use_trend_following,
+        trend_strength_threshold=point.ensemble_trend_strength_threshold,
         require_structure_resonance=point.require_structure_resonance,
         structure_resonance_buffer=point.structure_resonance_buffer,
         use_market_regime_filter=point.use_market_regime_filter,
@@ -323,6 +379,13 @@ def main() -> None:
         type=str,
         help="Optional path to write the JSON scan report.",
     )
+    parser.add_argument(
+        "--grid",
+        type=str,
+        default="default",
+        choices=["default", "ensemble"],
+        help="Parameter grid to use (default: default).",
+    )
     args = parser.parse_args()
 
     settings = Settings()
@@ -336,7 +399,13 @@ def main() -> None:
         period=args.period,
     )
 
-    results = run_scan(df)
+    grid: list[ScanPoint]
+    if args.grid == "ensemble":
+        grid = ensemble_grid()
+    else:
+        grid = default_grid()
+
+    results = run_scan(df, grid=grid)
     report = scan_report(
         results,
         sub_index_name=args.sub_index_name,
