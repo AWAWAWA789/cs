@@ -117,16 +117,24 @@ def fair_value_gap(
     return result
 
 
-def add_smart_money_features(df: pd.DataFrame) -> pd.DataFrame:
+def add_smart_money_features(
+    df: pd.DataFrame,
+    liquidity_grab_buffer: float = 0.005,
+) -> pd.DataFrame:
     """Add Smart Money feature columns to ``df``.
 
     Adds:
     - ``liquidity_grab``: boolean bullish liquidity grab signal.
     - ``order_block``: boolean Order Block revisit signal.
     - ``fair_value_gap``: boolean FVG revisit signal.
+
+    Args:
+        df: OHLC DataFrame with ``swing_low`` column.
+        liquidity_grab_buffer: Tolerance used by ``liquidity_grab`` when
+            checking whether price swept a recent swing low.
     """
     result = df.copy()
-    result["liquidity_grab"] = liquidity_grab(result)
+    result["liquidity_grab"] = liquidity_grab(result, buffer=liquidity_grab_buffer)
     result["order_block"] = order_block(result)
     result["fair_value_gap"] = fair_value_gap(result)
     return result

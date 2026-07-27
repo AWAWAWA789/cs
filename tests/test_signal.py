@@ -74,3 +74,44 @@ def test_smart_money_signal_reason():
 
     assert result["signal_long"].iloc[-1]
     assert "smart_money_liquidity_grab" in result["signal_reason"].iloc[-1]
+
+
+def _make_uptrend_with_breakout():
+    """Create a clear uptrend where the last bar breaks above recent swing highs."""
+    return pd.DataFrame(
+        {
+            "open": [1.0, 2.0, 1.5, 3.0, 2.5, 4.0, 3.5, 5.0, 4.5, 6.0],
+            "high": [2.0, 2.5, 2.0, 3.5, 3.0, 4.5, 4.0, 5.5, 5.0, 6.5],
+            "low": [0.5, 1.5, 1.0, 2.5, 2.0, 3.5, 3.0, 4.5, 4.0, 5.5],
+            "close": [2.0, 2.0, 1.5, 3.0, 2.5, 4.0, 3.5, 5.0, 4.5, 6.2],
+        }
+    )
+
+
+def test_trend_following_signal_reason():
+    df = _make_uptrend_with_breakout()
+    params = SignalParams(
+        swing_order=1,
+        fib_tolerance=0.05,
+        confirmations=1,
+        use_smart_money=False,
+        use_trend_following=True,
+    )
+    result = generate_signals(df, params)
+
+    assert result["signal_long"].iloc[-1]
+    assert "trend_following" in result["signal_reason"].iloc[-1]
+
+
+def test_trend_following_disabled():
+    df = _make_uptrend_with_breakout()
+    params = SignalParams(
+        swing_order=1,
+        fib_tolerance=0.05,
+        confirmations=1,
+        use_smart_money=False,
+        use_trend_following=False,
+    )
+    result = generate_signals(df, params)
+
+    assert not result["signal_long"].iloc[-1]

@@ -33,6 +33,9 @@ class ScanPoint:
     target_levels: tuple[str, ...] = ("0.5", "0.618")
     tp_target: str = "1.272"
     stop_loss_buffer: float = 0.002
+    use_smart_money: bool = True
+    liquidity_grab_buffer: float = 0.005
+    use_trend_following: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -42,11 +45,18 @@ class ScanPoint:
             "target_levels": list(self.target_levels),
             "tp_target": self.tp_target,
             "stop_loss_buffer": self.stop_loss_buffer,
+            "use_smart_money": self.use_smart_money,
+            "liquidity_grab_buffer": self.liquidity_grab_buffer,
+            "use_trend_following": self.use_trend_following,
         }
 
 
 def default_grid() -> list[ScanPoint]:
-    """Return a reasonable default parameter grid for glove/index 1d data."""
+    """Return a reasonable default parameter grid for glove/index 1d data.
+
+    The grid includes Smart Money switches and the liquidity-grab buffer so that
+    the scan can quantify the contribution of Smart Money features.
+    """
     swing_orders = [1, 2]
     fib_tolerances = [0.03, 0.05, 0.08]
     confirmations_list = [1, 2]
@@ -56,6 +66,9 @@ def default_grid() -> list[ScanPoint]:
     ]
     tp_targets = ["1.272", "1.618"]
     stop_loss_buffers = [0.002, 0.005]
+    use_smart_money_flags = [True, False]
+    liquidity_grab_buffers = [0.003, 0.005, 0.008]
+    use_trend_following_flags = [True, False]
 
     points: list[ScanPoint] = []
     for (
@@ -65,6 +78,9 @@ def default_grid() -> list[ScanPoint]:
         target_levels,
         tp_target,
         stop_loss_buffer,
+        use_smart_money,
+        liquidity_grab_buffer,
+        use_trend_following,
     ) in itertools.product(
         swing_orders,
         fib_tolerances,
@@ -72,7 +88,13 @@ def default_grid() -> list[ScanPoint]:
         target_level_sets,
         tp_targets,
         stop_loss_buffers,
+        use_smart_money_flags,
+        liquidity_grab_buffers,
+        use_trend_following_flags,
     ):
+        # Skip redundant buffer variations when Smart Money is disabled.
+        if not use_smart_money and liquidity_grab_buffer != liquidity_grab_buffers[0]:
+            continue
         points.append(
             ScanPoint(
                 swing_order=swing_order,
@@ -81,6 +103,9 @@ def default_grid() -> list[ScanPoint]:
                 target_levels=target_levels,
                 tp_target=tp_target,
                 stop_loss_buffer=stop_loss_buffer,
+                use_smart_money=use_smart_money,
+                liquidity_grab_buffer=liquidity_grab_buffer,
+                use_trend_following=use_trend_following,
             )
         )
     return points
@@ -92,6 +117,9 @@ def _signal_params(point: ScanPoint) -> SignalParams:
         fib_tolerance=point.fib_tolerance,
         target_levels=point.target_levels,
         confirmations=point.confirmations,
+        use_smart_money=point.use_smart_money,
+        liquidity_grab_buffer=point.liquidity_grab_buffer,
+        use_trend_following=point.use_trend_following,
     )
 
 

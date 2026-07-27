@@ -1,0 +1,37 @@
+{
+  "generated_at": "2026-07-27T14:09:18.701385+00:00",
+  "sub_index_name": "百元主战",
+  "period": "1day",
+  "signal_params": {
+    "swing_order": 2,
+    "fib_tolerance": 0.03,
+    "confirmations": 1,
+    "target_levels": [
+      "0.5",
+      "0.618"
+    ],
+    "use_smart_money": true,
+    "liquidity_grab_buffer": 0.005,
+    "use_trend_following": true
+  },
+  "backtest_params": {
+    "tp_target": "2.0",
+    "stop_loss_buffer": 0.002
+  },
+  "strategy": {
+    "initial_capital": 10000.0,
+    "final_equity": 16866.373106459658,
+    "total_return": 0.6866373106459658,
+    "max_drawdown": -0.11636290858643404,
+    "sharpe_ratio": 2.001247421255311,
+    "total_trades": 33,
+    "win_rate": 0.36363636363636365,
+    "profit_factor": 2.3508352524811342,
+    "avg_trade_return": 0.0007639291710444748
+  },
+  "benchmark": {
+    "start_price": 749.74,
+    "end_price": 2974.85,
+    "total_return": 2.9678421852909005
+  }
+}

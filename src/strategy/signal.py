@@ -16,6 +16,7 @@ from src.features.candlestick import identify_candlestick_patterns
 from src.features.fibonacci import is_near_level, retracement_levels
 from src.features.smart_money import add_smart_money_features
 from src.features.structure import add_structure_features
+from src.features.trend_following import add_trend_following_features
 
 
 class SignalParams:
@@ -28,12 +29,16 @@ class SignalParams:
         target_levels: tuple[str, ...] = ("0.5", "0.618"),
         confirmations: int = 2,
         use_smart_money: bool = True,
+        liquidity_grab_buffer: float = 0.005,
+        use_trend_following: bool = True,
     ) -> None:
         self.swing_order = swing_order
         self.fib_tolerance = fib_tolerance
         self.target_levels = target_levels
         self.confirmations = confirmations
         self.use_smart_money = use_smart_money
+        self.liquidity_grab_buffer = liquidity_grab_buffer
+        self.use_trend_following = use_trend_following
 
 
 def _last_swing_price(
@@ -90,7 +95,11 @@ def generate_signals(
         result[trend_col] = df[trend_col].values
     result = identify_candlestick_patterns(result)
     if params.use_smart_money:
-        result = add_smart_money_features(result)
+        result = add_smart_money_features(
+            result, liquidity_grab_buffer=params.liquidity_grab_buffer
+        )
+    if params.use_trend_following:
+        result = add_trend_following_features(result)
 
     signal_long = pd.Series(False, index=result.index)
     signal_reason = pd.Series("", index=result.index, dtype=object)
@@ -134,7 +143,17 @@ def generate_signals(
                 smart_money = True
                 smart_money_reason = "smart_money_fvg"
 
-        if (near and has_pattern) or smart_money:
+        trend_following = False
+        trend_following_reason = ""
+        if params.use_trend_following:
+            if result["higher_high_breakout"].iloc[i]:
+                trend_following = True
+                trend_following_reason = "trend_following_higher_high"
+            elif result["breakout_follow_through"].iloc[i]:
+                trend_following = True
+                trend_following_reason = "trend_following_breakout"
+
+        if (near and has_pattern) or smart_money or trend_following:
             signal_long.iloc[i] = True
             swing_low_prices.iloc[i] = low_price
             swing_high_prices.iloc[i] = high_price
@@ -149,6 +168,8 @@ def generate_signals(
                 )
             elif smart_money:
                 signal_reason.iloc[i] = smart_money_reason
+            elif trend_following:
+                signal_reason.iloc[i] = trend_following_reason
 
     result["signal_long"] = signal_long
     result["signal_reason"] = signal_reason

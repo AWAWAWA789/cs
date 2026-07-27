@@ -1,0 +1,37 @@
+{
+  "generated_at": "2026-07-27T14:09:17.586286+00:00",
+  "sub_index_name": "手套",
+  "period": "1day",
+  "signal_params": {
+    "swing_order": 2,
+    "fib_tolerance": 0.03,
+    "confirmations": 1,
+    "target_levels": [
+      "0.5",
+      "0.618"
+    ],
+    "use_smart_money": true,
+    "liquidity_grab_buffer": 0.005,
+    "use_trend_following": true
+  },
+  "backtest_params": {
+    "tp_target": "2.0",
+    "stop_loss_buffer": 0.002
+  },
+  "strategy": {
+    "initial_capital": 10000.0,
+    "final_equity": 15125.388833108816,
+    "total_return": 0.5125388833108817,
+    "max_drawdown": -0.07532513436556872,
+    "sharpe_ratio": 2.6450067311331735,
+    "total_trades": 26,
+    "win_rate": 0.4230769230769231,
+    "profit_factor": 2.5476691867862513,
+    "avg_trade_return": -0.009076404550305735
+  },
+  "benchmark": {
+    "start_price": 680.12,
+    "end_price": 694.74,
+    "total_return": 0.021496206551784986
+  }
+}
