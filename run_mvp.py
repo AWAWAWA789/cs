@@ -63,8 +63,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--confirmations",
         type=int,
-        default=int(os.getenv("TREND_CONFIRMATIONS", "2")),
-        help="Swing points required to confirm a trend (default: 2).",
+        default=int(os.getenv("TREND_CONFIRMATIONS", "1")),
+        help="Swing points required to confirm a trend (default: 1).",
     )
     parser.add_argument(
         "--higher-period",

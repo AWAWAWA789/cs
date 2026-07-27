@@ -15,6 +15,7 @@ import pandas as pd
 from src.features.candlestick import identify_candlestick_patterns
 from src.features.fibonacci import is_near_level, retracement_levels
 from src.features.market_regime import add_market_regime_feature
+from src.features.signal_quality import structure_resonance
 from src.features.smart_money import add_smart_money_features
 from src.features.structure import add_structure_features
 from src.features.trend_following import add_trend_following_features
@@ -28,7 +29,7 @@ class SignalParams:
         swing_order: int = 2,
         fib_tolerance: float = 0.03,
         target_levels: tuple[str, ...] = ("0.5", "0.618"),
-        confirmations: int = 2,
+        confirmations: int = 1,
         use_smart_money: bool = True,
         liquidity_grab_buffer: float = 0.005,
         use_trend_following: bool = False,
@@ -36,6 +37,8 @@ class SignalParams:
         adx_period: int = 14,
         use_market_regime_filter: bool = False,
         market_regime_confirmations: int = 4,
+        require_structure_resonance: bool = False,
+        structure_resonance_buffer: float = 0.03,
     ) -> None:
         self.swing_order = swing_order
         self.fib_tolerance = fib_tolerance
@@ -48,6 +51,8 @@ class SignalParams:
         self.adx_period = adx_period
         self.use_market_regime_filter = use_market_regime_filter
         self.market_regime_confirmations = market_regime_confirmations
+        self.require_structure_resonance = require_structure_resonance
+        self.structure_resonance_buffer = structure_resonance_buffer
 
 
 def _last_swing_price(
@@ -166,6 +171,12 @@ def generate_signals(
             elif result["fair_value_gap"].iloc[i]:
                 smart_money = True
                 smart_money_reason = "smart_money_fvg"
+
+            if smart_money and params.require_structure_resonance:
+                resonance = abs(close - low_price) / low_price <= params.structure_resonance_buffer
+                if not resonance:
+                    smart_money = False
+                    smart_money_reason = ""
 
         trend_following = False
         trend_following_reason = ""
