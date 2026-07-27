@@ -37,6 +37,22 @@ def test_scan_point_to_dict():
     assert d["swing_order"] == 1
     assert d["fib_tolerance"] == 0.05
     assert d["target_levels"] == ["0.5", "0.618"]
+    assert "use_smart_money" in d
+    assert "liquidity_grab_buffer" in d
+    assert "use_trend_following" in d
+
+
+def test_default_grid_includes_smart_money_variations():
+    grid = default_grid()
+    smart_money_on = [p for p in grid if p.use_smart_money]
+    smart_money_off = [p for p in grid if not p.use_smart_money]
+    assert len(smart_money_on) > 0
+    assert len(smart_money_off) > 0
+    # When Smart Money is disabled there should be only one buffer variant.
+    assert len(smart_money_off) <= len(set(
+        (p.swing_order, p.fib_tolerance, p.confirmations, p.target_levels, p.tp_target, p.stop_loss_buffer, p.use_trend_following)
+        for p in smart_money_off
+    ))
 
 
 def test_evaluate_point_returns_expected_keys():
