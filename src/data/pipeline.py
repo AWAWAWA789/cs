@@ -18,37 +18,56 @@ from src.data.cache import cache_file_path, exists, load, save
 _CUTOFF = pd.Timestamp("2024-01-01", tz="UTC")
 
 
-def resolve_sub_index_id(client: CSQAQClient, sub_index_name: str) -> str:
+def resolve_sub_index_id(
+    client: CSQAQClient, sub_index_name: str, skip_rate_limit: bool = False
+) -> str:
     """Look up a sub-index id by its Chinese name.
+
+    Exact matches take precedence; if none are found, the first name that
+    contains ``sub_index_name`` as a substring is used.
+
+    Args:
+        client: CSQAQ API client.
+        sub_index_name: Sub-index name to resolve.
+        skip_rate_limit: Bypass client-side rate limiting. Intended for tests.
 
     Raises:
         ValueError: if no matching sub-index is found.
     """
-    payload = get_current_data_init(client, skip_rate_limit=True)
+    payload = get_current_data_init(client, skip_rate_limit=skip_rate_limit)
     sub_index_data = payload.get("sub_index_data", [])
+
     for item in sub_index_data:
         if item.get("name") == sub_index_name:
             return str(item.get("id"))
+
+    for item in sub_index_data:
+        name = item.get("name", "")
+        if sub_index_name in name:
+            return str(item.get("id"))
+
     raise ValueError(f"Sub-index name not found: {sub_index_name}")
 
 
-def normalize_kline(data: dict) -> pd.DataFrame:
+def normalize_kline(data: dict | list) -> pd.DataFrame:
     """Convert raw CSQAQ K-line payload into a standard OHLC DataFrame.
 
-    The raw payload contains parallel arrays keyed by ``t``, ``o``, ``h``,
-    ``l``, ``c`` and optionally ``v``. Timestamps are assumed to be
-    milliseconds since epoch.
+    The API returns either:
+    - A list of records: ``[{t, o, h, l, c, v}, ...]``
+    - A dict of parallel arrays: ``{t: [...], o: [...], ...}``
+
+    Timestamps are treated as milliseconds since epoch.
     """
-    df = pd.DataFrame(
-        {
-            "timestamp": pd.to_datetime(data["t"], unit="ms", utc=True),
-            "open": data["o"],
-            "high": data["h"],
-            "low": data["l"],
-            "close": data["c"],
-        }
+    if isinstance(data, list):
+        df = pd.DataFrame(data)
+    else:
+        df = pd.DataFrame(data)
+
+    df = df.rename(
+        columns={"t": "timestamp", "o": "open", "h": "high", "l": "low", "c": "close"}
     )
-    return df
+    df["timestamp"] = pd.to_datetime(df["timestamp"].astype("int64"), unit="ms", utc=True)
+    return df[["timestamp", "open", "high", "low", "close"]]
 
 
 def filter_from_2024(df: pd.DataFrame) -> pd.DataFrame:
@@ -57,10 +76,22 @@ def filter_from_2024(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def fetch_ohlc(
-    client: CSQAQClient, sub_index_id: str, period: str = "4hour"
+    client: CSQAQClient,
+    sub_index_id: str,
+    period: str = "4hour",
+    skip_rate_limit: bool = False,
 ) -> pd.DataFrame:
-    """Fetch and normalise OHLC data for a given sub-index id and period."""
-    raw = get_sub_kline(client, sub_index_id, period, skip_rate_limit=True)
+    """Fetch and normalise OHLC data for a given sub-index id and period.
+
+    Args:
+        client: CSQAQ API client.
+        sub_index_id: Sub-index id.
+        period: K-line period.
+        skip_rate_limit: Bypass client-side rate limiting. Intended for tests.
+    """
+    raw = get_sub_kline(
+        client, sub_index_id, period, skip_rate_limit=skip_rate_limit
+    )
     return normalize_kline(raw)
 
 
@@ -72,6 +103,7 @@ def load_or_fetch(
     sub_index_name: str | None = None,
     period: str | None = None,
     force_refresh: bool = False,
+    skip_rate_limit: bool = False,
 ) -> pd.DataFrame:
     """Load OHLC data from cache or fetch from API, then persist to cache.
 
@@ -84,6 +116,7 @@ def load_or_fetch(
             resolution.
         period: K-line period. Defaults to ``settings.default_period``.
         force_refresh: If True, ignore the cache and refetch from the API.
+        skip_rate_limit: Bypass client-side rate limiting. Intended for tests.
 
     Returns:
         A DataFrame of OHLC data filtered to 2024-01-01 onwards.
@@ -95,7 +128,9 @@ def load_or_fetch(
     if not sub_index_id:
         if not sub_index_name:
             raise ValueError("Either sub_index_id or sub_index_name must be provided")
-        sub_index_id = resolve_sub_index_id(client, sub_index_name)
+        sub_index_id = resolve_sub_index_id(
+            client, sub_index_name, skip_rate_limit=skip_rate_limit
+        )
 
     cache_path = cache_file_path(sub_index_name, period, settings.cache_path)
 
@@ -104,6 +139,6 @@ def load_or_fetch(
         if df is not None:
             return filter_from_2024(df)
 
-    df = fetch_ohlc(client, sub_index_id, period)
+    df = fetch_ohlc(client, sub_index_id, period, skip_rate_limit=skip_rate_limit)
     save(df, cache_path)
     return filter_from_2024(df)
