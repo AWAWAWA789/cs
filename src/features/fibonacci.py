@@ -90,11 +90,12 @@ def is_near_level(
     if target_levels is not None:
         candidates = {name: levels[name] for name in target_levels if name in levels}
 
-    values = list(candidates.values())
-    if not values:
+    if not candidates:
         return False, None, 0.0
 
-    range_size = max(values) - min(values)
+    # Tolerance is relative to the full high-low range, not just the subset.
+    all_values = list(levels.values())
+    range_size = max(all_values) - min(all_values)
     abs_tolerance = tolerance * range_size if range_size > 0 else tolerance
 
     best_name: str | None = None
