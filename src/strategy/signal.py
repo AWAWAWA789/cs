@@ -25,10 +25,12 @@ class SignalParams:
         swing_order: int = 2,
         fib_tolerance: float = 0.03,
         target_levels: tuple[str, ...] = ("0.5", "0.618"),
+        confirmations: int = 2,
     ) -> None:
         self.swing_order = swing_order
         self.fib_tolerance = fib_tolerance
         self.target_levels = target_levels
+        self.confirmations = confirmations
 
 
 def _last_swing_price(
@@ -60,7 +62,9 @@ def generate_signals(df: pd.DataFrame, params: SignalParams | None = None) -> pd
     """
     params = params or SignalParams()
 
-    result = add_structure_features(df, swing_order=params.swing_order)
+    result = add_structure_features(
+        df, swing_order=params.swing_order, confirmations=params.confirmations
+    )
     result = identify_candlestick_patterns(result)
 
     signal_long = pd.Series(False, index=result.index)

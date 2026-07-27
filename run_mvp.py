@@ -58,6 +58,12 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Bind the current IP to the ApiToken whitelist before fetching data.",
     )
+    parser.add_argument(
+        "--confirmations",
+        type=int,
+        default=int(os.getenv("TREND_CONFIRMATIONS", "2")),
+        help="Swing points required to confirm a trend (default: 2).",
+    )
     return parser.parse_args()
 
 
@@ -140,8 +146,16 @@ def main() -> None:
     )
     sub_index_id = settings.sub_index_id or "resolved"
 
-    signal_df = generate_signals(df, SignalParams(swing_order=2, fib_tolerance=0.03))
+    signal_df = generate_signals(
+        df,
+        SignalParams(
+            swing_order=2,
+            fib_tolerance=0.03,
+            confirmations=args.confirmations,
+        ),
+    )
     signal_count = int(signal_df["signal_long"].sum())
+    print(f"Trend confirmations: {args.confirmations}")
     print(f"Long signals generated: {signal_count}")
 
     backtest_result = run_backtest(signal_df, BacktestParams())

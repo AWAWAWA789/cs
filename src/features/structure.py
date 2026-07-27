@@ -67,6 +67,7 @@ def trend_direction(
 def add_structure_features(
     df: pd.DataFrame,
     swing_order: int = 2,
+    confirmations: int = 2,
     high_col: str = "high",
     low_col: str = "low",
 ) -> pd.DataFrame:
@@ -75,7 +76,7 @@ def add_structure_features(
     Adds ``swing_high``, ``swing_low`` and ``trend`` columns.
     """
     result = identify_swing_points(df, high_col=high_col, low_col=low_col, order=swing_order)
-    result["trend"] = trend_direction(result)
+    result["trend"] = trend_direction(result, confirmations=confirmations)
     return result
 
 
