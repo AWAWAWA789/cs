@@ -1,0 +1,1410 @@
+[
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 10257.1873957656,
+      "total_return": 0.025718739576560123,
+      "max_drawdown": -0.020415132157747543,
+      "sharpe_ratio": 1.080186150265915,
+      "total_trades": 10,
+      "win_rate": 0.6,
+      "profit_factor": 1.8027725837889776,
+      "avg_trade_return": 0.0011134007871846559
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 13,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9890.352342807548,
+      "total_return": -0.010964765719245206,
+      "max_drawdown": -0.013237731787006487,
+      "sharpe_ratio": -1.1141546744312054,
+      "total_trades": 13,
+      "win_rate": 0.5384615384615384,
+      "profit_factor": 0.5529118000893238,
+      "avg_trade_return": 0.000980337563252647
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 13,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9890.352342807548,
+      "total_return": -0.010964765719245206,
+      "max_drawdown": -0.013237731787006487,
+      "sharpe_ratio": -1.1141546744312054,
+      "total_trades": 13,
+      "win_rate": 0.5384615384615384,
+      "profit_factor": 0.5529118000893238,
+      "avg_trade_return": 0.000980337563252647
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 13,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9890.352342807548,
+      "total_return": -0.010964765719245206,
+      "max_drawdown": -0.013237731787006487,
+      "sharpe_ratio": -1.1141546744312054,
+      "total_trades": 13,
+      "win_rate": 0.5384615384615384,
+      "profit_factor": 0.5529118000893238,
+      "avg_trade_return": 0.000980337563252647
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 13,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9890.352342807548,
+      "total_return": -0.010964765719245206,
+      "max_drawdown": -0.013237731787006487,
+      "sharpe_ratio": -1.1141546744312054,
+      "total_trades": 13,
+      "win_rate": 0.5384615384615384,
+      "profit_factor": 0.5529118000893238,
+      "avg_trade_return": 0.000980337563252647
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 16,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9882.71913575552,
+      "total_return": -0.011728086424448003,
+      "max_drawdown": -0.017973967229522908,
+      "sharpe_ratio": -1.0804981413961947,
+      "total_trades": 16,
+      "win_rate": 0.5625,
+      "profit_factor": 0.6076613456042366,
+      "avg_trade_return": 0.0006625210447942643
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 16,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9882.71913575552,
+      "total_return": -0.011728086424448003,
+      "max_drawdown": -0.017973967229522908,
+      "sharpe_ratio": -1.0804981413961947,
+      "total_trades": 16,
+      "win_rate": 0.5625,
+      "profit_factor": 0.6076613456042366,
+      "avg_trade_return": 0.0006625210447942643
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 16,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9882.71913575552,
+      "total_return": -0.011728086424448003,
+      "max_drawdown": -0.017973967229522908,
+      "sharpe_ratio": -1.0804981413961947,
+      "total_trades": 16,
+      "win_rate": 0.5625,
+      "profit_factor": 0.6076613456042366,
+      "avg_trade_return": 0.0006625210447942643
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 16,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9882.71913575552,
+      "total_return": -0.011728086424448003,
+      "max_drawdown": -0.017973967229522908,
+      "sharpe_ratio": -1.0804981413961947,
+      "total_trades": 16,
+      "win_rate": 0.5625,
+      "profit_factor": 0.6076613456042366,
+      "avg_trade_return": 0.0006625210447942643
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 6,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9876.79260204021,
+      "total_return": -0.01232073979597903,
+      "max_drawdown": -0.01459058961170158,
+      "sharpe_ratio": -1.7313923281857613,
+      "total_trades": 6,
+      "win_rate": 0.3333333333333333,
+      "profit_factor": 0.16957357635302248,
+      "avg_trade_return": 0.0006594386841616272
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 6,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9876.79260204021,
+      "total_return": -0.01232073979597903,
+      "max_drawdown": -0.01459058961170158,
+      "sharpe_ratio": -1.7313923281857613,
+      "total_trades": 6,
+      "win_rate": 0.3333333333333333,
+      "profit_factor": 0.16957357635302248,
+      "avg_trade_return": 0.0006594386841616272
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 6,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9876.79260204021,
+      "total_return": -0.01232073979597903,
+      "max_drawdown": -0.01459058961170158,
+      "sharpe_ratio": -1.7313923281857613,
+      "total_trades": 6,
+      "win_rate": 0.3333333333333333,
+      "profit_factor": 0.16957357635302248,
+      "avg_trade_return": 0.0006594386841616272
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 6,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9876.79260204021,
+      "total_return": -0.01232073979597903,
+      "max_drawdown": -0.01459058961170158,
+      "sharpe_ratio": -1.7313923281857613,
+      "total_trades": 6,
+      "win_rate": 0.3333333333333333,
+      "profit_factor": 0.16957357635302248,
+      "avg_trade_return": 0.0006594386841616272
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 9,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9793.491389941459,
+      "total_return": -0.020650861005854115,
+      "max_drawdown": -0.02290156682933648,
+      "sharpe_ratio": -2.293437628906257,
+      "total_trades": 9,
+      "win_rate": 0.3333333333333333,
+      "profit_factor": 0.15345860317278892,
+      "avg_trade_return": 0.00012166383120524763
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 9,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9793.491389941459,
+      "total_return": -0.020650861005854115,
+      "max_drawdown": -0.02290156682933648,
+      "sharpe_ratio": -2.293437628906257,
+      "total_trades": 9,
+      "win_rate": 0.3333333333333333,
+      "profit_factor": 0.15345860317278892,
+      "avg_trade_return": 0.00012166383120524763
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9741.128427609483,
+      "total_return": -0.02588715723905166,
+      "max_drawdown": -0.028125829190285365,
+      "sharpe_ratio": -2.6916414485154165,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.1259846362216298,
+      "avg_trade_return": -0.0004350821352120039
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9741.128427609483,
+      "total_return": -0.02588715723905166,
+      "max_drawdown": -0.028125829190285365,
+      "sharpe_ratio": -2.6916414485154165,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.1259846362216298,
+      "avg_trade_return": -0.0004350821352120039
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 3,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9715.26152058191,
+      "total_return": -0.028473847941809072,
+      "max_drawdown": -0.028473847941809072,
+      "sharpe_ratio": -2.582924439896011,
+      "total_trades": 3,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "avg_trade_return": -0.02504317949725506
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 3,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9715.26152058191,
+      "total_return": -0.028473847941809072,
+      "max_drawdown": -0.028473847941809072,
+      "sharpe_ratio": -2.582924439896011,
+      "total_trades": 3,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "avg_trade_return": -0.02504317949725506
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 9,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9614.261382201059,
+      "total_return": -0.03857386177989408,
+      "max_drawdown": -0.04547607098271351,
+      "sharpe_ratio": -2.3872270583343096,
+      "total_trades": 9,
+      "win_rate": 0.3333333333333333,
+      "profit_factor": 0.18520670223695018,
+      "avg_trade_return": -0.0288769147816799
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 9,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9614.261382201059,
+      "total_return": -0.03857386177989408,
+      "max_drawdown": -0.04547607098271351,
+      "sharpe_ratio": -2.3872270583343096,
+      "total_trades": 9,
+      "win_rate": 0.3333333333333333,
+      "profit_factor": 0.18520670223695018,
+      "avg_trade_return": -0.0288769147816799
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 4,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9608.923776348553,
+      "total_return": -0.039107622365144756,
+      "max_drawdown": -0.03910762236514474,
+      "sharpe_ratio": -3.001836545758892,
+      "total_trades": 4,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "avg_trade_return": -0.020037255271296454
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 4,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9608.923776348553,
+      "total_return": -0.039107622365144756,
+      "max_drawdown": -0.03910762236514474,
+      "sharpe_ratio": -3.001836545758892,
+      "total_trades": 4,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "avg_trade_return": -0.020037255271296454
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 6,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9530.571853165173,
+      "total_return": -0.046942814683482714,
+      "max_drawdown": -0.04694281468348272,
+      "sharpe_ratio": -2.9913547425265268,
+      "total_trades": 6,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "avg_trade_return": -0.04517341512332529
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9509.029128217238,
+      "total_return": -0.04909708717827621,
+      "max_drawdown": -0.049547111655063994,
+      "sharpe_ratio": -2.8017503781291273,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.15040702283715845,
+      "avg_trade_return": -0.026491171562853973
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9509.029128217238,
+      "total_return": -0.04909708717827621,
+      "max_drawdown": -0.049547111655063994,
+      "sharpe_ratio": -2.8017503781291273,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.15040702283715845,
+      "avg_trade_return": -0.026491171562853973
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 7,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9426.255617315785,
+      "total_return": -0.05737443826842159,
+      "max_drawdown": -0.05737443826842154,
+      "sharpe_ratio": -3.3576225731072875,
+      "total_trades": 7,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "avg_trade_return": -0.03943713904762462
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 13,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9413.113837574247,
+      "total_return": -0.058688616242575375,
+      "max_drawdown": -0.06544641888326215,
+      "sharpe_ratio": -3.1952227961445834,
+      "total_trades": 13,
+      "win_rate": 0.3076923076923077,
+      "profit_factor": 0.13256081737718542,
+      "avg_trade_return": -0.023285714543279292
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 13,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9413.113837574247,
+      "total_return": -0.058688616242575375,
+      "max_drawdown": -0.06544641888326215,
+      "sharpe_ratio": -3.1952227961445834,
+      "total_trades": 13,
+      "win_rate": 0.3076923076923077,
+      "profit_factor": 0.13256081737718542,
+      "avg_trade_return": -0.023285714543279292
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 2,
+      "trend_strength_threshold": 25.0,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": true
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9360.595014140154,
+      "total_return": -0.0639404985859846,
+      "max_drawdown": -0.06394049858598465,
+      "sharpe_ratio": -3.0619231770519253,
+      "total_trades": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.0670717728401351,
+      "avg_trade_return": -0.007641208083783426
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": true,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 9,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9329.292310665573,
+      "total_return": -0.06707076893344277,
+      "max_drawdown": -0.06707076893344274,
+      "sharpe_ratio": -3.7373237371754895,
+      "total_trades": 9,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "avg_trade_return": -0.034895856057656854
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 14,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9310.083230567032,
+      "total_return": -0.06899167694329678,
+      "max_drawdown": -0.06943228610309571,
+      "sharpe_ratio": -3.5327470948812607,
+      "total_trades": 14,
+      "win_rate": 0.2857142857142857,
+      "profit_factor": 0.11415139801817793,
+      "avg_trade_return": -0.02198098368971796
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": false,
+      "volatility_atr_multiplier": 1.0,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 14,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9310.083230567032,
+      "total_return": -0.06899167694329678,
+      "max_drawdown": -0.06943228610309571,
+      "sharpe_ratio": -3.5327470948812607,
+      "total_trades": 14,
+      "win_rate": 0.2857142857142857,
+      "profit_factor": 0.11415139801817793,
+      "avg_trade_return": -0.02198098368971796
+    }
+  },
+  {
+    "params": {
+      "swing_order": 1,
+      "trend_strength_threshold": null,
+      "use_di_filter": false,
+      "use_volatility_filter": true,
+      "volatility_atr_multiplier": 0.5,
+      "use_pullback_confirmation": false
+    },
+    "signal_count": 10,
+    "metrics": {
+      "initial_capital": 10000.0,
+      "final_equity": 9227.179166566659,
+      "total_return": -0.07728208334333408,
+      "max_drawdown": -0.07728208334333413,
+      "sharpe_ratio": -4.040794304403836,
+      "total_trades": 10,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "avg_trade_return": -0.031908218711233234
+    }
+  }
+]

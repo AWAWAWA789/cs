@@ -1,0 +1,69 @@
+{
+  "generated_at": "2026-07-27T17:01:40.947513+00:00",
+  "sub_index_name": "百元主战",
+  "sub_index_id": "resolved",
+  "period": "1day",
+  "bars": 938,
+  "date_range": {
+    "start": "2024-01-01 16:00:00+00:00",
+    "end": "2026-07-26 16:00:00+00:00"
+  },
+  "ensemble_params": {
+    "mode": "union",
+    "adx_threshold": 25.0,
+    "regime_confirmations": 4,
+    "trend_strength_threshold": 25.0
+  },
+  "strategies": [
+    {
+      "name": "Pullback",
+      "metrics": {
+        "initial_capital": 10000.0,
+        "final_equity": 14966.388083897456,
+        "total_return": 0.4966388083897457,
+        "max_drawdown": -0.1210525663286221,
+        "sharpe_ratio": 2.084432794226791,
+        "total_trades": 43,
+        "win_rate": 0.3953488372093023,
+        "profit_factor": 2.0926548856582277,
+        "avg_trade_return": 0.0057482865545651,
+        "signal_count": 118
+      }
+    },
+    {
+      "name": "Trend-Following",
+      "metrics": {
+        "initial_capital": 10000.0,
+        "final_equity": 9549.100987591803,
+        "total_return": -0.045089901240819796,
+        "max_drawdown": -0.04635844727926546,
+        "sharpe_ratio": -2.463650567793789,
+        "total_trades": 13,
+        "win_rate": 0.38461538461538464,
+        "profit_factor": 0.25910764737557446,
+        "avg_trade_return": -0.00872533639555243,
+        "signal_count": 14
+      }
+    },
+    {
+      "name": "Ensemble",
+      "metrics": {
+        "initial_capital": 10000.0,
+        "final_equity": 14157.730149646792,
+        "total_return": 0.4157730149646792,
+        "max_drawdown": -0.12105256632862202,
+        "sharpe_ratio": 1.8261327721112477,
+        "total_trades": 48,
+        "win_rate": 0.3541666666666667,
+        "profit_factor": 1.8227304922601013,
+        "avg_trade_return": -7.936724984654077e-05,
+        "signal_count": 128
+      }
+    }
+  ],
+  "benchmark": {
+    "start_price": 749.74,
+    "end_price": 2974.85,
+    "total_return": 2.9678421852909005
+  }
+}
