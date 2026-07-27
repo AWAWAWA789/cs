@@ -94,10 +94,76 @@ def higher_high_breakout(
     return result
 
 
+def breakout_pullback_confirmation(
+    df: pd.DataFrame,
+    breakout_col: str = "breakout_follow_through",
+    swing_high_col: str = "swing_high",
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+    open_col: str = "open",
+    lookback: int = 5,
+    buffer: float = 0.005,
+) -> pd.Series:
+    """Return True after a breakout when price pulls back to the breakout zone
+    and confirms support with a bullish close.
+
+    Logic:
+    - Identify raw breakout bars from ``breakout_col``.
+    - The breakout level is the most recent swing high price at the breakout bar.
+    - Within the next ``lookback`` bars, look for a bar whose low touches or
+      drops slightly below the breakout level (within ``buffer``) but whose
+      close holds at or above the breakout level.
+    - Enter on the confirming bar if it is bullish.
+
+    This reduces buying at the top of a breakout that immediately reverses.
+    """
+    swing_high_prices = df[high_col].where(df[swing_high_col]).ffill()
+    breakout = df[breakout_col].fillna(False)
+
+    low = df[low_col]
+    close = df[close_col]
+    open_ = df[open_col]
+
+    result = pd.Series(False, index=df.index)
+    breakout_levels = pd.Series(dtype=float, index=df.index)
+
+    # Record the breakout level for each breakout bar.
+    for i in range(len(df)):
+        if breakout.iloc[i]:
+            breakout_levels.iloc[i] = swing_high_prices.iloc[i]
+
+    for j in range(len(df)):
+        if not breakout.iloc[j]:
+            continue
+        level = breakout_levels.iloc[j]
+        if pd.isna(level):
+            continue
+
+        # Search within the lookback window after the breakout bar.
+        end = min(len(df), j + lookback + 1)
+        for k in range(j + 1, end):
+            lower_bound = level * (1 - buffer)
+            touched = low.iloc[k] <= level * (1 + buffer)
+            held = close.iloc[k] >= lower_bound
+            bullish = close.iloc[k] > open_.iloc[k]
+            if touched and held and bullish:
+                result.iloc[k] = True
+                break
+
+    return result
+
+
 def add_trend_following_features(
     df: pd.DataFrame,
     trend_strength_threshold: float | None = None,
     adx_period: int = 14,
+    use_di_filter: bool = False,
+    use_volatility_filter: bool = False,
+    volatility_atr_multiplier: float = 0.5,
+    use_pullback_confirmation: bool = False,
+    pullback_lookback: int = 5,
+    pullback_buffer: float = 0.005,
     **kwargs,
 ) -> pd.DataFrame:
     """Add trend-following feature columns to ``df``.
@@ -105,20 +171,50 @@ def add_trend_following_features(
     Adds:
     - ``breakout_follow_through``: basic swing-high breakout signal.
     - ``higher_high_breakout``: multi-swing-high breakout signal.
+    - ``breakout_pullback``: breakout followed by a pullback retest.
 
-    When ``trend_strength_threshold`` is provided, an ADX-style trend-strength
-    oscillator is computed and both breakout columns are AND-ed with
-    ``adx >= threshold``.  This filters out false breakouts in weak or choppy
-    markets.
+    Filtering options:
+    - ``trend_strength_threshold``: when provided, breakout signals are AND-ed
+      with ``adx >= threshold``.
+    - ``use_di_filter``: additionally require ``di_plus > di_minus`` so that
+      only upward directional movement is accepted.
+    - ``use_volatility_filter``: require the breakout magnitude (high - swing
+      high) to exceed ``volatility_atr_multiplier * atr``.
+    - ``use_pullback_confirmation``: generate a separate pullback-confirmed
+      breakout column instead of the immediate breakout.
     """
     result = df.copy()
     result["breakout_follow_through"] = breakout_with_follow_through(result, **kwargs)
     result["higher_high_breakout"] = higher_high_breakout(result, **kwargs)
 
-    if trend_strength_threshold is not None:
+    if use_pullback_confirmation:
+        result["breakout_pullback"] = breakout_pullback_confirmation(
+            result,
+            breakout_col="breakout_follow_through",
+            lookback=pullback_lookback,
+            buffer=pullback_buffer,
+        )
+
+    if trend_strength_threshold is not None or use_di_filter or use_volatility_filter:
         result = add_trend_strength_features(result, period=adx_period)
-        strength_ok = result["adx"] >= trend_strength_threshold
-        result["breakout_follow_through"] = result["breakout_follow_through"] & strength_ok
-        result["higher_high_breakout"] = result["higher_high_breakout"] & strength_ok
+
+        if trend_strength_threshold is not None:
+            strength_ok = result["adx"] >= trend_strength_threshold
+            result["breakout_follow_through"] = result["breakout_follow_through"] & strength_ok
+            result["higher_high_breakout"] = result["higher_high_breakout"] & strength_ok
+
+        if use_di_filter:
+            di_ok = result["di_plus"] > result["di_minus"]
+            result["breakout_follow_through"] = result["breakout_follow_through"] & di_ok
+            result["higher_high_breakout"] = result["higher_high_breakout"] & di_ok
+
+        if use_volatility_filter:
+            swing_high_prices = result[kwargs.get("high_col", "high")].where(
+                result[kwargs.get("swing_high_col", "swing_high")]
+            ).ffill()
+            breakout_size = result[kwargs.get("high_col", "high")] - swing_high_prices
+            volatility_ok = breakout_size >= volatility_atr_multiplier * result["atr"]
+            result["breakout_follow_through"] = result["breakout_follow_through"] & volatility_ok
+            result["higher_high_breakout"] = result["higher_high_breakout"] & volatility_ok
 
     return result

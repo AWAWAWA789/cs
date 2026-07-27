@@ -61,7 +61,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         default="regime_switch",
-        choices=["regime_switch", "union"],
+        choices=["regime_switch", "union", "dynamic_weight"],
         help="Ensemble mode (default: regime_switch).",
     )
     parser.add_argument(
@@ -81,6 +81,50 @@ def _parse_args() -> argparse.Namespace:
         type=float,
         default=25.0,
         help="ADX threshold for trend-following signals (default: 25.0).",
+    )
+    parser.add_argument(
+        "--trend-use-di-filter",
+        action="store_true",
+        help="Require +DI > -DI for trend-following signals.",
+    )
+    parser.add_argument(
+        "--trend-use-volatility-filter",
+        action="store_true",
+        help="Require breakout size to exceed ATR * multiplier.",
+    )
+    parser.add_argument(
+        "--trend-volatility-atr-multiplier",
+        type=float,
+        default=0.5,
+        help="ATR multiplier for volatility filter (default: 0.5).",
+    )
+    parser.add_argument(
+        "--trend-use-pullback-confirmation",
+        action="store_true",
+        help="Wait for a pullback retest before entering breakouts.",
+    )
+    parser.add_argument(
+        "--trend-pullback-lookback",
+        type=int,
+        default=5,
+        help="Lookback bars for pullback confirmation (default: 5).",
+    )
+    parser.add_argument(
+        "--trend-pullback-buffer",
+        type=float,
+        default=0.005,
+        help="Buffer around breakout level for pullback confirmation (default: 0.005).",
+    )
+    parser.add_argument(
+        "--use-signal-quality",
+        action="store_true",
+        help="Enable signal quality scoring and filtering.",
+    )
+    parser.add_argument(
+        "--min-signal-quality",
+        type=float,
+        default=0.0,
+        help="Minimum signal quality score [0, 1] (default: 0.0).",
     )
     parser.add_argument(
         "--charts",
@@ -186,6 +230,8 @@ def main() -> None:
         confirmations=1,
         use_smart_money=True,
         use_trend_following=False,
+        use_signal_quality=args.use_signal_quality,
+        min_signal_quality=args.min_signal_quality,
     )
     trend_params = TrendFollowingParams(
         swing_order=2,
@@ -193,6 +239,12 @@ def main() -> None:
         trend_strength_threshold=args.trend_strength_threshold,
         use_higher_high_breakout=False,
         require_uptrend=True,
+        use_di_filter=args.trend_use_di_filter,
+        use_volatility_filter=args.trend_use_volatility_filter,
+        volatility_atr_multiplier=args.trend_volatility_atr_multiplier,
+        use_pullback_confirmation=args.trend_use_pullback_confirmation,
+        pullback_lookback=args.trend_pullback_lookback,
+        pullback_buffer=args.trend_pullback_buffer,
     )
     ensemble_params = EnsembleParams(
         pullback_params=pullback_params,
@@ -200,6 +252,8 @@ def main() -> None:
         mode=args.mode,
         adx_threshold=args.adx_threshold,
         regime_confirmations=args.regime_confirmations,
+        use_signal_quality=args.use_signal_quality,
+        min_signal_quality=args.min_signal_quality,
     )
 
     pullback_df = generate_signals(df, pullback_params)

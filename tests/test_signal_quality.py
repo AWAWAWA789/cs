@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.features.signal_quality import structure_resonance
+from src.features.signal_quality import (
+    add_signal_quality_features,
+    structure_resonance,
+)
 from src.strategy.signal import SignalParams, generate_signals
 
 
@@ -73,3 +76,65 @@ def test_resonance_filter_removes_far_smart_money_signal():
     filt_df = generate_signals(df, filtered)
     assert base_df["signal_long"].iloc[-1]
     assert not filt_df["signal_long"].iloc[-1]
+
+
+def test_signal_quality_score_added_when_enabled():
+    df = _make_liquidity_grab_near_swing_low()
+    params = SignalParams(
+        swing_order=1,
+        fib_tolerance=0.5,
+        confirmations=1,
+        use_smart_money=True,
+        liquidity_grab_buffer=0.01,
+        use_signal_quality=True,
+    )
+    result = generate_signals(df, params)
+    assert "signal_quality" in result.columns
+    # Non-signal bars receive a quality of 0.
+    assert (result.loc[~result["signal_long"], "signal_quality"] == 0.0).all()
+    # Signal bars receive a positive quality score.
+    signal_scores = result.loc[result["signal_long"], "signal_quality"]
+    assert (signal_scores > 0.0).all()
+
+
+def test_min_signal_quality_filters_marginal_signals():
+    df = _make_liquidity_grab_near_swing_low()
+    low_threshold = SignalParams(
+        swing_order=1,
+        fib_tolerance=0.5,
+        confirmations=1,
+        use_smart_money=True,
+        liquidity_grab_buffer=0.01,
+        use_signal_quality=True,
+        min_signal_quality=0.0,
+    )
+    high_threshold = SignalParams(
+        swing_order=1,
+        fib_tolerance=0.5,
+        confirmations=1,
+        use_smart_money=True,
+        liquidity_grab_buffer=0.01,
+        use_signal_quality=True,
+        min_signal_quality=1.0,
+    )
+    low_df = generate_signals(df, low_threshold)
+    high_df = generate_signals(df, high_threshold)
+    assert low_df["signal_long"].sum() >= high_df["signal_long"].sum()
+
+
+def test_add_signal_quality_features_scores_signal_bars_only():
+    df = pd.DataFrame(
+        {
+            "open": [1.0, 1.82, 1.5, 2.5],
+            "high": [1.2, 2.0, 1.8, 2.8],
+            "low": [0.8, 1.78, 1.4, 2.2],
+            "close": [1.0, 1.81, 1.5, 2.5],
+            "signal_long": [False, True, False, False],
+            "signal_swing_low": [None, 1.8, None, None],
+        }
+    )
+    result = add_signal_quality_features(df)
+    assert result["signal_quality"].iloc[0] == 0.0
+    assert result["signal_quality"].iloc[2] == 0.0
+    assert result["signal_quality"].iloc[3] == 0.0
+    assert result["signal_quality"].iloc[1] > 0.0

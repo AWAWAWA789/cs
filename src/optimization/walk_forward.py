@@ -110,6 +110,32 @@ def _scan_point_from_dict(params: dict[str, Any]) -> ScanPoint:
         ensemble_trend_strength_threshold=params.get(
             "ensemble_trend_strength_threshold", 25.0
         ),
+        ensemble_dynamic_weight_min=params.get("ensemble_dynamic_weight_min", 0.2),
+        ensemble_dynamic_weight_max=params.get("ensemble_dynamic_weight_max", 0.8),
+        ensemble_dynamic_weight_adx_scale=params.get(
+            "ensemble_dynamic_weight_adx_scale", 25.0
+        ),
+        ensemble_use_signal_quality=params.get("ensemble_use_signal_quality", False),
+        ensemble_min_signal_quality=params.get("ensemble_min_signal_quality", 0.0),
+        ensemble_quality_trend_weight=params.get(
+            "ensemble_quality_trend_weight", 0.4
+        ),
+        ensemble_quality_structure_weight=params.get(
+            "ensemble_quality_structure_weight", 0.4
+        ),
+        ensemble_quality_confluence_weight=params.get(
+            "ensemble_quality_confluence_weight", 0.2
+        ),
+        trend_use_di_filter=params.get("trend_use_di_filter", False),
+        trend_use_volatility_filter=params.get("trend_use_volatility_filter", False),
+        trend_volatility_atr_multiplier=params.get(
+            "trend_volatility_atr_multiplier", 0.5
+        ),
+        trend_use_pullback_confirmation=params.get(
+            "trend_use_pullback_confirmation", False
+        ),
+        trend_pullback_lookback=params.get("trend_pullback_lookback", 5),
+        trend_pullback_buffer=params.get("trend_pullback_buffer", 0.005),
     )
 
 

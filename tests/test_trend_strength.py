@@ -19,10 +19,11 @@ def test_adx_is_zero_for_flat_prices():
             "close": [100.0] * 20,
         }
     )
-    adx, di_plus, di_minus = average_directional_index(df, period=14)
+    adx, di_plus, di_minus, atr = average_directional_index(df, period=14)
     assert adx.iloc[-1] == 0
     assert di_plus.iloc[-1] == 0
     assert di_minus.iloc[-1] == 0
+    assert atr.iloc[-1] == 0
 
 
 def test_adx_rises_in_strong_uptrend():
@@ -35,10 +36,11 @@ def test_adx_rises_in_strong_uptrend():
         },
         dtype=float,
     )
-    adx, di_plus, di_minus = average_directional_index(df, period=14)
+    adx, di_plus, di_minus, atr = average_directional_index(df, period=14)
     # In a steady rising market DI+ should dominate and ADX should be elevated.
     assert di_plus.iloc[-1] > di_minus.iloc[-1]
     assert adx.iloc[-1] > 20
+    assert atr.iloc[-1] > 0
 
 
 def test_add_trend_strength_features_adds_columns():
@@ -54,3 +56,4 @@ def test_add_trend_strength_features_adds_columns():
     assert "adx" in result.columns
     assert "di_plus" in result.columns
     assert "di_minus" in result.columns
+    assert "atr" in result.columns

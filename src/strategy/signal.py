@@ -15,7 +15,7 @@ import pandas as pd
 from src.features.candlestick import identify_candlestick_patterns
 from src.features.fibonacci import is_near_level, retracement_levels
 from src.features.market_regime import add_market_regime_feature
-from src.features.signal_quality import structure_resonance
+from src.features.signal_quality import add_signal_quality_features, structure_resonance
 from src.features.smart_money import add_smart_money_features
 from src.features.structure import add_structure_features
 from src.features.trend_following import add_trend_following_features
@@ -39,6 +39,11 @@ class SignalParams:
         market_regime_confirmations: int = 4,
         require_structure_resonance: bool = False,
         structure_resonance_buffer: float = 0.03,
+        use_signal_quality: bool = False,
+        min_signal_quality: float = 0.0,
+        quality_trend_weight: float = 0.4,
+        quality_structure_weight: float = 0.4,
+        quality_confluence_weight: float = 0.2,
     ) -> None:
         self.swing_order = swing_order
         self.fib_tolerance = fib_tolerance
@@ -53,6 +58,11 @@ class SignalParams:
         self.market_regime_confirmations = market_regime_confirmations
         self.require_structure_resonance = require_structure_resonance
         self.structure_resonance_buffer = structure_resonance_buffer
+        self.use_signal_quality = use_signal_quality
+        self.min_signal_quality = min_signal_quality
+        self.quality_trend_weight = quality_trend_weight
+        self.quality_structure_weight = quality_structure_weight
+        self.quality_confluence_weight = quality_confluence_weight
 
 
 def _last_swing_price(
@@ -125,6 +135,11 @@ def generate_signals(
             confirmations=params.market_regime_confirmations,
         )
 
+    # Pre-compute diagnostics used by the signal-quality scorer.
+    near_fib = pd.Series(False, index=result.index)
+    fib_level_name = pd.Series("", index=result.index, dtype=object)
+    has_bullish_pattern = pd.Series(False, index=result.index)
+
     signal_long = pd.Series(False, index=result.index)
     signal_reason = pd.Series("", index=result.index, dtype=object)
     swing_low_prices = pd.Series(dtype=float, index=result.index)
@@ -154,10 +169,13 @@ def generate_signals(
             tolerance=params.fib_tolerance,
             target_levels=params.target_levels,
         )
+        near_fib.iloc[i] = near
+        fib_level_name.iloc[i] = level_name
 
         has_pattern = (
             result["pin_bar_bull"].iloc[i] or result["engulfing_bull"].iloc[i]
         )
+        has_bullish_pattern.iloc[i] = has_pattern
 
         smart_money = False
         smart_money_reason = ""
@@ -206,8 +224,32 @@ def generate_signals(
             elif trend_following:
                 signal_reason.iloc[i] = trend_following_reason
 
+    result["near_fib"] = near_fib
+    result["fib_level_name"] = fib_level_name
+    result["has_bullish_pattern"] = has_bullish_pattern
     result["signal_long"] = signal_long
     result["signal_reason"] = signal_reason
     result["signal_swing_low"] = swing_low_prices
     result["signal_swing_high"] = swing_high_prices
+
+    if params.use_signal_quality:
+        result = add_signal_quality_features(
+            result,
+            trend_weight=params.quality_trend_weight,
+            structure_weight=params.quality_structure_weight,
+            confluence_weight=params.quality_confluence_weight,
+        )
+        if params.min_signal_quality > 0.0:
+            quality_mask = result["signal_quality"] >= params.min_signal_quality
+            result["signal_long"] = result["signal_long"] & quality_mask
+            result["signal_reason"] = result["signal_reason"].where(
+                result["signal_long"], ""
+            )
+            result["signal_swing_low"] = result["signal_swing_low"].where(
+                result["signal_long"]
+            )
+            result["signal_swing_high"] = result["signal_swing_high"].where(
+                result["signal_long"]
+            )
+
     return result
