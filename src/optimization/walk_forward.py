@@ -100,6 +100,10 @@ def _scan_point_from_dict(params: dict[str, Any]) -> ScanPoint:
         use_smart_money=params["use_smart_money"],
         liquidity_grab_buffer=params["liquidity_grab_buffer"],
         use_trend_following=params["use_trend_following"],
+        require_structure_resonance=params.get("require_structure_resonance", False),
+        structure_resonance_buffer=params.get("structure_resonance_buffer", 0.03),
+        use_market_regime_filter=params.get("use_market_regime_filter", False),
+        market_regime_confirmations=params.get("market_regime_confirmations", 4),
     )
 
 
