@@ -153,3 +153,32 @@ def test_history_dtw_method(client):
     )
     assert response.status_code == 200
     assert response.json()["method"] == "dtw"
+
+
+def test_history_respects_n_neighbors(client):
+    response = client.get(
+        "/scenario/history",
+        params={"sub_index": "手套", "period": "1day", "method": "knn", "n_neighbors": 3},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["matches"]) <= 3
+
+
+def test_templates_respects_min_confidence(client):
+    response = client.get(
+        "/scenario/templates",
+        params={"sub_index": "手套", "period": "1day", "min_confidence": 0.95},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert all(m["confidence"] >= 0.95 for m in data["matches"])
+
+
+def test_monitoring_records_requests(client):
+    from src.api.monitoring import COLLECTOR
+
+    before = COLLECTOR.metrics()["request_count"]
+    client.get("/scenario/meta")
+    after = COLLECTOR.metrics()["request_count"]
+    assert after > before
