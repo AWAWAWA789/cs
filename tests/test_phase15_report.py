@@ -15,7 +15,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from generate_phase15_report import build_phase15_report
 
 
-def test_report_contains_brier_and_benchmark(tmp_path: Path, monkeypatch) -> None:
+def test_report_contains_buy_and_hold_benchmark(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr("generate_phase15_report.DEFAULT_OUTPUT_DIR", tmp_path)
     df = pd.DataFrame({
         "timestamp": pd.date_range("2024-01-01", periods=10, freq="D", tz="UTC"),
