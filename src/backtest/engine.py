@@ -42,6 +42,7 @@ class BacktestParams:
     risk_fraction: float = 0.02
     stop_loss_buffer: float = 0.002
     tp_target: str = "1.272"
+    max_position_fraction: float = 1.0
 
 
 @dataclass
@@ -129,6 +130,13 @@ def run_backtest(
                 equity_values[-1], params.risk_fraction, entry_price, stop_price
             )
             if size > 0:
+                # Cap position size so the notional exposure does not exceed
+                # the configured fraction of current equity. This prevents
+                # oversized positions on volatile sub-indices with tight stops.
+                max_size = (
+                    equity_values[-1] * params.max_position_fraction
+                ) / entry_price
+                size = min(size, max_size)
                 open_trade = Trade(
                     entry_index=i,
                     entry_time=df.index[i],

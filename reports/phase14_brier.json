@@ -1,0 +1,88 @@
+{
+  "sub_indices": [
+    "匕首",
+    "手套",
+    "百元主战",
+    "贴纸"
+  ],
+  "horizons": [
+    5,
+    7
+  ],
+  "walk_forward_params": {
+    "min_bars": 200,
+    "step_bars": 20
+  },
+  "aggregate": {
+    "horizon_5": {
+      "brier_score": 0.33713,
+      "n_samples": 192,
+      "mean_probability": 0.737983,
+      "mean_outcome": 0.59375
+    },
+    "horizon_7": {
+      "brier_score": 0.333412,
+      "n_samples": 192,
+      "mean_probability": 0.737983,
+      "mean_outcome": 0.609375
+    }
+  },
+  "per_sub_index": {
+    "匕首": {
+      "horizon_5": {
+        "brier_score": 0.252398,
+        "n_samples": 48,
+        "mean_probability": 0.488661,
+        "mean_outcome": 0.604167
+      },
+      "horizon_7": {
+        "brier_score": 0.253321,
+        "n_samples": 48,
+        "mean_probability": 0.488661,
+        "mean_outcome": 0.645833
+      }
+    },
+    "手套": {
+      "horizon_5": {
+        "brier_score": 0.354004,
+        "n_samples": 48,
+        "mean_probability": 0.970874,
+        "mean_outcome": 0.625
+      },
+      "horizon_7": {
+        "brier_score": 0.354004,
+        "n_samples": 48,
+        "mean_probability": 0.970874,
+        "mean_outcome": 0.625
+      }
+    },
+    "百元主战": {
+      "horizon_5": {
+        "brier_score": 0.510962,
+        "n_samples": 48,
+        "mean_probability": 0.970874,
+        "mean_outcome": 0.458333
+      },
+      "horizon_7": {
+        "brier_score": 0.491342,
+        "n_samples": 48,
+        "mean_probability": 0.970874,
+        "mean_outcome": 0.479167
+      }
+    },
+    "贴纸": {
+      "horizon_5": {
+        "brier_score": 0.231156,
+        "n_samples": 48,
+        "mean_probability": 0.521523,
+        "mean_outcome": 0.6875
+      },
+      "horizon_7": {
+        "brier_score": 0.234981,
+        "n_samples": 48,
+        "mean_probability": 0.521523,
+        "mean_outcome": 0.6875
+      }
+    }
+  }
+}

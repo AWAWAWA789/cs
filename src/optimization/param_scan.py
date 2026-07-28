@@ -60,6 +60,8 @@ class ScanPoint:
     trend_use_pullback_confirmation: bool = False
     trend_pullback_lookback: int = 5
     trend_pullback_buffer: float = 0.005
+    risk_fraction: float = 0.02
+    max_position_fraction: float = 1.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -94,6 +96,8 @@ class ScanPoint:
             "trend_use_pullback_confirmation": self.trend_use_pullback_confirmation,
             "trend_pullback_lookback": self.trend_pullback_lookback,
             "trend_pullback_buffer": self.trend_pullback_buffer,
+            "risk_fraction": self.risk_fraction,
+            "max_position_fraction": self.max_position_fraction,
         }
 
 
@@ -217,6 +221,112 @@ def ensemble_grid() -> list[ScanPoint]:
     return points
 
 
+def phase9_grid(sub_index: str) -> list[ScanPoint]:
+    """Return a per-sub-index grid focused on tp/sl and signal quality for phase 9.
+
+    The grid starts from the known phase-8 baseline for each weak sub-index and
+    only perturbs the parameters most likely to improve out-of-sample stability:
+    take-profit, stop-loss, ensemble mode and signal-quality threshold. This
+    avoids the overfitting observed when a broad tp/sl/quality grid was applied
+    to 百元主战.
+    """
+    baselines = {
+        "百元主战": {
+            "swing_order": 1,
+            "fib_tolerance": 0.03,
+            "tp_target": "1.272",
+            "stop_loss_buffer": 0.002,
+        },
+        "匕首": {
+            "swing_order": 1,
+            "fib_tolerance": 0.03,
+            "tp_target": "1.272",
+            "stop_loss_buffer": 0.005,
+        },
+    }
+    baseline = baselines.get(
+        sub_index,
+        {
+            "swing_order": 2,
+            "fib_tolerance": 0.03,
+            "tp_target": "1.618",
+            "stop_loss_buffer": 0.002,
+        },
+    )
+
+    base = {
+        "confirmations": 1,
+        "target_levels": ("0.5", "0.618"),
+        "use_smart_money": True,
+        "liquidity_grab_buffer": 0.005,
+        "use_trend_following": False,
+        "require_structure_resonance": False,
+        "structure_resonance_buffer": 0.03,
+        "use_market_regime_filter": False,
+        "market_regime_confirmations": 4,
+        "ensemble_adx_threshold": 25.0,
+        "ensemble_regime_confirmations": 4,
+        "ensemble_trend_strength_threshold": 25.0,
+        "ensemble_dynamic_weight_min": 0.2,
+        "ensemble_dynamic_weight_max": 0.8,
+        "ensemble_dynamic_weight_adx_scale": 25.0,
+        "ensemble_use_signal_quality": False,
+        "ensemble_quality_trend_weight": 0.4,
+        "ensemble_quality_structure_weight": 0.4,
+        "ensemble_quality_confluence_weight": 0.2,
+        "trend_use_di_filter": False,
+        "trend_use_volatility_filter": False,
+        "trend_volatility_atr_multiplier": 0.5,
+        "trend_use_pullback_confirmation": False,
+        "trend_pullback_lookback": 5,
+        "trend_pullback_buffer": 0.005,
+    }
+    base.update(baseline)
+
+    # Sub-index-specific perturbation ranges. 百元主战 benefits from a tight
+    # grid around the known phase-8 baseline; 匕首 needs to explore fib
+    # tolerance and confirmation depth to find a stable configuration.
+    if sub_index == "百元主战":
+        tp_targets = (baseline["tp_target"], "1.618")
+        stop_loss_buffers = (baseline["stop_loss_buffer"], 0.005)
+        fib_tolerances = (baseline["fib_tolerance"],)
+        confirmations_list = (1,)
+        ensemble_modes = (None, "regime_switch", "dynamic_weight")
+        signal_qualities = ((False, 0.0), (True, 0.3))
+    elif sub_index == "匕首":
+        tp_targets = (baseline["tp_target"], "1.618")
+        stop_loss_buffers = (baseline["stop_loss_buffer"], 0.002)
+        fib_tolerances = (0.03, 0.05, 0.08)
+        confirmations_list = (1, 2)
+        ensemble_modes = (None, "regime_switch")
+        signal_qualities = ((False, 0.0), (True, 0.3))
+    else:
+        tp_targets = (baseline["tp_target"], "1.618")
+        stop_loss_buffers = (baseline["stop_loss_buffer"], 0.005)
+        fib_tolerances = (baseline["fib_tolerance"],)
+        confirmations_list = (1,)
+        ensemble_modes = (None, "regime_switch", "dynamic_weight")
+        signal_qualities = ((False, 0.0), (True, 0.3))
+
+    points: list[ScanPoint] = []
+    for tp_target in tp_targets:
+        for stop_loss_buffer in stop_loss_buffers:
+            for fib_tolerance in fib_tolerances:
+                for confirmations in confirmations_list:
+                    for ensemble_mode in ensemble_modes:
+                        for use_signal_quality, min_signal_quality in signal_qualities:
+                            params = dict(base)
+                            params["tp_target"] = tp_target
+                            params["stop_loss_buffer"] = stop_loss_buffer
+                            params["fib_tolerance"] = fib_tolerance
+                            params["confirmations"] = confirmations
+                            params["ensemble_mode"] = ensemble_mode
+                            params["ensemble_use_signal_quality"] = use_signal_quality
+                            params["ensemble_min_signal_quality"] = min_signal_quality
+                            points.append(ScanPoint(**params))
+    return points
+
+
 def _signal_params(point: ScanPoint) -> SignalParams:
     return SignalParams(
         swing_order=point.swing_order,
@@ -243,6 +353,8 @@ def _backtest_params(point: ScanPoint) -> BacktestParams:
     return BacktestParams(
         tp_target=point.tp_target,
         stop_loss_buffer=point.stop_loss_buffer,
+        risk_fraction=point.risk_fraction,
+        max_position_fraction=point.max_position_fraction,
     )
 
 
@@ -383,7 +495,7 @@ def main() -> None:
         "--grid",
         type=str,
         default="default",
-        choices=["default", "ensemble"],
+        choices=["default", "ensemble", "phase9"],
         help="Parameter grid to use (default: default).",
     )
     args = parser.parse_args()
@@ -402,6 +514,8 @@ def main() -> None:
     grid: list[ScanPoint]
     if args.grid == "ensemble":
         grid = ensemble_grid()
+    elif args.grid == "phase9":
+        grid = phase9_grid(args.sub_index_name)
     else:
         grid = default_grid()
 

@@ -1,0 +1,110 @@
+[
+  {
+    "name": "double_bottom_bullish",
+    "category": "reversal",
+    "direction": "bullish",
+    "description": "双底（W 底）：两个相近低点后突破颈线，形成底部反转。",
+    "rules": [
+      "两个底部低点接近。",
+      "中间高点构成颈线。",
+      "收盘价突破颈线确认。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 20,
+    "structure": {
+      "sequence": [
+        {"label": "B1", "type": "low"},
+        {"label": "N1", "type": "high"},
+        {"label": "B2", "type": "low"},
+        {"label": "N2", "type": "high"}
+      ],
+      "structural_conditions": [
+        {"type": "higher_high", "left": "N1", "right": "N2"}
+      ],
+      "price_conditions": [
+        {
+          "type": "price_ratio",
+          "left": "B1",
+          "right": "B2",
+          "base": "B1",
+          "min_ratio": 0.0,
+          "max_ratio": 0.05
+        },
+        {
+          "type": "breakout",
+          "level": "N1",
+          "direction": "bullish",
+          "require_cross": false,
+          "comment": "当前 K 线收盘价突破第一个颈线高点，确认双底完成。"
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "B1", "end": "N2", "value": 8},
+        {"type": "max_bars", "start": "B1", "end": "N2", "value": 70},
+        {"type": "max_gap", "value": 15}
+      ]
+    },
+    "projection": {
+      "support": "min(B1, B2)",
+      "resistance": "N2",
+      "target": "N2 + (N2 - min(B1, B2))",
+      "stop_loss": "min(B1, B2) - 0.5 * atr",
+      "suggestion": "long",
+      "probability_prior": 0.54
+    }
+  },
+  {
+    "name": "double_top_bearish",
+    "category": "reversal",
+    "direction": "bearish",
+    "description": "双顶（M 顶）：两个相近高点后跌破颈线，形成顶部反转。",
+    "rules": [
+      "两个顶部高点接近。",
+      "中间低点构成颈线。",
+      "收盘价跌破颈线确认。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 20,
+    "structure": {
+      "sequence": [
+        {"label": "T1", "type": "high"},
+        {"label": "N1", "type": "low"},
+        {"label": "T2", "type": "high"},
+        {"label": "N2", "type": "low"}
+      ],
+      "structural_conditions": [
+        {"type": "lower_low", "left": "N1", "right": "N2"}
+      ],
+      "price_conditions": [
+        {
+          "type": "price_ratio",
+          "left": "T1",
+          "right": "T2",
+          "base": "T1",
+          "min_ratio": 0.0,
+          "max_ratio": 0.05
+        },
+        {
+          "type": "breakout",
+          "level": "N1",
+          "direction": "bearish",
+          "require_cross": false,
+          "comment": "当前 K 线收盘价跌破第一个颈线低点，确认双顶完成。"
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "T1", "end": "N2", "value": 8},
+        {"type": "max_bars", "start": "T1", "end": "N2", "value": 70},
+        {"type": "max_gap", "value": 15}
+      ]
+    },
+    "projection": {
+      "support": "N2",
+      "resistance": "max(T1, T2)",
+      "target": "N2 - (max(T1, T2) - N2)",
+      "stop_loss": "max(T1, T2) + 0.5 * atr",
+      "suggestion": "short",
+      "probability_prior": 0.54
+    }
+  }
+]

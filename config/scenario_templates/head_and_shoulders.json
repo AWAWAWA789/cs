@@ -1,0 +1,130 @@
+[
+  {
+    "name": "head_and_shoulders_top",
+    "category": "reversal",
+    "direction": "bearish",
+    "description": "头肩顶：左肩、头部、右肩依次形成，跌破颈线后看空。",
+    "rules": [
+      "头部高于左右肩。",
+      "左右肩高点接近。",
+      "颈线由两肩之间低点构成。",
+      "收盘价跌破颈线确认反转。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 25,
+    "structure": {
+      "sequence": [
+        {"label": "S1", "type": "high"},
+        {"label": "N1", "type": "low"},
+        {"label": "HEAD", "type": "high"},
+        {"label": "N2", "type": "low"},
+        {"label": "S2", "type": "high"}
+      ],
+      "structural_conditions": [
+        {"type": "higher_high", "left": "S1", "right": "HEAD"},
+        {"type": "higher_high", "left": "S2", "right": "HEAD"}
+      ],
+      "price_conditions": [
+        {
+          "type": "price_ratio",
+          "left": "S1",
+          "right": "S2",
+          "base": "S1",
+          "min_ratio": 0.0,
+          "max_ratio": 0.08
+        },
+        {
+          "type": "price_ratio",
+          "left": "N1",
+          "right": "N2",
+          "base": "N1",
+          "min_ratio": 0.0,
+          "max_ratio": 0.03
+        },
+        {
+          "type": "breakout",
+          "level": "min(N1, N2)",
+          "direction": "bearish",
+          "require_cross": true
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "S1", "end": "S2", "value": 10},
+        {"type": "max_bars", "start": "S1", "end": "S2", "value": 90},
+        {"type": "max_gap", "value": 18}
+      ]
+    },
+    "projection": {
+      "support": "min(N1, N2)",
+      "resistance": "HEAD",
+      "target": "2 * min(N1, N2) - HEAD",
+      "stop_loss": "max(HEAD, S2) + 0.5 * atr",
+      "suggestion": "short",
+      "probability_prior": 0.53
+    }
+  },
+  {
+    "name": "head_and_shoulders_bottom",
+    "category": "reversal",
+    "direction": "bullish",
+    "description": "头肩底：左肩、头部、右肩依次形成，突破颈线后看多。",
+    "rules": [
+      "头部低于左右肩。",
+      "左右肩低点接近。",
+      "颈线由两肩之间高点构成。",
+      "收盘价突破颈线确认反转。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 25,
+    "structure": {
+      "sequence": [
+        {"label": "S1", "type": "low"},
+        {"label": "N1", "type": "high"},
+        {"label": "HEAD", "type": "low"},
+        {"label": "N2", "type": "high"},
+        {"label": "S2", "type": "low"}
+      ],
+      "structural_conditions": [
+        {"type": "lower_low", "left": "S1", "right": "HEAD"},
+        {"type": "lower_low", "left": "S2", "right": "HEAD"}
+      ],
+      "price_conditions": [
+        {
+          "type": "price_ratio",
+          "left": "S1",
+          "right": "S2",
+          "base": "S1",
+          "min_ratio": 0.0,
+          "max_ratio": 0.08
+        },
+        {
+          "type": "price_ratio",
+          "left": "N1",
+          "right": "N2",
+          "base": "N1",
+          "min_ratio": 0.0,
+          "max_ratio": 0.03
+        },
+        {
+          "type": "breakout",
+          "level": "max(N1, N2)",
+          "direction": "bullish",
+          "require_cross": true
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "S1", "end": "S2", "value": 10},
+        {"type": "max_bars", "start": "S1", "end": "S2", "value": 90},
+        {"type": "max_gap", "value": 18}
+      ]
+    },
+    "projection": {
+      "support": "HEAD",
+      "resistance": "max(N1, N2)",
+      "target": "2 * max(N1, N2) - HEAD",
+      "stop_loss": "min(HEAD, S2) - 0.5 * atr",
+      "suggestion": "long",
+      "probability_prior": 0.53
+    }
+  }
+]

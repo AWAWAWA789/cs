@@ -1,0 +1,126 @@
+[
+  {
+    "name": "flag_bullish",
+    "category": "consolidation",
+    "direction": "bullish",
+    "description": "旗形整理（多头）：一段陡峭上涨形成旗杆，随后小幅回调并向上突破。",
+    "rules": [
+      "旗杆涨幅显著（通常 >= 2.5 倍 ATR）。",
+      "回调幅度常在 0.382 至 0.618 之间。",
+      "突破前高确认延续。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 15,
+    "structure": {
+      "sequence": [
+        {"label": "L0", "type": "low"},
+        {"label": "H1", "type": "high"},
+        {"label": "L2", "type": "low"},
+        {"label": "H3", "type": "high"}
+      ],
+      "structural_conditions": [
+        {"type": "higher_high", "left": "H1", "right": "H3"},
+        {"type": "higher_low", "left": "L0", "right": "L2"}
+      ],
+      "price_conditions": [
+        {
+          "type": "atr_multiple",
+          "a": "H1",
+          "b": "L0",
+          "min_multiple": 2.5,
+          "max_multiple": 15.0
+        },
+        {
+          "type": "fib_retracement",
+          "swing_start": "L0",
+          "swing_end": "H1",
+          "point": "L2",
+          "levels": ["0.382", "0.5", "0.618"],
+          "tolerance": 0.1
+        },
+        {
+          "type": "breakout",
+          "level": "H1",
+          "direction": "bullish",
+          "require_cross": false,
+          "comment": "当前 K 线收盘价突破旗杆高点，确认多头延续。"
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "L0", "end": "H3", "value": 6},
+        {"type": "max_bars", "start": "L0", "end": "H3", "value": 50},
+        {"type": "max_gap", "value": 12}
+      ]
+    },
+    "projection": {
+      "support": "L2",
+      "resistance": "H3",
+      "target": "H3 + (H1 - L0)",
+      "stop_loss": "L2 - 0.5 * atr",
+      "suggestion": "long",
+      "probability_prior": 0.54
+    }
+  },
+  {
+    "name": "flag_bearish",
+    "category": "consolidation",
+    "direction": "bearish",
+    "description": "旗形整理（空头）：一段陡峭下跌形成旗杆，随后小幅反弹并向下突破。",
+    "rules": [
+      "旗杆跌幅显著（通常 >= 2.5 倍 ATR）。",
+      "反弹幅度常在 0.382 至 0.618 之间。",
+      "跌破前低确认延续。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 15,
+    "structure": {
+      "sequence": [
+        {"label": "H0", "type": "high"},
+        {"label": "L1", "type": "low"},
+        {"label": "H2", "type": "high"},
+        {"label": "L3", "type": "low"}
+      ],
+      "structural_conditions": [
+        {"type": "lower_low", "left": "L1", "right": "L3"},
+        {"type": "lower_high", "left": "H0", "right": "H2"}
+      ],
+      "price_conditions": [
+        {
+          "type": "atr_multiple",
+          "a": "H0",
+          "b": "L1",
+          "min_multiple": 2.5,
+          "max_multiple": 15.0
+        },
+        {
+          "type": "fib_retracement",
+          "swing_start": "H0",
+          "swing_end": "L1",
+          "point": "H2",
+          "levels": ["0.382", "0.5", "0.618"],
+          "tolerance": 0.1
+        },
+        {
+          "type": "breakout",
+          "level": "L1",
+          "direction": "bearish",
+          "require_cross": false,
+          "comment": "当前 K 线收盘价跌破旗杆低点，确认空头延续。"
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "H0", "end": "L3", "value": 6},
+        {"type": "max_bars", "start": "H0", "end": "L3", "value": 50},
+        {"type": "max_gap", "value": 12}
+      ]
+    },
+    "projection": {
+      "support": "L3",
+      "resistance": "H2",
+      "target": "L3 - (H0 - L1)",
+      "stop_loss": "H2 + 0.5 * atr",
+      "suggestion": "short",
+      "probability_prior": 0.54
+    }
+  }
+]

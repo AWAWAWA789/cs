@@ -39,6 +39,7 @@ def walk_forward(
     train_size: int,
     test_size: int,
     step_size: int | None = None,
+    criterion: str = "total_return",
 ) -> list[WalkForwardWindow]:
     """Run a rolling walk-forward analysis.
 
@@ -49,6 +50,8 @@ def walk_forward(
         test_size: Number of bars in each test window.
         step_size: Number of bars to advance between windows. Defaults to
             ``test_size`` (non-overlapping test windows).
+        criterion: Metric used to pick the best parameters on the training
+            window. One of ``total_return`` or ``sharpe_ratio``.
 
     Returns:
         A list of ``WalkForwardWindow`` records, one per completed window.
@@ -68,6 +71,7 @@ def walk_forward(
         test_df = df.iloc[test_start:test_end].reset_index(drop=True)
 
         train_results = run_scan(train_df, grid=grid)
+        train_results.sort(key=lambda r: r["metrics"][criterion], reverse=True)
         best = train_results[0]
         best_point = _scan_point_from_dict(best["params"])
 
@@ -143,6 +147,7 @@ def walk_forward_report(
     windows: list[WalkForwardWindow],
     sub_index_name: str,
     period: str,
+    criterion: str = "total_return",
 ) -> dict[str, Any]:
     """Build a structured walk-forward report."""
     test_returns = [w.test_metrics["total_return"] for w in windows]
@@ -153,6 +158,7 @@ def walk_forward_report(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "sub_index_name": sub_index_name,
         "period": period,
+        "criterion": criterion,
         "windows": len(windows),
         "avg_test_return": avg_test_return,
         "positive_windows": positive_windows,
@@ -190,7 +196,7 @@ def main() -> None:
     from src.api.client import CSQAQClient
     from src.config import Settings
     from src.data.pipeline import load_or_fetch
-    from src.optimization.param_scan import default_grid
+    from src.optimization.param_scan import default_grid, ensemble_grid, phase9_grid
 
     parser = argparse.ArgumentParser(
         description="Run walk-forward validation for the price-action strategy."
@@ -215,8 +221,22 @@ def main() -> None:
     parser.add_argument(
         "--test-size",
         type=int,
-        default=150,
-        help="Test window size in bars (default: 150).",
+        default=100,
+        help="Test window size in bars (default: 100).",
+    )
+    parser.add_argument(
+        "--grid",
+        type=str,
+        default="default",
+        choices=["default", "ensemble", "phase9"],
+        help="Parameter grid to use (default: default).",
+    )
+    parser.add_argument(
+        "--criterion",
+        type=str,
+        default="total_return",
+        choices=["total_return", "sharpe_ratio"],
+        help="Training window selection criterion (default: total_return).",
     )
     parser.add_argument(
         "--output",
@@ -236,44 +256,26 @@ def main() -> None:
         period=args.period,
     )
 
-    # Use a reduced grid focused on market regime filtering and ensemble modes.
-    grid = [
-        ScanPoint(
-            swing_order=swing_order,
-            fib_tolerance=fib_tolerance,
-            confirmations=1,
-            target_levels=("0.5", "0.618"),
-            tp_target=tp_target,
-            stop_loss_buffer=stop_loss_buffer,
-            use_smart_money=use_smart_money,
-            liquidity_grab_buffer=0.005,
-            use_trend_following=False,
-            use_market_regime_filter=use_market_regime_filter,
-            market_regime_confirmations=4,
-            ensemble_mode=ensemble_mode,
-            ensemble_adx_threshold=25.0,
-            ensemble_regime_confirmations=4,
-            ensemble_trend_strength_threshold=25.0,
-        )
-        for swing_order in (1, 2)
-        for fib_tolerance in (0.03, 0.05)
-        for tp_target in ("1.272", "1.618")
-        for stop_loss_buffer in (0.002, 0.005)
-        for use_smart_money in (True, False)
-        for use_market_regime_filter in (True, False)
-        for ensemble_mode in (None, "regime_switch", "union")
-    ]
+    grid: list[ScanPoint]
+    if args.grid == "ensemble":
+        grid = ensemble_grid()
+    elif args.grid == "phase9":
+        grid = phase9_grid(args.sub_index_name)
+    else:
+        grid = default_grid()
 
     windows = walk_forward(
         df,
         grid=grid,
         train_size=args.train_size,
         test_size=args.test_size,
+        criterion=args.criterion,
     )
     report = walk_forward_report(
         windows,
         sub_index_name=args.sub_index_name,
         period=args.period,
+        criterion=args.criterion,
     )
 
     print(f"Completed {len(windows)} walk-forward windows.")

@@ -1,0 +1,128 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "description": "CSQAQ 市场状态向量定义。向量刻画单根 K 线所处的趋势、波动、结构、信号质量与均线环境，用于历史相似性搜索与情景预判。",
+    "principles": [
+      "仅使用 OHLC 与时间信息，不依赖成交量",
+      "每个维度必须可解释、可复现",
+      "所有数值在搜索前需经标准化处理",
+      "子指数无关，切换标的仅通过参数完成"
+    ],
+    "source_modules": [
+      "src.features.trend_strength",
+      "src.features.swing",
+      "src.features.structure",
+      "src.features.signal_quality",
+      "src.features.candlestick",
+      "src.features.smart_money",
+      "src.features.trend_following"
+    ]
+  },
+  "fields": {
+    "adx_normalized": {
+      "type": "float",
+      "range": [0.0, 1.0],
+      "weight": 1.0,
+      "category": "trend_strength",
+      "description": "ADX 归一化值，等于 adx / 100。0 表示完全无趋势，1 表示极强趋势。"
+    },
+    "di_plus_minus_diff": {
+      "type": "float",
+      "range": [-100.0, 100.0],
+      "weight": 0.8,
+      "category": "trend_strength",
+      "description": "+DI 与 -DI 的差值（di_plus - di_minus），正值偏多，负值偏空。"
+    },
+    "atr_percent": {
+      "type": "float",
+      "range": [0.0, null],
+      "weight": 1.0,
+      "category": "volatility_structure",
+      "description": "ATR 占收盘价的百分比，等于 atr / close * 100，衡量绝对波动水平。"
+    },
+    "bb_position": {
+      "type": "float",
+      "range": [0.0, 1.0],
+      "weight": 0.8,
+      "category": "volatility_structure",
+      "description": "收盘价在 20 周期布林带中的相对位置。0 表示贴近下轨，1 表示贴近上轨。"
+    },
+    "volatility_regime": {
+      "type": "ordinal",
+      "range": { "0": "low", "1": "normal", "2": "high" },
+      "weight": 0.6,
+      "category": "volatility_structure",
+      "description": "波动率状态。基于 ATR% 相对过去 50 根 K 线滚动中位数划分：低波动、正常、高波动。"
+    },
+    "distance_to_swing_low": {
+      "type": "float",
+      "range": [-1.0, 1.0],
+      "weight": 0.7,
+      "category": "swing_position",
+      "description": "当前收盘价与最近 Swing Low 的相对距离，等于 (close - last_swing_low) / last_swing_low。正值表示在低点之上。"
+    },
+    "distance_to_swing_high": {
+      "type": "float",
+      "range": [-1.0, 1.0],
+      "weight": 0.7,
+      "category": "swing_position",
+      "description": "当前收盘价与最近 Swing High 的相对距离，等于 (close - last_swing_high) / last_swing_high。负值表示在高点之下。"
+    },
+    "swing_position_ratio": {
+      "type": "float",
+      "range": [0.0, 1.0],
+      "weight": 0.9,
+      "category": "swing_position",
+      "description": "收盘价在最近 Swing Low 到 Swing High 区间内的相对位置。0 表示接近低点，1 表示接近高点。"
+    },
+    "signal_quality": {
+      "type": "float",
+      "range": [0.0, 1.0],
+      "weight": 1.0,
+      "category": "signal_quality",
+      "description": "多头信号质量综合得分，非信号栏为 0。由趋势、结构、共振与汇合多维度加权得到。"
+    },
+    "trend_quality": {
+      "type": "float",
+      "range": [0.0, 1.0],
+      "weight": 0.9,
+      "category": "signal_quality",
+      "description": "趋势一致性得分，综合 ADX 强度与 +DI > -DI 的方向一致性。"
+    },
+    "structure_resonance": {
+      "type": "float",
+      "range": [0.0, 1.0],
+      "weight": 0.9,
+      "category": "signal_quality",
+      "description": "价格与最近 Swing Low 锚点的共振得分。1 表示价格正好在锚点，0 表示远离缓冲带。"
+    },
+    "confluence_quality": {
+      "type": "float",
+      "range": [0.0, 1.0],
+      "weight": 0.7,
+      "category": "signal_quality",
+      "description": "多概念汇合得分，统计斐波那契回调、Smart Money、趋势跟随信号同时出现的数量并归一化。"
+    },
+    "price_vs_sma20": {
+      "type": "float",
+      "range": [-2.0, 2.0],
+      "weight": 0.8,
+      "category": "moving_average",
+      "description": "收盘价相对 20 周期 SMA 的百分比偏差，等于 (close - sma20) / sma20。"
+    },
+    "price_vs_sma50": {
+      "type": "float",
+      "range": [-2.0, 2.0],
+      "weight": 0.8,
+      "category": "moving_average",
+      "description": "收盘价相对 50 周期 SMA 的百分比偏差，等于 (close - sma50) / sma50。"
+    },
+    "sma20_vs_sma50": {
+      "type": "float",
+      "range": [-1.0, 1.0],
+      "weight": 0.7,
+      "category": "moving_average",
+      "description": "20 周期 SMA 相对 50 周期 SMA 的百分比偏差，等于 (sma20 - sma50) / sma50。"
+    }
+  }
+}

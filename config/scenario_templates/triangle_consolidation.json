@@ -1,0 +1,96 @@
+[
+  {
+    "name": "triangle_bullish",
+    "category": "consolidation",
+    "direction": "bullish",
+    "description": "三角整理向上突破：高点逐次下移、低点逐次上移，价格收敛后向上突破上轨。",
+    "rules": [
+      "至少两个依次降低的高点。",
+      "至少两个依次抬高的低点。",
+      "收盘价突破最近一个高点时确认向上。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 15,
+    "structure": {
+      "sequence": [
+        {"label": "H0", "type": "high"},
+        {"label": "L1", "type": "low"},
+        {"label": "H2", "type": "high"},
+        {"label": "L3", "type": "low"}
+      ],
+      "structural_conditions": [
+        {"type": "lower_high", "left": "H0", "right": "H2"},
+        {"type": "higher_low", "left": "L1", "right": "L3"}
+      ],
+      "price_conditions": [
+        {
+          "type": "breakout",
+          "level": "H2",
+          "direction": "bullish",
+          "require_cross": false,
+          "comment": "当前 K 线收盘价突破三角形下降上轨，确认向上。"
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "H0", "end": "L3", "value": 6},
+        {"type": "max_bars", "start": "H0", "end": "L3", "value": 80},
+        {"type": "max_gap", "value": 15}
+      ]
+    },
+    "projection": {
+      "support": "L3",
+      "resistance": "H2",
+      "target": "close + (H0 - L1)",
+      "stop_loss": "L3 - 0.5 * atr",
+      "suggestion": "long",
+      "probability_prior": 0.52
+    }
+  },
+  {
+    "name": "triangle_bearish",
+    "category": "consolidation",
+    "direction": "bearish",
+    "description": "三角整理向下突破：高点逐次下移、低点逐次上移，价格收敛后向下突破下轨。",
+    "rules": [
+      "至少两个依次降低的高点。",
+      "至少两个依次抬高的低点。",
+      "收盘价跌破最近一个低点时确认向下。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 15,
+    "structure": {
+      "sequence": [
+        {"label": "H0", "type": "high"},
+        {"label": "L1", "type": "low"},
+        {"label": "H2", "type": "high"},
+        {"label": "L3", "type": "low"}
+      ],
+      "structural_conditions": [
+        {"type": "lower_high", "left": "H0", "right": "H2"},
+        {"type": "higher_low", "left": "L1", "right": "L3"}
+      ],
+      "price_conditions": [
+        {
+          "type": "breakout",
+          "level": "L3",
+          "direction": "bearish",
+          "require_cross": false,
+          "comment": "当前 K 线收盘价跌破三角形最近低点 L3，确认向下。"
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "H0", "end": "L3", "value": 6},
+        {"type": "max_bars", "start": "H0", "end": "L3", "value": 80},
+        {"type": "max_gap", "value": 15}
+      ]
+    },
+    "projection": {
+      "support": "L3",
+      "resistance": "H2",
+      "target": "close - (H0 - L1)",
+      "stop_loss": "H2 + 0.5 * atr",
+      "suggestion": "short",
+      "probability_prior": 0.52
+    }
+  }
+]

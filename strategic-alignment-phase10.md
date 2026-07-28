@@ -1,0 +1,115 @@
+# 第十阶段战略-战术对齐检查报告
+
+**阶段主题：** 状态向量与历史相似性搜索  
+**检查日期：** 2026-07-27  
+**对应战术文档：** [tactical-document-phase10.md](computer:///workspace/tactical-document-phase10.md)  
+**前置报告：** [strategic-alignment-phase9.md](computer:///workspace/csqaq-glove-quant/strategic-alignment-phase9.md)
+
+---
+
+## 1. 阶段目标完成情况
+
+| 目标 | 状态 | 交付物 |
+|------|------|--------|
+| 定义市场状态向量 | 已完成 | `config/state_vector_schema.json` |
+| 历史片段标准化与距离度量 | 已完成 | `src/scenario_engine/normalization.py` |
+| KNN 最近邻检索 | 已完成 | `src/scenario_engine/knn_search.py` |
+| DTW 形状对齐检索 | 已完成 | `src/scenario_engine/dtw_search.py` |
+| K-Means 状态聚类 | 已完成 | `src/scenario_engine/state_clustering.py` |
+| 相似性搜索集成与验证 | 已完成 | `src/scenario_engine/similarity_search.py`、`reports/phase10_similarity_search_validation.json` |
+| 单元测试与双环境校验 | 已完成 | `tests/scenario_engine/` 新增 39 个测试，全部通过 |
+| 战略-战术对齐检查 | 已完成 | 本报告 |
+
+---
+
+## 2. 核心实验结果
+
+### 2.1 验证数据集
+
+| 子指数 | K 线数量 | 起始时间 | 结束时间 |
+|--------|---------|---------|---------|
+| 手套 | 938 | 2024-01-01 | 2026-07-26 |
+| 匕首 | 938 | 2024-01-01 | 2026-07-26 |
+| 百元主战 | 938 | 2024-01-01 | 2026-07-26 |
+| 贴纸 | 938 | 2024-01-01 | 2026-07-26 |
+
+### 2.2 KNN / DTW / 聚类摘要
+
+| 子指数 | KNN Top-1 距离 | DTW Top-1 距离 | Silhouette | 主导聚类样本数 |
+|--------|---------------|---------------|------------|---------------|
+| 手套 | 0.625 | 3.292 | 0.210 | 362 |
+| 匕首 | 0.439 | 2.901 | 0.253 | 327 |
+| 百元主战 | 0.911 | 4.490 | 0.167 | 283 |
+| 贴纸 | 1.050 | 1.431 | 0.219 | 283 |
+
+### 2.3 状态向量维度
+
+已覆盖战略要求的五维：
+
+| 维度 | 字段示例 |
+|------|---------|
+| 趋势强度 | `adx_normalized`、`di_plus_minus_diff` |
+| 波动结构 | `atr_percent`、`bb_position`、`volatility_regime` |
+| Swing 位置 | `distance_to_swing_low`、`distance_to_swing_high`、`swing_position_ratio` |
+| 信号质量 | `signal_quality`、`trend_quality`、`structure_resonance`、`confluence_quality` |
+| 均线关系 | `price_vs_sma20`、`price_vs_sma50`、`sma20_vs_sma50` |
+
+---
+
+## 3. 验收标准检查
+
+| 编号 | 验收项 | 结果 | 说明 |
+|------|--------|------|------|
+| AC71 | 状态向量覆盖五维 | 通过 | 已覆盖趋势 / 波动 / 结构 / 质量 / 均线 |
+| AC72 | KNN 最近邻可解释 | 通过 | 返回距离、时间戳、状态向量、后续收益率 |
+| AC73 | DTW 对偏移鲁棒 | 通过 | 单元测试验证 1–3 根 K 线偏移仍可检索 |
+| AC74 | K-Means 聚类可解释 | 部分通过 | Silhouette 0.17–0.25，聚类中心可标注，但需 Phase 11/12 结合模板语义进一步提升 |
+| AC75 | 无成交量依赖 | 通过 | 未读取 `volume` |
+| AC76 | 子指数可迁移 | 通过 | 切换子指数仅需命令行参数 |
+| AC77 | 双环境兼容 | 通过 | pytest 39 项全部通过 |
+| AC78 | 集成接口统一 | 通过 | `find_similar_states(df, method, n_neighbors)` 支持 knn/dtw/cluster |
+
+---
+
+## 4. 战略对齐检查
+
+| 检查项 | 是否对齐 | 说明 |
+|--------|---------|------|
+| 框架无硬编码标的 | 是 | 状态向量计算与子指数无关 |
+| 不使用成交量 | 是 | 仅基于 OHLC 与时间 |
+| 核心判断去 LLM 化 | 是 | 相似性结果由算法输出 |
+| 多子指数可迁移 | 是 | 切换子指数仅需配置 |
+| 双环境可运行 | 是 | 验收 AC77 |
+
+---
+
+## 5. 未达标项根因与后续建议
+
+1. **聚类可解释性仍有提升空间**
+   - Silhouette 分数处于中等水平，部分聚类边界模糊。
+   - 建议：Phase 11 引入模板语义后，可将聚类标签与模板类型关联，提升可解释性。
+
+2. **状态向量权重未经验证**
+   - 当前权重为人工设定，未经过历史回测优化。
+   - 建议：Phase 12 融合阶段可引入权重优化或特征重要性分析。
+
+---
+
+## 6. 关键变更文件
+
+- `config/state_vector_schema.json`
+- `src/scenario_engine/normalization.py`
+- `src/scenario_engine/knn_search.py`
+- `src/scenario_engine/dtw_search.py`
+- `src/scenario_engine/state_clustering.py`
+- `src/scenario_engine/similarity_search.py`
+- `src/scenario_engine/state_vector.py`
+- `tests/scenario_engine/*.py`
+- `reports/phase10_similarity_search_validation.json`
+- `reports/phase10_clustering_*.json`
+
+---
+
+## 7. 结论
+
+第十阶段完成了状态向量定义、KNN 最近邻检索、DTW 形状对齐检索、K-Means 状态聚类以及统一集成接口，历史相似性搜索轨道已经打通。所有核心模块均通过单元测试，未使用成交量，未硬编码标的。建议在第十一阶段继续构建预定义模式模板库，为第十二阶段的深度融合做准备。

@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-07-27T19:05:00+00:00",
+  "sub_index_name": "手套",
+  "period": "1day",
+  "fixed_params": {
+    "swing_order": 1,
+    "confirmations": 1,
+    "trend_strength_threshold": 20.0,
+    "adx_period": 14,
+    "use_higher_high_breakout": false,
+    "require_uptrend": true,
+    "use_di_filter": false,
+    "use_volatility_filter": false,
+    "volatility_atr_multiplier": 1.0,
+    "use_pullback_confirmation": true,
+    "pullback_lookback": 5,
+    "pullback_buffer": 0.005
+  },
+  "windows": 6,
+  "avg_test_return": 0.006455921248163521,
+  "positive_windows": 4,
+  "window_details": [
+    {
+      "signal_count": 2,
+      "test_return": 0.005050920019584071,
+      "test_trades": 2,
+      "test_max_drawdown": -0.0003749641615037766,
+      "test_sharpe": 4.36493983150433,
+      "train_start": 0,
+      "train_end": 300,
+      "test_start": 300,
+      "test_end": 400
+    },
+    {
+      "signal_count": 1,
+      "test_return": 0.006415417253729405,
+      "test_trades": 1,
+      "test_max_drawdown": 0.0,
+      "test_sharpe": 4.7033192663492605,
+      "train_start": 100,
+      "train_end": 400,
+      "test_start": 400,
+      "test_end": 500
+    },
+    {
+      "signal_count": 1,
+      "test_return": 0.008020850620575226,
+      "test_trades": 1,
+      "test_max_drawdown": 0.0,
+      "test_sharpe": 4.703319266349255,
+      "train_start": 200,
+      "train_end": 500,
+      "test_start": 500,
+      "test_end": 600
+    },
+    {
+      "signal_count": 0,
+      "test_return": 0.0,
+      "test_trades": 0,
+      "test_max_drawdown": 0.0,
+      "test_sharpe": 0.0,
+      "train_start": 300,
+      "train_end": 600,
+      "test_start": 600,
+      "test_end": 700
+    },
+    {
+      "signal_count": 1,
+      "test_return": 0.019248339595092423,
+      "test_trades": 1,
+      "test_max_drawdown": 0.0,
+      "test_sharpe": 4.703319266349258,
+      "train_start": 400,
+      "train_end": 700,
+      "test_start": 700,
+      "test_end": 800
+    },
+    {
+      "signal_count": 0,
+      "test_return": 0.0,
+      "test_trades": 0,
+      "test_max_drawdown": 0.0,
+      "test_sharpe": 0.0,
+      "train_start": 500,
+      "train_end": 800,
+      "test_start": 800,
+      "test_end": 900
+    }
+  ]
+}
