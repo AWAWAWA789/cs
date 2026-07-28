@@ -81,3 +81,13 @@ def test_standard_scenario_names_present():
     names = {s["name"] for s in result["scenarios"]}
     required = {"上涨延续", "下跌反转", "先跌后涨", "区间震荡"}
     assert required.issubset(names)
+
+
+def test_generate_scenarios_uses_adaptive_temperature():
+    df = _make_ohlc(250)
+    result = generate_scenarios(
+        {"1day": df},
+        sub_index="test_glove",
+        use_adaptive_temperature=True,
+    )
+    assert 4 <= len(result["scenarios"]) <= 6
