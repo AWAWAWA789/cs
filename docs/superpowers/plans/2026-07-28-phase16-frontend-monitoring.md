@@ -1,0 +1,1247 @@
+# Phase 16 前端体验升级与生产监控 Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** 补齐前端错误边界、面板级加载态、参数调节原型、回测净值/交易点位可视化，修复浪形草图折线回溯，并在后端建立请求延迟、失败率、Brier 漂移的运行时监控与告警。
+
+**Architecture:** 前端保持纯原生 JS + Lightweight Charts，通过新增面板级 skeleton CSS、全局错误覆盖层、参数控件实现体验升级；后端新增 `/backtest/equity` 端点复用现有信号生成与回测引擎输出净值曲线和交易列表；监控模块以内存滚动窗口聚合请求指标，暴露 `/monitoring/metrics` 并在阈值越界时打告警日志，不引入外部时序数据库。
+
+**Tech Stack:** Python 3.10, FastAPI, pandas, pytest; HTML/CSS/Vanilla JS, Lightweight Charts, SVG.
+
+---
+
+## File Structure
+
+| 文件 | 用途 |
+|------|------|
+| `frontend/index.html` | 新增参数调节控件、净值曲线切换按钮、监控摘要区 |
+| `frontend/static/app.js` | 错误边界、加载态、参数传递、净值/交易点渲染、浪形草图修复 |
+| `frontend/static/style.css` | skeleton、错误覆盖层、监控摘要、净值面板样式 |
+| `src/api/backtest_endpoints.py` | `/backtest/equity` 端点：生成信号 + 运行回测 |
+| `src/api/monitoring.py` | `MetricsCollector`、告警阈值、日志告警 |
+| `src/api/scenario_endpoints.py` | 在 `/scenario/*` 端点中接入监控记录 |
+| `run_scenario_server.py` | 注册 backtest 与 monitoring 路由 |
+| `tests/test_backtest_endpoints.py` | `/backtest/equity` 响应结构测试 |
+| `tests/test_monitoring.py` | 监控聚合、告警、阈值测试 |
+| `tests/test_scenario_api.py` | 补充 500 降级与参数传递测试 |
+| `tests/frontend/phase16_e2e.md` | 前端手动验收清单 |
+| `strategic-alignment-phase16.md` | 阶段对齐报告 |
+
+---
+
+### Task 1: 前端全局错误边界与面板级 skeleton 加载态
+
+**Files:**
+- Modify: `frontend/static/app.js`
+- Modify: `frontend/static/style.css`
+- Modify: `frontend/index.html`
+- Test: `tests/frontend/phase16_e2e.md`
+
+- [ ] **Step 1: 在 `index.html` 为每个面板包裹独立加载容器**
+
+在 `index.html` 中，为 `chartContainer`、`scenarioBars`、`tradeAdvice`、`historyList`、`templateCards`、`waveSketch`、`llmExplanation` 外层添加 `.panel-body` 容器，并预留 `.skeleton` 元素。以情景概率面板为例：
+
+```html
+<aside class="panel side-panel">
+  <h2>情景概率</h2>
+  <div class="panel-body" id="scenarioBarsBody">
+    <div id="scenarioBars" class="panel-content"></div>
+    <div class="skeleton" id="scenarioBarsSkeleton" aria-hidden="true">
+      <div class="skeleton-bar"></div>
+      <div class="skeleton-bar"></div>
+      <div class="skeleton-bar"></div>
+    </div>
+  </div>
+  <!-- 其余面板同样处理 -->
+</aside>
+```
+
+- [ ] **Step 2: 在 `style.css` 增加 skeleton 与错误覆盖层样式**
+
+```css
+.panel-body { position: relative; min-height: 60px; }
+.panel-content { display: none; }
+.panel-content.ready { display: block; }
+
+.skeleton {
+  display: none;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+}
+.skeleton.active { display: flex; }
+
+.skeleton-bar {
+  height: 18px;
+  background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%);
+  background-size: 200% 100%;
+  border-radius: 0.25rem;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.error-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 15, 25, 0.92);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  z-index: 1000;
+}
+.error-overlay.active { display: flex; }
+.error-overlay h2 { color: #ef4444; margin: 0; }
+.error-overlay p { color: #9ca3af; max-width: 480px; text-align: center; }
+.error-overlay .btn { min-width: 120px; }
+```
+
+- [ ] **Step 3: 在 `app.js` 增加加载/错误工具函数**
+
+在 `els` 对象之后追加：
+
+```javascript
+function setPanelLoading(id, loading) {
+  const content = document.getElementById(id);
+  const skeleton = document.getElementById(id + "Skeleton");
+  if (!content || !skeleton) return;
+  content.classList.toggle("ready", !loading);
+  skeleton.classList.toggle("active", loading);
+}
+
+function setGlobalError(message, retryCallback) {
+  let overlay = document.getElementById("globalErrorOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "globalErrorOverlay";
+    overlay.className = "error-overlay";
+    overlay.innerHTML = `
+      <h2>加载失败</h2>
+      <p id="globalErrorMessage"></p>
+      <button id="globalErrorRetry" class="btn primary">重试</button>
+    `;
+    document.body.appendChild(overlay);
+  }
+  document.getElementById("globalErrorMessage").textContent = message;
+  const retryBtn = document.getElementById("globalErrorRetry");
+  retryBtn.onclick = () => {
+    overlay.classList.remove("active");
+    if (retryCallback) retryCallback();
+  };
+  overlay.classList.add("active");
+}
+
+function clearGlobalError() {
+  const overlay = document.getElementById("globalErrorOverlay");
+  if (overlay) overlay.classList.remove("active");
+}
+
+window.addEventListener("error", (event) => {
+  setGlobalError(`运行时错误：${event.message}`, () => window.location.reload());
+});
+```
+
+- [ ] **Step 4: 修改 `loadAll` 为每个面板设置独立加载态并统一错误处理**
+
+```javascript
+const PANELS = ["chartContainer", "scenarioBars", "tradeAdvice", "historyList", "templateCards", "waveSketch", "llmExplanation"];
+
+async function loadAll({ refresh = false } = {}) {
+  clearGlobalError();
+  clearHighlights();
+  setStatus("加载中...");
+  PANELS.forEach((id) => setPanelLoading(id, true));
+
+  try {
+    const [ohlcRes, genRes, histRes, tmplRes] = await Promise.all([
+      apiGet("/scenario/ohlc", { sub_index: state.subIndex, period: state.period }),
+      apiGet("/scenario/generate", { sub_index: state.subIndex, period: state.period, refresh: refresh ? "1" : "0" }),
+      apiGet("/scenario/history", { sub_index: state.subIndex, period: state.period, method: state.method, n_neighbors: state.nNeighbors }),
+      apiGet("/scenario/templates", { sub_index: state.subIndex, period: state.period, min_confidence: state.minConfidence }),
+    ]);
+
+    renderChart(ohlcRes.ohlc);
+    renderScenarios(genRes.scenarios);
+    renderHistory(histRes.matches);
+    renderTemplates(tmplRes.matches);
+
+    const cached = genRes.cached ? "（缓存）" : "（已生成）";
+    setStatus(`${cached} 耗时 ${genRes.generation_time_ms || 0} ms`);
+  } catch (err) {
+    setStatus(`错误：${err.message}`);
+    setGlobalError(`无法加载 ${state.subIndex} ${state.period} 数据：${err.message}`, () => loadAll({ refresh: true }));
+  } finally {
+    PANELS.forEach((id) => setPanelLoading(id, false));
+  }
+}
+```
+
+- [ ] **Step 5: 运行前端手动验收并提交**
+
+启动服务器：`python run_scenario_server.py`，访问 `http://localhost:8000/`，验证：
+1. 刷新页面时各面板显示 skeleton 条；
+2. 在浏览器 DevTools Network 中将 `/scenario/generate` 设为 Block request URL 后刷新，应出现全局错误覆盖层；
+3. 点击重试恢复正常。
+
+```bash
+git add frontend/index.html frontend/static/style.css frontend/static/app.js
+git commit -m "feat(frontend): add global error boundary and panel skeleton loaders"
+```
+
+---
+
+### Task 2: 前端参数调节原型（近邻数 / 模板置信度）
+
+**Files:**
+- Modify: `frontend/index.html`
+- Modify: `frontend/static/app.js`
+- Modify: `frontend/static/style.css`
+- Test: `tests/test_scenario_api.py`
+
+- [ ] **Step 1: 在 `index.html` controls 区域添加参数控件**
+
+```html
+<label for="methodSelect">相似方法</label>
+<select id="methodSelect">
+  <option value="knn" selected>KNN</option>
+  <option value="dtw">DTW</option>
+  <option value="cluster">Cluster</option>
+</select>
+
+<label for="nNeighborsInput">近邻数</label>
+<input id="nNeighborsInput" type="number" min="1" max="100" value="10">
+
+<label for="minConfidenceInput">模板置信度</label>
+<input id="minConfidenceInput" type="number" min="0" max="1" step="0.05" value="0.5">
+```
+
+- [ ] **Step 2: 在 `app.js` state 与 els 中注册新控件**
+
+```javascript
+const state = {
+  subIndex: "手套",
+  period: "1day",
+  method: "knn",
+  nNeighbors: 10,
+  minConfidence: 0.5,
+  // ...
+};
+
+const els = {
+  // ...
+  methodSelect: document.getElementById("methodSelect"),
+  nNeighborsInput: document.getElementById("nNeighborsInput"),
+  minConfidenceInput: document.getElementById("minConfidenceInput"),
+};
+```
+
+- [ ] **Step 3: 绑定控件事件并在请求中传递参数**
+
+在 `bindEvents` 中追加：
+
+```javascript
+els.methodSelect.addEventListener("change", (e) => {
+  state.method = e.target.value;
+  loadAll({ refresh: false });
+});
+els.nNeighborsInput.addEventListener("change", (e) => {
+  const v = parseInt(e.target.value, 10);
+  state.nNeighbors = Number.isFinite(v) ? Math.max(1, Math.min(100, v)) : 10;
+  e.target.value = state.nNeighbors;
+  loadAll({ refresh: false });
+});
+els.minConfidenceInput.addEventListener("change", (e) => {
+  const v = parseFloat(e.target.value);
+  state.minConfidence = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
+  e.target.value = state.minConfidence;
+  loadAll({ refresh: false });
+});
+```
+
+`loadAll` 中已使用 `state.method`、`state.nNeighbors`、`state.minConfidence`（见 Task 1）。
+
+- [ ] **Step 4: 为参数输入框添加 CSS**
+
+```css
+.controls input[type="number"] {
+  width: 72px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  padding: 0.35rem 0.5rem;
+}
+```
+
+- [ ] **Step 5: 后端测试验证参数透传**
+
+在 `tests/test_scenario_api.py` 追加：
+
+```python
+def test_history_respects_n_neighbors(client):
+    response = client.get(
+        "/scenario/history",
+        params={"sub_index": "手套", "period": "1day", "method": "knn", "n_neighbors": 3},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["matches"]) <= 3
+
+
+def test_templates_respects_min_confidence(client):
+    response = client.get(
+        "/scenario/templates",
+        params={"sub_index": "手套", "period": "1day", "min_confidence": 0.95},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert all(m["confidence"] >= 0.95 for m in data["matches"])
+```
+
+- [ ] **Step 6: 运行测试并提交**
+
+```bash
+pytest tests/test_scenario_api.py -v
+```
+
+```bash
+git add frontend/index.html frontend/static/style.css frontend/static/app.js tests/test_scenario_api.py
+git commit -m "feat(frontend): expose n_neighbors and min_confidence controls"
+```
+
+---
+
+### Task 3: 后端回测净值/交易端点
+
+**Files:**
+- Create: `src/api/backtest_endpoints.py`
+- Modify: `run_scenario_server.py`
+- Test: `tests/test_backtest_endpoints.py`
+
+- [ ] **Step 1: 创建 `/backtest/equity` 端点**
+
+```python
+"""Backtest endpoints for Phase 16.
+
+Exposes the existing trend-following signal generator and backtest engine over
+HTTP so the frontend can render an equity curve and trade markers.
+"""
+
+from __future__ import annotations
+
+import time
+from datetime import datetime, timezone
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from fastapi import APIRouter, HTTPException, Query
+
+from src.api.logging import get_logger, log_request
+from src.api.scenario_endpoints import _load_ohlc, _normalize_period
+from src.backtest.engine import BacktestParams, run_backtest
+from src.strategy.signal import SignalParams, generate_signals
+
+
+LOGGER = get_logger("csqaq.backtest_api")
+router = APIRouter(prefix="/backtest", tags=["backtest"])
+
+
+def _run_backtest(df: pd.DataFrame) -> dict[str, Any]:
+    """Generate signals and run a long-only backtest on ``df``."""
+    df_with_signals = generate_signals(df, SignalParams(use_smart_money=True, use_trend_following=True))
+    result = run_backtest(df_with_signals, BacktestParams())
+
+    equity_records = []
+    for ts, value in result.equity_curve.items():
+        ts_iso = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
+        equity_records.append({"timestamp": ts_iso, "equity": round(float(value), 4)})
+
+    trade_records = []
+    for trade in result.trades:
+        trade_records.append(
+            {
+                "entry_index": trade.entry_index,
+                "entry_time": _to_iso(trade.entry_time),
+                "entry_price": round(float(trade.entry_price), 6),
+                "exit_time": _to_iso(trade.exit_time),
+                "exit_price": round(float(trade.exit_price), 6) if trade.exit_price is not None else None,
+                "exit_reason": trade.exit_reason,
+                "pnl": round(float(trade.pnl), 4),
+                "return_pct": round(float(trade.return_pct), 6),
+            }
+        )
+
+    final_equity = float(result.final_equity)
+    initial = float(result.params.initial_capital)
+    total_return = round((final_equity - initial) / initial, 6)
+
+    return {
+        "equity_curve": equity_records,
+        "trades": trade_records,
+        "total_return": total_return,
+        "final_equity": round(final_equity, 4),
+        "trade_count": len(trade_records),
+    }
+
+
+def _to_iso(value: object) -> str | None:
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+@router.get("/equity")
+def equity(
+    sub_index: str = Query(..., description="Sub-index Chinese name."),
+    period: str = Query("1day", description="K-line period."),
+) -> dict[str, Any]:
+    """Return equity curve and simulated trades for the price-action strategy."""
+    period = _normalize_period(period)
+    start = time.perf_counter()
+    try:
+        df = _load_ohlc(sub_index, period)
+        payload = _run_backtest(df)
+    except Exception as exc:
+        latency_ms = (time.perf_counter() - start) * 1000
+        log_request(
+            LOGGER,
+            endpoint="/backtest/equity",
+            sub_index=sub_index,
+            period=period,
+            latency_ms=latency_ms,
+            error=str(exc),
+        )
+        raise HTTPException(status_code=500, detail=f"Backtest failed: {exc}") from exc
+
+    latency_ms = (time.perf_counter() - start) * 1000
+    log_request(
+        LOGGER,
+        endpoint="/backtest/equity",
+        sub_index=sub_index,
+        period=period,
+        latency_ms=latency_ms,
+        trade_count=payload["trade_count"],
+    )
+    return {
+        "sub_index": sub_index,
+        "period": period,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        **payload,
+    }
+```
+
+- [ ] **Step 2: 在 `run_scenario_server.py` 注册路由**
+
+```python
+from src.api.backtest_endpoints import router as backtest_router
+
+app.include_router(backtest_router)
+```
+
+- [ ] **Step 3: 编写测试**
+
+```python
+# tests/test_backtest_endpoints.py
+"""Tests for the backtest equity endpoint."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from run_scenario_server import app
+
+
+@pytest.fixture
+def client():
+    return TestClient(app)
+
+
+def test_equity_returns_curve_and_trades(client):
+    response = client.get("/backtest/equity", params={"sub_index": "手套", "period": "1day"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "equity_curve" in data
+    assert "trades" in data
+    assert "total_return" in data
+    assert data["sub_index"] == "手套"
+    assert data["period"] == "1day"
+    if data["trades"]:
+        trade = data["trades"][0]
+        assert "entry_time" in trade
+        assert "exit_reason" in trade
+
+
+def test_equity_invalid_period_returns_400(client):
+    response = client.get("/backtest/equity", params={"sub_index": "手套", "period": "10year"})
+    assert response.status_code == 400
+```
+
+- [ ] **Step 4: 运行测试并提交**
+
+```bash
+pytest tests/test_backtest_endpoints.py -v
+```
+
+```bash
+git add src/api/backtest_endpoints.py run_scenario_server.py tests/test_backtest_endpoints.py
+git commit -m "feat(api): add /backtest/equity endpoint for equity curve and trades"
+```
+
+---
+
+### Task 4: 前端净值曲线与交易点位图组件
+
+**Files:**
+- Modify: `frontend/index.html`
+- Modify: `frontend/static/app.js`
+- Modify: `frontend/static/style.css`
+- Test: `tests/frontend/phase16_e2e.md`
+
+- [ ] **Step 1: 在 `index.html` 添加净值面板与切换按钮**
+
+在 `chart-panel` 内添加切换按钮，并在底部新增净值面板：
+
+```html
+<section class="panel chart-panel">
+  <div class="chart-tabs">
+    <button class="chart-tab active" data-chart="price">价格</button>
+    <button class="chart-tab" data-chart="equity">净值</button>
+  </div>
+  <div id="chartContainer" class="chart-content active"></div>
+  <div id="equityChartContainer" class="chart-content"></div>
+  <div id="highlightInfo" class="highlight-info"></div>
+</section>
+
+<!-- 在 bottom-panel 增加交易列表 -->
+<section class="panel bottom-panel">
+  <div class="trade-summary" id="tradeSummary"></div>
+  <!-- explanation-grid 保留 -->
+</section>
+```
+
+- [ ] **Step 2: 在 `style.css` 添加标签页与净值面板样式**
+
+```css
+.chart-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.chart-tab {
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+}
+
+.chart-tab.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.chart-content {
+  display: none;
+  flex: 1;
+  min-height: 300px;
+}
+
+.chart-content.active { display: block; }
+
+.trade-summary {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
+.trade-summary .value { color: var(--text); font-weight: 600; }
+```
+
+- [ ] **Step 3: 在 `app.js` 初始化净值图表并加载数据**
+
+在 state 中增加：
+
+```javascript
+const state = {
+  // ...
+  equityChart: null,
+  equitySeries: null,
+  activeChart: "price",
+};
+```
+
+新增初始化函数：
+
+```javascript
+function initEquityChart() {
+  if (state.equityChart) state.equityChart.remove();
+  state.equityChart = LightweightCharts.createChart(document.getElementById("equityChartContainer"), {
+    layout: {
+      background: { color: "#121826" },
+      textColor: "#e5e7eb",
+    },
+    grid: { vertLines: { color: "#1f2937" }, horzLines: { color: "#1f2937" } },
+    rightPriceScale: { borderColor: "#1f2937" },
+    timeScale: { borderColor: "#1f2937" },
+  });
+  state.equitySeries = state.equityChart.addLineSeries({ color: "#3b82f6", lineWidth: 2 });
+}
+
+function renderEquity(equityCurve, trades) {
+  if (!state.equitySeries) initEquityChart();
+  const data = equityCurve.map((pt) => ({ time: isoToTimestamp(pt.timestamp), value: pt.equity }));
+  state.equitySeries.setData(data);
+
+  const markers = trades.flatMap((t) => [
+    { time: isoToTimestamp(t.entry_time), position: "belowBar", color: "#22c55e", shape: "arrowUp", text: "买" },
+    { time: isoToTimestamp(t.exit_time), position: "aboveBar", color: "#ef4444", shape: "arrowDown", text: "卖" },
+  ]);
+  state.equitySeries.setMarkers(markers);
+  state.equityChart.timeScale().fitContent();
+
+  const wins = trades.filter((t) => t.pnl > 0).length;
+  document.getElementById("tradeSummary").innerHTML = `
+    <span>交易数：<span class="value">${trades.length}</span></span>
+    <span>胜率：<span class="value">${trades.length ? ((wins / trades.length) * 100).toFixed(1) : 0}%</span></span>
+    <span>最终净值：<span class="value">${trades.length ? trades[trades.length - 1].exit_price : "-"}</span></span>
+  `;
+}
+```
+
+注意：净值最终值应使用 equityCurve 最后一项的 equity，而非 exit_price。修正：
+
+```javascript
+const finalEquity = equityCurve.length ? equityCurve[equityCurve.length - 1].equity : "-";
+```
+
+- [ ] **Step 4: 在 `loadAll` 中调用净值加载**
+
+在 `loadAll` 的 try 块末尾追加：
+
+```javascript
+const equityRes = await apiGet("/backtest/equity", { sub_index: state.subIndex, period: state.period });
+renderEquity(equityRes.equity_curve, equityRes.trades);
+```
+
+- [ ] **Step 5: 绑定标签页切换**
+
+```javascript
+function bindChartTabs() {
+  document.querySelectorAll(".chart-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".chart-tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      state.activeChart = tab.dataset.chart;
+      document.getElementById("chartContainer").classList.toggle("active", state.activeChart === "price");
+      document.getElementById("equityChartContainer").classList.toggle("active", state.activeChart === "equity");
+      if (state.activeChart === "equity" && state.equityChart) {
+        state.equityChart.applyOptions({ width: document.getElementById("equityChartContainer").clientWidth });
+        state.equityChart.timeScale().fitContent();
+      }
+    });
+  });
+}
+```
+
+在 `init()` 中调用 `initEquityChart()` 和 `bindChartTabs()`。
+
+- [ ] **Step 6: 手动验收并提交**
+
+启动服务器，验证：
+1. 价格/净值标签可切换；
+2. 净值图显示蓝色曲线与买卖箭头；
+3. 交易摘要更新。
+
+```bash
+git add frontend/index.html frontend/static/style.css frontend/static/app.js
+git commit -m "feat(frontend): add equity curve and trade marker chart"
+```
+
+---
+
+### Task 5: 修复浪形草图 SVG 折线回溯问题
+
+**Files:**
+- Modify: `frontend/static/app.js`
+- Test: `tests/frontend/phase16_e2e.md`
+
+- [ ] **Step 1: 在 `renderWaveSketch` 中过滤回溯点**
+
+在 prices 提取后、绘制前加入单调性清理：
+
+```javascript
+function renderWaveSketch(sketch) {
+  // ... 前置空检查不变
+
+  // 移除导致折线水平回溯或违反波浪顺序的重复/回退点
+  const cleaned = [];
+  for (const pt of sketch) {
+    if (cleaned.length < 2) {
+      cleaned.push(pt);
+      continue;
+    }
+    const prev = cleaned[cleaned.length - 1];
+    const prev2 = cleaned[cleaned.length - 2];
+    const prevDir = Math.sign(prev.price - prev2.price);
+    const curDir = Math.sign(pt.price - prev.price);
+    // 允许方向改变（形成浪），但不允许同方向价格回退
+    if (curDir !== 0 && curDir === prevDir && pt.price * curDir <= prev.price * curDir) {
+      continue;
+    }
+    cleaned.push(pt);
+  }
+
+  const prices = cleaned.map((p) => p.price);
+  // ... 后续逻辑使用 cleaned 替代 sketch
+}
+```
+
+- [ ] **Step 2: 将后续绘制循环中的 `sketch` 替换为 `cleaned`**
+
+```javascript
+const points = cleaned.map((pt, i) => `${xFor(i)},${yFor(pt.price)}`).join(" ");
+// ...
+cleaned.forEach((pt, i) => {
+  // 绘制圆点与标签
+});
+```
+
+- [ ] **Step 3: 提交**
+
+```bash
+git add frontend/static/app.js
+git commit -m "fix(frontend): remove wave sketch backtracking points"
+```
+
+---
+
+### Task 6: 后端监控指标聚合器
+
+**Files:**
+- Create: `src/api/monitoring.py`
+- Test: `tests/test_monitoring.py`
+
+- [ ] **Step 1: 实现内存滚动窗口指标聚合**
+
+```python
+"""Runtime monitoring and alerting for the scenario API.
+
+Keeps a small in-memory rolling window of request latencies and outcomes.
+Exposes aggregated metrics and logs alerts when thresholds are breached.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import logging
+import statistics
+import threading
+import time
+from collections import deque
+from typing import Any
+
+from src.api.logging import get_logger
+
+
+LOGGER = get_logger("csqaq.monitoring")
+
+
+@dataclasses.dataclass(frozen=True)
+class RequestRecord:
+    """A single request observation."""
+
+    endpoint: str
+    latency_ms: float
+    error: bool
+    timestamp: float
+
+
+@dataclasses.dataclass
+class AlertThresholds:
+    """Configurable alert thresholds."""
+
+    failure_rate: float = 0.05
+    latency_p99_ms: float = 2000.0
+    brier_drift: float = 0.05
+
+
+class MetricsCollector:
+    """Thread-safe rolling-window metrics collector."""
+
+    def __init__(self, window_seconds: float = 300.0) -> None:
+        self._window_seconds = window_seconds
+        self._records: deque[RequestRecord] = deque()
+        self._lock = threading.Lock()
+        self._thresholds = AlertThresholds()
+        self._brier_baseline: float | None = None
+
+    def record(
+        self,
+        endpoint: str,
+        latency_ms: float,
+        error: bool = False,
+    ) -> None:
+        """Record a request observation."""
+        now = time.time()
+        record = RequestRecord(
+            endpoint=endpoint,
+            latency_ms=float(latency_ms),
+            error=error,
+            timestamp=now,
+        )
+        with self._lock:
+            self._records.append(record)
+            self._evict_old(now)
+
+    def update_brier_baseline(self, brier_score: float) -> None:
+        """Set the current Brier baseline for drift detection."""
+        self._brier_baseline = float(brier_score)
+
+    def _evict_old(self, now: float) -> None:
+        cutoff = now - self._window_seconds
+        while self._records and self._records[0].timestamp < cutoff:
+            self._records.popleft()
+
+    def _recent_records(self) -> list[RequestRecord]:
+        now = time.time()
+        with self._lock:
+            self._evict_old(now)
+            return list(self._records)
+
+    def metrics(self) -> dict[str, Any]:
+        """Return aggregated metrics for the current window."""
+        records = self._recent_records()
+        if not records:
+            return {
+                "window_seconds": self._window_seconds,
+                "request_count": 0,
+                "failure_count": 0,
+                "failure_rate": 0.0,
+                "latency_p50_ms": 0.0,
+                "latency_p99_ms": 0.0,
+                "brier_baseline": self._brier_baseline,
+            }
+
+        latencies = sorted(r.latency_ms for r in records)
+        failure_count = sum(1 for r in records if r.error)
+        request_count = len(records)
+        failure_rate = failure_count / request_count
+        p50 = latencies[len(latencies) // 2]
+        p99_idx = int(len(latencies) * 0.99) or len(latencies) - 1
+        p99 = latencies[p99_idx]
+
+        per_endpoint: dict[str, dict[str, Any]] = {}
+        for endpoint in {r.endpoint for r in records}:
+            ep_records = [r for r in records if r.endpoint == endpoint]
+            ep_latencies = sorted(r.latency_ms for r in ep_records)
+            ep_failures = sum(1 for r in ep_records if r.error)
+            per_endpoint[endpoint] = {
+                "request_count": len(ep_records),
+                "failure_rate": ep_failures / len(ep_records),
+                "latency_p99_ms": ep_latencies[int(len(ep_latencies) * 0.99) or len(ep_latencies) - 1],
+            }
+
+        return {
+            "window_seconds": self._window_seconds,
+            "request_count": request_count,
+            "failure_count": failure_count,
+            "failure_rate": round(failure_rate, 6),
+            "latency_p50_ms": round(p50, 3),
+            "latency_p99_ms": round(p99, 3),
+            "brier_baseline": self._brier_baseline,
+            "per_endpoint": per_endpoint,
+        }
+
+    def check_alerts(self) -> list[dict[str, Any]]:
+        """Check thresholds and return active alerts."""
+        records = self._recent_records()
+        alerts: list[dict[str, Any]] = []
+        if not records:
+            return alerts
+
+        latencies = sorted(r.latency_ms for r in records)
+        failure_count = sum(1 for r in records if r.error)
+        failure_rate = failure_count / len(records)
+        p99_idx = int(len(latencies) * 0.99) or len(latencies) - 1
+        p99 = latencies[p99_idx]
+
+        if failure_rate > self._thresholds.failure_rate:
+            alerts.append(
+                {
+                    "metric": "failure_rate",
+                    "value": round(failure_rate, 4),
+                    "threshold": self._thresholds.failure_rate,
+                    "severity": "critical",
+                }
+            )
+        if p99 > self._thresholds.latency_p99_ms:
+            alerts.append(
+                {
+                    "metric": "latency_p99_ms",
+                    "value": round(p99, 3),
+                    "threshold": self._thresholds.latency_p99_ms,
+                    "severity": "warning",
+                }
+            )
+        return alerts
+
+    def log_alerts(self) -> None:
+        """Log any active alerts."""
+        for alert in self.check_alerts():
+            LOGGER.warning(
+                "Monitoring alert: %(metric)s=%(value)s exceeds threshold %(threshold)s",
+                alert,
+            )
+
+
+# Singleton collector used across API endpoints.
+COLLECTOR = MetricsCollector()
+
+
+def record_request(endpoint: str, latency_ms: float, error: bool = False) -> None:
+    """Record a request and immediately check for alerts."""
+    COLLECTOR.record(endpoint, latency_ms, error)
+    COLLECTOR.log_alerts()
+```
+
+- [ ] **Step 2: 编写测试**
+
+```python
+# tests/test_monitoring.py
+"""Tests for the API monitoring collector."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.api.monitoring import MetricsCollector
+
+
+@pytest.fixture
+def collector():
+    return MetricsCollector(window_seconds=60.0)
+
+
+def test_metrics_empty(collector):
+    m = collector.metrics()
+    assert m["request_count"] == 0
+    assert m["failure_rate"] == 0.0
+
+
+def test_failure_rate_calculation(collector):
+    for _ in range(95):
+        collector.record("/scenario/generate", 100.0, error=False)
+    for _ in range(5):
+        collector.record("/scenario/generate", 100.0, error=True)
+    assert collector.metrics()["failure_rate"] == 0.05
+    assert collector.check_alerts() == []
+
+
+def test_failure_rate_alert(collector):
+    for _ in range(10):
+        collector.record("/scenario/generate", 100.0, error=True)
+    alerts = collector.check_alerts()
+    assert any(a["metric"] == "failure_rate" for a in alerts)
+
+
+def test_latency_p99_alert(collector):
+    for i in range(100):
+        collector.record("/scenario/generate", float(i * 10), error=False)
+    alerts = collector.check_alerts()
+    assert any(a["metric"] == "latency_p99_ms" for a in alerts)
+
+
+def test_window_eviction(collector):
+    collector.record("/scenario/generate", 100.0, error=False)
+    import time
+    time.sleep(0.05)
+    collector.window_seconds = 0.01
+    m = collector.metrics()
+    assert m["request_count"] == 0
+```
+
+注意：`window_seconds` 是 dataclass 字段，但上面的测试直接赋值不优雅。应通过初始化参数：
+
+```python
+def test_window_eviction():
+    collector = MetricsCollector(window_seconds=0.01)
+    collector.record("/scenario/generate", 100.0, error=False)
+    time.sleep(0.05)
+    assert collector.metrics()["request_count"] == 0
+```
+
+- [ ] **Step 3: 运行测试并提交**
+
+```bash
+pytest tests/test_monitoring.py -v
+```
+
+```bash
+git add src/api/monitoring.py tests/test_monitoring.py
+git commit -m "feat(api): add in-memory metrics collector with alerts"
+```
+
+---
+
+### Task 7: 在 scenario 端点接入监控并暴露 `/monitoring/metrics`
+
+**Files:**
+- Modify: `src/api/scenario_endpoints.py`
+- Modify: `src/api/monitoring.py`
+- Modify: `run_scenario_server.py`
+- Test: `tests/test_monitoring.py`
+
+- [ ] **Step 1: 在 `scenario_endpoints.py` 用监控器记录每个端点**
+
+在文件顶部导入：
+
+```python
+from src.api.monitoring import record_request
+```
+
+修改 `/scenario/generate` 的成功与失败分支，调用 `record_request`：
+
+```python
+except Exception as exc:
+    latency_ms = (time.perf_counter() - start) * 1000
+    record_request("/scenario/generate", latency_ms, error=True)
+    # ... 原有日志和 raise 不变
+
+# 成功分支末尾
+record_request("/scenario/generate", latency_ms, error=False)
+return {**payload, "cached": False}
+```
+
+对 `/scenario/ohlc`、`/scenario/history`、`/scenario/templates` 做同样处理：在成功分支末尾调用 `record_request(endpoint, latency_ms)`，失败分支调用 `record_request(endpoint, latency_ms, error=True)`。
+
+- [ ] **Step 2: 在 `monitoring.py` 添加 `/monitoring/metrics` 路由**
+
+在 `monitoring.py` 底部追加：
+
+```python
+from fastapi import APIRouter
+
+monitoring_router = APIRouter(prefix="/monitoring", tags=["monitoring"])
+
+
+@monitoring_router.get("/metrics")
+def metrics() -> dict[str, Any]:
+    """Return current rolling-window metrics and active alerts."""
+    return {
+        "metrics": COLLECTOR.metrics(),
+        "alerts": COLLECTOR.check_alerts(),
+        "thresholds": dataclasses.asdict(COLLECTOR._thresholds),
+    }
+```
+
+- [ ] **Step 3: 在 `run_scenario_server.py` 注册监控路由**
+
+```python
+from src.api.monitoring import monitoring_router
+
+app.include_router(monitoring_router)
+```
+
+- [ ] **Step 4: 测试端点**
+
+```python
+def test_monitoring_metrics(client):
+    # Trigger a request first to populate metrics.
+    client.get("/scenario/meta")
+    response = client.get("/monitoring/metrics")
+    assert response.status_code == 200
+    data = response.json()
+    assert "metrics" in data
+    assert "alerts" in data
+```
+
+- [ ] **Step 5: 运行测试并提交**
+
+```bash
+pytest tests/test_monitoring.py tests/test_scenario_api.py -v
+```
+
+```bash
+git add src/api/scenario_endpoints.py src/api/monitoring.py run_scenario_server.py tests/test_monitoring.py
+git commit -m "feat(api): wire monitoring into scenario endpoints and expose /monitoring/metrics"
+```
+
+---
+
+### Task 8: 前端监控摘要面板
+
+**Files:**
+- Modify: `frontend/index.html`
+- Modify: `frontend/static/app.js`
+- Modify: `frontend/static/style.css`
+- Test: `tests/frontend/phase16_e2e.md`
+
+- [ ] **Step 1: 在 `index.html` header 添加监控摘要区**
+
+```html
+<div class="monitoring-summary" id="monitoringSummary"></div>
+```
+
+- [ ] **Step 2: 在 `style.css` 添加监控摘要样式**
+
+```css
+.monitoring-summary {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.monitoring-summary .alert { color: #ef4444; font-weight: 600; }
+.monitoring-summary .ok { color: #22c55e; }
+```
+
+- [ ] **Step 3: 在 `app.js` 定时拉取监控指标**
+
+```javascript
+const MONITORING_REFRESH_MS = 30_000;
+
+async function loadMonitoring() {
+  try {
+    const data = await apiGet("/monitoring/metrics");
+    const m = data.metrics;
+    const alerts = data.alerts || [];
+    const alertText = alerts.length
+      ? `<span class="alert">告警：${alerts.map((a) => `${a.metric}=${a.value}`).join(", ")}</span>`
+      : `<span class="ok">运行正常</span>`;
+    document.getElementById("monitoringSummary").innerHTML = `
+      <span>P99: ${m.latency_p99_ms.toFixed(1)}ms</span>
+      <span>失败率: ${(m.failure_rate * 100).toFixed(2)}%</span>
+      <span>请求数: ${m.request_count}</span>
+      ${alertText}
+    `;
+  } catch (err) {
+    document.getElementById("monitoringSummary").innerHTML = `<span class="alert">监控不可用</span>`;
+  }
+}
+
+function initMonitoring() {
+  loadMonitoring();
+  setInterval(loadMonitoring, MONITORING_REFRESH_MS);
+}
+```
+
+在 `init()` 中调用 `initMonitoring()`。
+
+- [ ] **Step 4: 提交**
+
+```bash
+git add frontend/index.html frontend/static/style.css frontend/static/app.js
+git commit -m "feat(frontend): add monitoring summary panel"
+```
+
+---
+
+### Task 9: 完整回归测试与 Phase 16 对齐报告
+
+**Files:**
+- Create: `tests/frontend/phase16_e2e.md`
+- Create: `strategic-alignment-phase16.md`
+- Modify: 必要时更新 `docs/scenario_api.md`
+
+- [ ] **Step 1: 编写前端手动验收清单**
+
+```markdown
+# Phase 16 前端验收清单
+
+1. 全局错误边界
+   - [ ] 屏蔽 `/scenario/generate` 后刷新，出现错误覆盖层
+   - [ ] 点击重试恢复正常
+2. 面板加载态
+   - [ ] 刷新时各面板先显示 skeleton
+   - [ ] 数据到达后 skeleton 消失、内容出现
+3. 参数调节
+   - [ ] 修改近邻数后历史片段数量变化
+   - [ ] 修改模板置信度后匹配结果变化
+4. 净值曲线
+   - [ ] 切换到净值标签显示曲线
+   - [ ] 买卖点箭头与交易摘要一致
+5. 浪形草图
+   - [ ] 选择不同情景，草图无折线回溯
+6. 监控
+   - [ ] header 显示 P99 / 失败率 / 请求数
+   - [ ] 人为触发多次 500 后显示告警
+```
+
+- [ ] **Step 2: 运行完整测试套件**
+
+```bash
+python -m pytest tests/ -q --tb=short
+```
+
+- [ ] **Step 3: 生成 Phase 16 战略-战术对齐报告**
+
+创建 `strategic-alignment-phase16.md`，包含：
+- 阶段目标完成情况表
+- 验收标准检查表（AC94–AC98）
+- 关键变更文件列表
+- 战略对齐检查（G7 可视化、G2 回测可视化、G4/G6 监控）
+- 下一步建议
+
+- [ ] **Step 4: 提交所有变更**
+
+```bash
+git add .
+git commit -m "docs: add Phase 16 tactical plan and strategic alignment report"
+```
+
+---
+
+## Self-Review
+
+**1. Spec coverage:**
+- T101 全局错误边界 + skeleton → Task 1
+- T102 参数调节原型 → Task 2
+- T103 净值曲线与交易点位 → Task 3 + Task 4
+- T104 浪形草图折线交叉 → Task 5
+- T105 结构化日志聚合与告警 → Task 6 + Task 7 + Task 8
+- AC94–AC98 验收标准 → 各 Task 及 Task 9 对齐报告
+
+**2. Placeholder scan:** 无 TBD/TODO；每步均含代码或命令。
+
+**3. Type consistency：**
+- `state.method`/`state.nNeighbors`/`state.minConfidence` 在 Task 2 定义并在 Task 1 `loadAll` 中使用。
+- `record_request` 签名一致（endpoint, latency_ms, error=False）。
+- `/backtest/equity` 返回字段在 Task 3 与 Task 4 消费端一致。
+
+---
+
+## Execution Handoff
+
+**Plan complete and saved to `docs/superpowers/plans/2026-07-28-phase16-frontend-monitoring.md`. Two execution options:**
+
+**1. Subagent-Driven (recommended)** - I dispatch a fresh subagent per task, review between tasks, fast iteration
+
+**2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints
+
+**Which approach?**
