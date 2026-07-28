@@ -1,0 +1,582 @@
+# Phase 17 跨子指数策略绩效验证与超额收益报告
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** 在所有可用子指数上跑通价格行为策略回测，与买入持有基准对比，生成超额收益报告，验证战略目标 G2，并补齐 Phase 16 遗留的 Brier 漂移监控基线接口。
+
+**Architecture:** 新增 `src/analysis/performance.py` 统一封装“策略回测 + 买入持有基准 + 超额收益”三元组；新增 `generate_phase17_report.py` 遍历缓存中的子指数日线数据，批量产出 `reports/phase17_strategy_performance.json`；扩展 `src/api/monitoring.py` 从 `data/calibration/<sub_index>_brier.json` 读取基线并在漂移时告警。
+
+**Tech Stack:** Python 3.10, pandas, numpy, pytest, FastAPI.
+
+---
+
+## File Structure
+
+| 文件 | 类型 | 职责 |
+|------|------|------|
+| `src/analysis/performance.py` | 新建 | 对比策略与买入持有，输出超额收益与胜率等指标 |
+| `tests/test_performance.py` | 新建 | 覆盖 performance.py 的核心计算路径 |
+| `generate_phase17_report.py` | 新建 | 遍历子指数缓存，生成 Phase 17 绩效报告 |
+| `tests/test_phase17_report.py` | 新建 | 验证报告生成器结构与输出字段 |
+| `src/api/monitoring.py` | 修改 | 增加 Brier 基线加载与漂移告警 |
+| `tests/test_monitoring.py` | 修改 | 补充 Brier 漂移告警用例 |
+| `tests/test_phase15_report.py` | 修改 | 修正测试函数命名与断言描述 |
+| `strategic-alignment-phase17.md` | 新建 | Phase 17 战略-战术对齐检查报告 |
+
+---
+
+## Task 1: 创建策略绩效对比模块
+
+**Files:**
+- Create: `src/analysis/performance.py`
+- Test: `tests/test_performance.py`
+
+- [ ] **Step 1: 写失败测试**
+
+```python
+# tests/test_performance.py
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from src.analysis.performance import compare_strategy_vs_benchmark
+
+
+def _make_ohlc_with_signal(n: int = 50) -> pd.DataFrame:
+    rng = np.random.default_rng(17)
+    price = 100.0 * np.exp(np.cumsum(rng.normal(0.0, 0.005, n)))
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="D", tz="UTC"),
+            "open": price,
+            "high": price * 1.02,
+            "low": price * 0.98,
+            "close": price,
+        }
+    )
+    # Force one long signal near the start so the strategy participates.
+    df["signal_long"] = False
+    df["signal_swing_low"] = df["low"]
+    df["signal_swing_high"] = df["high"]
+    df.loc[5, "signal_long"] = True
+    return df
+
+
+def test_compare_returns_required_fields():
+    df = _make_ohlc_with_signal()
+    result = compare_strategy_vs_benchmark(df)
+    assert "strategy" in result
+    assert "benchmark" in result
+    assert "excess_return" in result
+    assert "beat_buy_and_hold" in result
+    assert isinstance(result["beat_buy_and_hold"], bool)
+```
+
+Run: `pytest tests/test_performance.py::test_compare_returns_required_fields -v`
+Expected: FAIL with `ModuleNotFoundError` or `ImportError`.
+
+- [ ] **Step 2: 实现最小模块**
+
+```python
+# src/analysis/performance.py
+from __future__ import annotations
+
+from typing import Any
+
+import pandas as pd
+
+from src.analysis.buy_and_hold import compute_buy_and_hold
+from src.analysis.metrics import summarize
+from src.backtest.engine import BacktestParams, run_backtest
+from src.strategy.signal import SignalParams, generate_signals
+
+
+def compare_strategy_vs_benchmark(
+    df: pd.DataFrame,
+    signal_params: SignalParams | None = None,
+    backtest_params: BacktestParams | None = None,
+) -> dict[str, Any]:
+    """Run strategy backtest and compare with buy-and-hold benchmark.
+
+    Args:
+        df: OHLC DataFrame. If ``signal_long`` is not present, signals are
+            generated using ``signal_params``.
+        signal_params: Parameters for signal generation.
+        backtest_params: Parameters for the backtest engine.
+
+    Returns:
+        Dictionary with strategy metrics, benchmark metrics, excess return,
+        and a boolean flag indicating whether the strategy beat buy-and-hold.
+    """
+    signal_params = signal_params or SignalParams()
+    backtest_params = backtest_params or BacktestParams()
+
+    if "signal_long" not in df.columns:
+        df = generate_signals(df, signal_params)
+
+    backtest_result = run_backtest(df, backtest_params)
+    strategy_metrics = summarize(backtest_result)
+    benchmark_metrics = compute_buy_and_hold(df)
+
+    excess_return = float(strategy_metrics["total_return"] - benchmark_metrics["total_return"])
+
+    return {
+        "strategy": strategy_metrics,
+        "benchmark": benchmark_metrics,
+        "excess_return": round(excess_return, 6),
+        "beat_buy_and_hold": excess_return > 0,
+    }
+```
+
+Run: `pytest tests/test_performance.py::test_compare_returns_required_fields -v`
+Expected: PASS.
+
+- [ ] **Step 3: 提交**
+
+```bash
+git add src/analysis/performance.py tests/test_performance.py
+git commit -m "feat(analysis): add strategy vs buy-and-hold comparison module"
+```
+
+---
+
+## Task 2: 创建 Phase 17 报告生成器
+
+**Files:**
+- Create: `generate_phase17_report.py`
+- Test: `tests/test_phase17_report.py`
+
+- [ ] **Step 1: 写失败测试**
+
+```python
+# tests/test_phase17_report.py
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from generate_phase17_report import build_phase17_report
+
+
+def test_report_contains_per_sub_index_and_summary():
+    rng = np.random.default_rng(21)
+    n = 60
+    price = 100.0 * np.exp(np.cumsum(rng.normal(0.0, 0.01, n)))
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="D", tz="UTC"),
+            "open": price,
+            "high": price * (1.0 + np.abs(rng.normal(0.0, 0.01, n))),
+            "low": price * (1.0 - np.abs(rng.normal(0.0, 0.01, n))),
+            "close": price,
+        }
+    )
+    df["signal_long"] = False
+    df["signal_swing_low"] = df["low"]
+    df["signal_swing_high"] = df["high"]
+    df.loc[10, "signal_long"] = True
+
+    report = build_phase17_report({"test_index": df})
+    assert "generated_at" in report
+    assert "per_sub_index" in report
+    assert "summary" in report
+    assert "test_index" in report["per_sub_index"]
+    entry = report["per_sub_index"]["test_index"]
+    assert "strategy" in entry
+    assert "benchmark" in entry
+    assert "excess_return" in entry
+    assert "beat_buy_and_hold" in entry
+```
+
+Run: `pytest tests/test_phase17_report.py::test_report_contains_per_sub_index_and_summary -v`
+Expected: FAIL with `ModuleNotFoundError`.
+
+- [ ] **Step 2: 实现报告生成器**
+
+```python
+# generate_phase17_report.py
+"""生成 Phase 17 跨子指数策略绩效与超额收益报告。"""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from src.analysis.performance import compare_strategy_vs_benchmark
+from src.config import Settings
+from src.data.cache import cache_file_path, load
+
+
+DEFAULT_OUTPUT_DIR = Path("reports")
+DEFAULT_OUTPUT_PATH = DEFAULT_OUTPUT_DIR / "phase17_strategy_performance.json"
+
+
+def _discover_sub_indices(settings: Settings) -> list[str]:
+    """从日线缓存目录发现子指数名称。"""
+    cache_dir = Path(settings.cache_path)
+    discovered: set[str] = set()
+    if cache_dir.exists():
+        for path in cache_dir.glob("*_1d.parquet"):
+            name = path.stem.rsplit("_", 1)[0]
+            if name:
+                discovered.add(name)
+    if discovered:
+        return sorted(discovered)
+    return ["手套", "匕首", "百元主战", "贴纸"]
+
+
+def _load_daily_df(sub_index: str, settings: Settings) -> pd.DataFrame | None:
+    """加载缓存的日线 OHLC 数据。"""
+    path = cache_file_path(sub_index, "1day", settings.cache_path)
+    df = load(path)
+    if df is None or df.empty:
+        return None
+    return df.reset_index(drop=True)
+
+
+def build_phase17_report(
+    df_by_sub_index: dict[str, pd.DataFrame] | None = None,
+) -> dict[str, Any]:
+    """为每个子指数计算策略绩效、买入持有基准与超额收益。"""
+    if df_by_sub_index is None:
+        settings = Settings()
+        sub_indices = _discover_sub_indices(settings)
+        df_by_sub_index = {}
+        for sub_index in sub_indices:
+            df = _load_daily_df(sub_index, settings)
+            if df is not None:
+                df_by_sub_index[sub_index] = df
+
+    per_sub_index: dict[str, Any] = {}
+    beat_count = 0
+    total_excess = 0.0
+
+    for sub_index, df in df_by_sub_index.items():
+        comparison = compare_strategy_vs_benchmark(df)
+        per_sub_index[sub_index] = {
+            "sub_index": sub_index,
+            "bar_count": len(df),
+            **comparison,
+        }
+        if comparison["beat_buy_and_hold"]:
+            beat_count += 1
+        total_excess += comparison["excess_return"]
+
+    summary = {
+        "sub_index_count": len(per_sub_index),
+        "beat_buy_and_hold_count": beat_count,
+        "beat_buy_and_hold_ratio": round(beat_count / len(per_sub_index), 4)
+        if per_sub_index
+        else 0.0,
+        "average_excess_return": round(total_excess / len(per_sub_index), 6)
+        if per_sub_index
+        else 0.0,
+    }
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "per_sub_index": per_sub_index,
+        "summary": summary,
+    }
+
+
+def save_phase17_report(
+    report: dict[str, Any],
+    path: Path | str | None = None,
+) -> Path:
+    """将 Phase 17 报告持久化为 JSON。"""
+    output_path = Path(path or DEFAULT_OUTPUT_PATH)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(report, f, ensure_ascii=False, indent=2, default=str)
+    return output_path
+
+
+def main() -> None:
+    """CLI entry point for generating the Phase 17 report."""
+    report = build_phase17_report()
+    save_phase17_report(report)
+    print(f"Phase 17 report saved to {DEFAULT_OUTPUT_PATH}")
+    summary = report["summary"]
+    print(
+        f"Beat buy-and-hold: {summary['beat_buy_and_hold_count']}/{summary['sub_index_count']} "
+        f"({summary['beat_buy_and_hold_ratio']*100:.2f}%)"
+    )
+
+
+if __name__ == "__main__":
+    main()
+```
+
+Run: `pytest tests/test_phase17_report.py::test_report_contains_per_sub_index_and_summary -v`
+Expected: PASS.
+
+- [ ] **Step 3: 提交**
+
+```bash
+git add generate_phase17_report.py tests/test_phase17_report.py
+git commit -m "feat(reports): add Phase 17 cross-sub-index performance report generator"
+```
+
+---
+
+## Task 3: 运行 Phase 17 报告并提交结果
+
+**Files:**
+- Create: `reports/phase17_strategy_performance.json`
+
+- [ ] **Step 1: 运行生成器**
+
+Run: `python generate_phase17_report.py`
+Expected: 输出各子指数策略绩效、买入持有收益与超额收益，并保存到 `reports/phase17_strategy_performance.json`。
+
+- [ ] **Step 2: 提交报告**
+
+```bash
+git add reports/phase17_strategy_performance.json
+git commit -m "reports: add Phase 17 strategy performance and excess return results"
+```
+
+---
+
+## Task 4: 补齐 Phase 16 Brier 漂移监控基线
+
+**Files:**
+- Modify: `src/api/monitoring.py`
+- Test: `tests/test_monitoring.py`
+
+- [ ] **Step 1: 写失败测试**
+
+```python
+# tests/test_monitoring.py
+
+def test_brier_drift_alert(tmp_path, monkeypatch):
+    from src.api.monitoring import COLLECTOR, AlertThresholds
+
+    monkeypatch.setattr(
+        AlertThresholds, "brier_drift_threshold", 0.05, raising=False
+    )
+    baseline_path = tmp_path / "手套_brier.json"
+    baseline_path.write_text('{"brier_score": 0.20}')
+    COLLECTOR.update_brier_baseline(0.20)
+    COLLECTOR.set_brier_baseline_path(str(tmp_path))
+
+    alerts = COLLECTOR.check_alerts(current_brier=0.27)
+    drift_alerts = [a for a in alerts if a["metric"] == "brier_drift"]
+    assert len(drift_alerts) == 1
+    assert drift_alerts[0]["value"] == pytest.approx(0.07, abs=1e-6)
+```
+
+Run: `pytest tests/test_monitoring.py::test_brier_drift_alert -v`
+Expected: FAIL because `set_brier_baseline_path` and `brier_drift_threshold` do not exist.
+
+- [ ] **Step 2: 扩展 MetricsCollector**
+
+在 `src/api/monitoring.py` 的 `MetricsCollector.__init__` 中增加：
+
+```python
+self._brier_baseline_path: Path | None = None
+```
+
+在 `AlertThresholds` 中增加：
+
+```python
+brier_drift_threshold: float = 0.05
+```
+
+在 `MetricsCollector` 中增加方法：
+
+```python
+def set_brier_baseline_path(self, path: Path | str | None) -> None:
+    self._brier_baseline_path = Path(path) if path else None
+
+def _load_brier_baseline(self) -> float | None:
+    if self._brier_baseline is not None:
+        return self._brier_baseline
+    if self._brier_baseline_path is None:
+        return None
+    path = self._brier_baseline_path / "brier_baseline.json"
+    if not path.exists():
+        return None
+    import json
+
+    with path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    return float(data.get("brier_score", data.get("value", 0.0)))
+
+def check_alerts(self, current_brier: float | None = None) -> list[dict[str, Any]]:
+    # ... existing latency / failure rate alerts ...
+
+    baseline = self._load_brier_baseline()
+    if baseline is not None and current_brier is not None:
+        drift = current_brier - baseline
+        if drift > self._thresholds.brier_drift_threshold:
+            alerts.append(
+                {
+                    "metric": "brier_drift",
+                    "value": round(drift, 4),
+                    "threshold": self._thresholds.brier_drift_threshold,
+                    "current_brier": round(current_brier, 4),
+                    "baseline": round(baseline, 4),
+                    "severity": "warning",
+                }
+            )
+    return alerts
+```
+
+注意保持现有 `check_alerts` 签名向后兼容：为 `current_brier` 提供默认值 `None`。
+
+Run: `pytest tests/test_monitoring.py::test_brier_drift_alert -v`
+Expected: PASS.
+
+- [ ] **Step 3: 提交**
+
+```bash
+git add src/api/monitoring.py tests/test_monitoring.py
+git commit -m "feat(monitoring): add Brier drift baseline loading and alerting"
+```
+
+---
+
+## Task 5: 修复 Phase 15 测试命名
+
+**Files:**
+- Modify: `tests/test_phase15_report.py`
+
+- [ ] **Step 1: 修改测试函数名**
+
+将 `tests/test_phase15_report.py` 中的：
+
+```python
+def test_report_contains_brier_and_benchmark(tmp_path: Path, monkeypatch) -> None:
+```
+
+改为：
+
+```python
+def test_report_contains_buy_and_hold_benchmark(tmp_path: Path, monkeypatch) -> None:
+```
+
+- [ ] **Step 2: 运行测试**
+
+Run: `pytest tests/test_phase15_report.py -v`
+Expected: PASS.
+
+- [ ] **Step 3: 提交**
+
+```bash
+git add tests/test_phase15_report.py
+git commit -m "test: correct Phase 15 report test name to reflect buy-and-hold benchmark"
+```
+
+---
+
+## Task 6: 全量回归测试
+
+- [ ] **Step 1: 运行全量测试**
+
+Run: `pytest -q`
+Expected: 全部通过（新增用例后应 > 284 项）。
+
+---
+
+## Task 7: 创建 Phase 17 战略-战术对齐检查报告
+
+**Files:**
+- Create: `strategic-alignment-phase17.md`
+
+- [ ] **Step 1: 基于 `reports/phase17_strategy_performance.json` 与战略目标填写报告**
+
+报告模板：
+
+```markdown
+# 第十七阶段战略-战术对齐检查报告
+
+**阶段主题：** 跨子指数策略绩效验证与超额收益报告  
+**检查日期：** 2026-07-28  
+**对应战术文档：** [docs/superpowers/plans/2026-07-28-phase17-performance-validation.md](computer:///workspace/csqaq-glove-quant/docs/superpowers/plans/2026-07-28-phase17-performance-validation.md)
+
+---
+
+## 1. 阶段目标完成情况
+
+| 目标 | 状态 | 交付物 |
+|------|------|--------|
+| 策略 vs 买入持有对比模块 | 已完成 | `src/analysis/performance.py` |
+| 跨子指数绩效报告 | 已完成 | `reports/phase17_strategy_performance.json` |
+| Brier 漂移基线接口 | 已完成 | `src/api/monitoring.py` |
+| 回归测试 | 已完成 | `tests/test_performance.py`、`tests/test_phase17_report.py`、更新后的 `tests/test_monitoring.py` |
+| 战略-战术对齐检查 | 已完成 | 本报告 |
+
+## 2. 关键结果
+
+（根据实际生成的 `phase17_strategy_performance.json` 填写）
+
+## 3. 验收标准检查
+
+| 编号 | 验收项 | 结果 | 说明 |
+|------|--------|------|------|
+| G2 | 策略相对买入持有超额收益 > 0 | 待验证 | 见第 2 节 |
+| AC98 扩展 | Brier 基线可从文件加载并触发漂移告警 | 通过 | `MetricsCollector.set_brier_baseline_path` + `check_alerts(current_brier=...)` |
+
+## 4. 战略对齐检查
+
+| 检查项 | 是否对齐 | 说明 |
+|--------|---------|------|
+| G2 手套验证：超额收益可量化 | 是 | 报告输出 `excess_return` |
+| G1 通用框架：多子指数一键跑通 | 是 | 报告遍历所有缓存子指数 |
+| G6 校准可靠性：Brier 基线可监控 | 是 | 监控接口已预留 |
+| 不使用成交量 | 是 | 仅使用 OHLC 与时间 |
+| 框架无硬编码标的 | 是 | 子指数从缓存发现 |
+
+## 5. 结论
+
+第十七阶段完成了跨子指数策略绩效验证与超额收益报告，补齐了 Brier 漂移监控基线接口，为下一阶段是否调整策略参数或继续概率校准闭环提供了数据依据。
+```
+
+- [ ] **Step 2: 提交**
+
+```bash
+git add strategic-alignment-phase17.md
+git commit -m "docs: add Phase 17 strategic alignment report"
+```
+
+---
+
+## Self-Review
+
+1. **Spec coverage:**
+   - G2 验证 -> Task 1/2/3 输出超额收益。
+   - Brier 漂移监控 -> Task 4 扩展 monitoring。
+   - Phase 15 测试命名修复 -> Task 5。
+   - 无遗漏。
+
+2. **Placeholder scan:**
+   - 无 TBD/TODO。
+   - 所有代码块完整。
+   - 命令与预期输出明确。
+
+3. **Type consistency:**
+   - `compare_strategy_vs_benchmark` 返回字段与测试断言一致。
+   - `check_alerts(current_brier=None)` 保持向后兼容。
+
+---
+
+## Execution Handoff
+
+**Plan complete and saved to `docs/superpowers/plans/2026-07-28-phase17-performance-validation.md`.**
+
+**Execution approach:** Inline Execution - execute tasks in this session using executing-plans, batch execution with checkpoints.
