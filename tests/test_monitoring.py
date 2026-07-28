@@ -67,3 +67,35 @@ def test_monitoring_metrics_endpoint(monitoring_client):
     assert "metrics" in data
     assert "alerts" in data
     assert "thresholds" in data
+
+
+def test_brier_drift_alert(collector, tmp_path, monkeypatch):
+    baseline_path = tmp_path / "brier_baseline.json"
+    baseline_path.write_text('{"brier_score": 0.20}')
+    collector.set_brier_baseline_path(str(tmp_path))
+
+    alerts = collector.check_alerts(current_brier=0.27)
+    drift_alerts = [a for a in alerts if a["metric"] == "brier_drift"]
+    assert len(drift_alerts) == 1
+    assert drift_alerts[0]["value"] == pytest.approx(0.07, abs=1e-6)
+    assert drift_alerts[0]["baseline"] == pytest.approx(0.20, abs=1e-6)
+
+
+def test_brier_drift_no_alert_when_within_threshold(collector, tmp_path):
+    baseline_path = tmp_path / "brier_baseline.json"
+    baseline_path.write_text('{"brier_score": 0.20}')
+    collector.set_brier_baseline_path(str(tmp_path))
+
+    alerts = collector.check_alerts(current_brier=0.24)
+    drift_alerts = [a for a in alerts if a["metric"] == "brier_drift"]
+    assert drift_alerts == []
+
+
+def test_brier_drift_no_alert_without_current_brier(collector, tmp_path):
+    baseline_path = tmp_path / "brier_baseline.json"
+    baseline_path.write_text('{"brier_score": 0.20}')
+    collector.set_brier_baseline_path(str(tmp_path))
+
+    alerts = collector.check_alerts()
+    drift_alerts = [a for a in alerts if a["metric"] == "brier_drift"]
+    assert drift_alerts == []
