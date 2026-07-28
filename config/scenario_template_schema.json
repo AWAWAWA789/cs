@@ -1,0 +1,338 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CSQAQ Scenario Template DSL",
+  "description": "预定义模式模板描述语言 Schema。模板仅依赖 OHLC 与时间，不依赖成交量。",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "$ref": "#/definitions/template"
+  },
+  "definitions": {
+    "template": {
+      "type": "object",
+      "required": [
+        "name",
+        "category",
+        "direction",
+        "structure",
+        "projection"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "模板唯一标识，通常与文件名对应。"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "trend_continuation",
+            "consolidation",
+            "reversal"
+          ],
+          "description": "模板所属市场情景类别。"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "bullish",
+            "bearish",
+            "both"
+          ],
+          "description": "模板默认方向。both 表示根据当前价格突破方向动态判定。"
+        },
+        "description": {
+          "type": "string",
+          "description": "人类可读的模板说明。"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "波浪理论或其他经典规则的文字说明，便于人工审阅。"
+        },
+        "swing_order": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2,
+          "description": "Swing High/Low 检测的左右窗口长度。"
+        },
+        "min_required_bars": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30,
+          "description": "匹配该模板所需的最少 K 线数量。"
+        },
+        "structure": {
+          "type": "object",
+          "required": [
+            "sequence"
+          ],
+          "properties": {
+            "sequence": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "$ref": "#/definitions/swingPoint"
+              },
+              "description": "按时间顺序排列的 Swing 点序列。"
+            },
+            "structural_conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/structuralCondition"
+              },
+              "description": "结构条件：swing_high/low、高点/低点相对关系。"
+            },
+            "price_conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/priceCondition"
+              },
+              "description": "价格条件：price_ratio、atr_multiple、fib_retracement、breakout。"
+            },
+            "time_conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/timeCondition"
+              },
+              "description": "时间条件：min_bars、max_bars、max_gap。"
+            }
+          }
+        },
+        "projection": {
+          "type": "object",
+          "required": [
+            "support",
+            "resistance",
+            "target",
+            "stop_loss",
+            "suggestion",
+            "probability_prior"
+          ],
+          "properties": {
+            "support": {
+              "$ref": "#/definitions/formula"
+            },
+            "resistance": {
+              "$ref": "#/definitions/formula"
+            },
+            "target": {
+              "$ref": "#/definitions/formula"
+            },
+            "stop_loss": {
+              "$ref": "#/definitions/formula"
+            },
+            "suggestion": {
+              "type": "string",
+              "enum": [
+                "long",
+                "short",
+                "wait",
+                "neutral"
+              ]
+            },
+            "probability_prior": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "先验概率，由历史统计或领域知识给出。"
+            }
+          }
+        }
+      }
+    },
+    "swingPoint": {
+      "type": "object",
+      "required": [
+        "label",
+        "type"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "high",
+            "low"
+          ]
+        },
+        "optional": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "structuralCondition": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "swing_high",
+            "swing_low",
+            "higher_high",
+            "higher_low",
+            "lower_high",
+            "lower_low"
+          ]
+        },
+        "left": {
+          "type": "string",
+          "description": "左侧 Swing 点标签或当前价格标识。"
+        },
+        "right": {
+          "type": "string",
+          "description": "右侧 Swing 点标签或当前价格标识。"
+        },
+        "label": {
+          "type": "string",
+          "description": "当 type 为 swing_high/swing_low 时对应的标签。"
+        },
+        "required": {
+          "type": "boolean",
+          "default": true,
+          "description": "该条件是否为硬约束，失败时直接淘汰候选。"
+        }
+      }
+    },
+    "priceCondition": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "price_ratio",
+            "atr_multiple",
+            "fib_retracement",
+            "breakout"
+          ]
+        },
+        "left": {
+          "type": "string",
+          "description": "price_ratio 的左侧价格标签。"
+        },
+        "right": {
+          "type": "string",
+          "description": "price_ratio 的右侧价格标签。"
+        },
+        "min_ratio": {
+          "type": "number"
+        },
+        "max_ratio": {
+          "type": "number"
+        },
+        "a": {
+          "type": "string",
+          "description": "atr_multiple 的起始价格标签。"
+        },
+        "b": {
+          "type": "string",
+          "description": "atr_multiple 的结束价格标签。"
+        },
+        "min_multiple": {
+          "type": "number"
+        },
+        "max_multiple": {
+          "type": "number"
+        },
+        "swing_start": {
+          "type": "string",
+          "description": "fib_retracement 的波段起点标签。"
+        },
+        "swing_end": {
+          "type": "string",
+          "description": "fib_retracement 的波段终点标签。"
+        },
+        "point": {
+          "type": "string",
+          "description": "fib_retracement 中需要判定的回调点标签。"
+        },
+        "levels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "目标斐波那契回调位，如 ['0.382', '0.5', '0.618']。"
+        },
+        "tolerance": {
+          "type": "number",
+          "description": "fib_retracement 的相对容差。"
+        },
+        "level": {
+          "type": "string",
+          "description": "breakout 需要突破的价位标签。"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "bullish",
+            "bearish"
+          ]
+        },
+        "require_cross": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否要求前一根收盘价位于突破位的另一侧。"
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "timeCondition": {
+      "type": "object",
+      "required": [
+        "type",
+        "value"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "min_bars",
+            "max_bars",
+            "max_gap"
+          ]
+        },
+        "start": {
+          "type": "string",
+          "description": "起始 Swing 点标签。max_gap 未提供时对整个序列生效。"
+        },
+        "end": {
+          "type": "string",
+          "description": "结束 Swing 点标签。"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "formula": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "基于 Swing 标签、close、atr、direction 的安全公式表达式。"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    }
+  }
+}

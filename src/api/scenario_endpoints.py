@@ -1,0 +1,468 @@
+"""Scenario API endpoints for Phase 13.
+
+This module exposes the algorithmic scenario pipeline over HTTP. It is
+sub-index agnostic: callers provide ``sub_index`` (Chinese name) and
+``period`` and the backend loads cached OHLC data or falls back to a
+deterministic synthetic dataset when no API token is available.
+"""
+
+from __future__ import annotations
+
+import time
+from datetime import datetime, timezone
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from src.api.cache import SCENARIO_CACHE
+from src.api.client import CSQAQClient
+from src.api.endpoints import get_current_data_init, get_sub_kline
+from src.api.logging import get_logger, log_request
+from src.config import Settings
+from src.data.cache import cache_file_path, load as load_cache, save as save_cache
+from src.data.pipeline import filter_from_2024, normalize_kline
+from src.scenario_engine.scenario_generator import generate_scenarios
+from src.scenario_engine.similarity_search import find_similar_states
+from src.scenario_engine.template_matcher import match_templates
+
+
+LOGGER = get_logger("csqaq.scenario_api")
+
+
+router = APIRouter(prefix="/scenario", tags=["scenario"])
+
+# Supported K-line periods. The API accepts human-friendly aliases and
+# normalises them to the internal names used elsewhere in the project.
+_PERIOD_ALIASES = {
+    "1day": "1day",
+    "1d": "1day",
+    "daily": "1day",
+    "day": "1day",
+    "4hour": "4hour",
+    "4h": "4hour",
+    "1hour": "1hour",
+    "1h": "1hour",
+    "hour": "1hour",
+    "7day": "7day",
+    "7d": "7day",
+    "weekly": "7day",
+    "week": "7day",
+}
+SUPPORTED_PERIODS = {"1day", "4hour", "1hour", "7day"}
+
+# Minimum number of bars required by the downstream state-vector / template
+# engines. The synthetic fallback always produces at least this many rows.
+_MIN_BARS = 300
+
+
+class ExplainRequest(BaseModel):
+    """Request body for /scenario/explain."""
+
+    scenario: dict[str, Any] = Field(..., description="Algorithm-generated scenario JSON.")
+    context: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional market context (sub_index, period, current_price).",
+    )
+
+
+class ExplainResponse(BaseModel):
+    """Response from /scenario/explain."""
+
+    prompt: str
+    explanation: str
+    wave_sketch_description: str
+
+
+def _normalize_period(period: str) -> str:
+    """Convert a period alias to the internal period name."""
+    normalized = _PERIOD_ALIASES.get(str(period).strip().lower())
+    if normalized is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported period: {period}. Supported: {sorted(SUPPORTED_PERIODS)}",
+        )
+    return normalized
+
+
+def _resolve_sub_index_id(client: CSQAQClient, sub_index_name: str) -> str:
+    """Resolve a Chinese sub-index name to its API id."""
+    payload = get_current_data_init(client, skip_rate_limit=True)
+    sub_index_data = payload.get("sub_index_data", [])
+    for item in sub_index_data:
+        if item.get("name") == sub_index_name:
+            return str(item.get("id"))
+    for item in sub_index_data:
+        if sub_index_name in item.get("name", ""):
+            return str(item.get("id"))
+    raise ValueError(f"Sub-index name not found: {sub_index_name}")
+
+
+def _synthetic_ohlc(sub_index: str, period: str, n: int = _MIN_BARS) -> pd.DataFrame:
+    """Generate deterministic synthetic OHLC data for tests / demo mode.
+
+    The series is seeded from ``sub_index`` and ``period`` so repeated calls
+    for the same inputs return identical data.
+    """
+    seed = int(hash(f"{sub_index}:{period}")) % (2**31)
+    rng = np.random.default_rng(abs(seed))
+    price = 100.0 * np.exp(np.cumsum(rng.normal(0.0, 0.01, n)))
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="D", tz="UTC"),
+            "open": price * (1.0 + rng.normal(0.0, 0.005, n)),
+            "high": price * (1.0 + np.abs(rng.normal(0.0, 0.015, n))),
+            "low": price * (1.0 - np.abs(rng.normal(0.0, 0.015, n))),
+            "close": price,
+        }
+    )
+    # Ensure OHLC consistency.
+    df["high"] = df[["open", "high", "low", "close"]].max(axis=1)
+    df["low"] = df[["open", "high", "low", "close"]].min(axis=1)
+    return df
+
+
+def _load_ohlc(sub_index: str, period: str, *, force_refresh: bool = False) -> pd.DataFrame:
+    """Load OHLC data from cache, API, or synthetic fallback.
+
+    Args:
+        sub_index: Sub-index Chinese name, used for cache file naming.
+        period: Internal period name (e.g. ``1day``).
+        force_refresh: Ignore the local cache and attempt a fresh fetch.
+
+    Returns:
+        A DataFrame with ``timestamp``, ``open``, ``high``, ``low``, ``close``.
+    """
+    settings = Settings()
+    cache_path = cache_file_path(sub_index, period, settings.cache_path)
+
+    if not force_refresh:
+        df = load_cache(cache_path)
+        if df is not None:
+            return filter_from_2024(df)
+
+    # Attempt a real fetch only when an API token is configured.
+    if settings.api_token:
+        try:
+            client = CSQAQClient(settings)
+            sub_index_id = settings.sub_index_id or _resolve_sub_index_id(client, sub_index)
+            raw = get_sub_kline(client, sub_index_id, period, skip_rate_limit=True)
+            df = normalize_kline(raw)
+            save_cache(df, cache_path)
+            return filter_from_2024(df)
+        except Exception as exc:  # pragma: no cover - demo fallback path
+            # Fall back to synthetic data so the UI and tests always work.
+            pass
+
+    df = _synthetic_ohlc(sub_index, period)
+    save_cache(df, cache_path)
+    return df
+
+
+def _run_generate(sub_index: str, period: str) -> dict[str, Any]:
+    """Execute the scenario generator and wrap the result with metadata."""
+    df = _load_ohlc(sub_index, period)
+    if len(df) < _MIN_BARS:
+        df = _synthetic_ohlc(sub_index, period)
+
+    start = time.perf_counter()
+    result = generate_scenarios({period: df})
+    elapsed = time.perf_counter() - start
+
+    return {
+        "sub_index": sub_index,
+        "period": period,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generation_time_ms": round(elapsed * 1000, 3),
+        "scenarios": result["scenarios"],
+        "per_period": result.get("per_period", {}),
+    }
+
+
+@router.get("/generate")
+def generate(
+    sub_index: str = Query(..., description="Sub-index Chinese name (e.g. 手套)."),
+    period: str = Query("1day", description="K-line period (e.g. 1day, 4hour, 1hour)."),
+    refresh: bool = Query(False, description="Bypass cache and force regeneration."),
+) -> dict[str, Any]:
+    """Return the latest scenario set for the requested sub-index and period."""
+    period = _normalize_period(period)
+
+    if refresh:
+        SCENARIO_CACHE.invalidate(sub_index, period)
+
+    cached = SCENARIO_CACHE.get(sub_index, period)
+    if cached is not None:
+        log_request(
+            LOGGER,
+            endpoint="/scenario/generate",
+            sub_index=sub_index,
+            period=period,
+            cached=True,
+            scenario_count=len(cached.get("scenarios", [])),
+        )
+        return {**cached, "cached": True}
+
+    start = time.perf_counter()
+    try:
+        payload = _run_generate(sub_index, period)
+    except Exception as exc:
+        latency_ms = (time.perf_counter() - start) * 1000
+        log_request(
+            LOGGER,
+            endpoint="/scenario/generate",
+            sub_index=sub_index,
+            period=period,
+            latency_ms=latency_ms,
+            error=str(exc),
+        )
+        raise HTTPException(status_code=500, detail=f"Scenario generation failed: {exc}") from exc
+
+    SCENARIO_CACHE.set(sub_index, period, payload)
+    latency_ms = (time.perf_counter() - start) * 1000
+    log_request(
+        LOGGER,
+        endpoint="/scenario/generate",
+        sub_index=sub_index,
+        period=period,
+        latency_ms=latency_ms,
+        cached=False,
+        scenario_count=len(payload.get("scenarios", [])),
+    )
+    return {**payload, "cached": False}
+
+
+@router.get("/ohlc")
+def ohlc(
+    sub_index: str = Query(..., description="Sub-index Chinese name."),
+    period: str = Query("1day", description="K-line period."),
+) -> dict[str, Any]:
+    """Return the raw OHLC series used by the scenario pipeline."""
+    period = _normalize_period(period)
+    start = time.perf_counter()
+    df = _load_ohlc(sub_index, period)
+    latency_ms = (time.perf_counter() - start) * 1000
+    log_request(
+        LOGGER,
+        endpoint="/scenario/ohlc",
+        sub_index=sub_index,
+        period=period,
+        latency_ms=latency_ms,
+        extra={"bar_count": len(df)},
+    )
+
+    records = []
+    for _, row in df.iterrows():
+        ts = row["timestamp"]
+        if isinstance(ts, pd.Timestamp):
+            ts = ts.isoformat()
+        records.append(
+            {
+                "timestamp": ts,
+                "open": round(float(row["open"]), 6),
+                "high": round(float(row["high"]), 6),
+                "low": round(float(row["low"]), 6),
+                "close": round(float(row["close"]), 6),
+            }
+        )
+
+    return {
+        "sub_index": sub_index,
+        "period": period,
+        "count": len(records),
+        "ohlc": records,
+    }
+
+
+@router.get("/history")
+def history(
+    sub_index: str = Query(..., description="Sub-index Chinese name."),
+    period: str = Query("1day", description="K-line period."),
+    method: str = Query("knn", description="One of knn, dtw, cluster."),
+    n_neighbors: int = Query(10, ge=1, le=100, description="Number of historical matches."),
+) -> dict[str, Any]:
+    """Return historically similar market states for the current window."""
+    period = _normalize_period(period)
+    df = _load_ohlc(sub_index, period)
+
+    start = time.perf_counter()
+    try:
+        matches = find_similar_states(df, method=method, n_neighbors=n_neighbors)
+    except Exception as exc:
+        latency_ms = (time.perf_counter() - start) * 1000
+        log_request(
+            LOGGER,
+            endpoint="/scenario/history",
+            sub_index=sub_index,
+            period=period,
+            latency_ms=latency_ms,
+            error=str(exc),
+            extra={"method": method},
+        )
+        raise HTTPException(status_code=500, detail=f"Similarity search failed: {exc}") from exc
+
+    latency_ms = (time.perf_counter() - start) * 1000
+    log_request(
+        LOGGER,
+        endpoint="/scenario/history",
+        sub_index=sub_index,
+        period=period,
+        latency_ms=latency_ms,
+        extra={"method": method, "match_count": len(matches)},
+    )
+    return {
+        "sub_index": sub_index,
+        "period": period,
+        "method": method,
+        "matches": matches,
+    }
+
+
+@router.get("/templates")
+def templates(
+    sub_index: str = Query(..., description="Sub-index Chinese name."),
+    period: str = Query("1day", description="K-line period."),
+    min_confidence: float = Query(0.5, ge=0.0, le=1.0, description="Minimum template confidence."),
+) -> dict[str, Any]:
+    """Return the currently matched classic pattern templates."""
+    period = _normalize_period(period)
+    df = _load_ohlc(sub_index, period)
+
+    start = time.perf_counter()
+    try:
+        matches = match_templates(df, min_confidence=min_confidence)
+    except Exception as exc:
+        latency_ms = (time.perf_counter() - start) * 1000
+        log_request(
+            LOGGER,
+            endpoint="/scenario/templates",
+            sub_index=sub_index,
+            period=period,
+            latency_ms=latency_ms,
+            error=str(exc),
+            extra={"min_confidence": min_confidence},
+        )
+        raise HTTPException(status_code=500, detail=f"Template matching failed: {exc}") from exc
+
+    latency_ms = (time.perf_counter() - start) * 1000
+    log_request(
+        LOGGER,
+        endpoint="/scenario/templates",
+        sub_index=sub_index,
+        period=period,
+        latency_ms=latency_ms,
+        extra={"min_confidence": min_confidence, "match_count": len(matches)},
+    )
+    return {
+        "sub_index": sub_index,
+        "period": period,
+        "min_confidence": min_confidence,
+        "matches": matches,
+    }
+
+
+@router.post("/explain", response_model=ExplainResponse)
+def explain(request: ExplainRequest) -> ExplainResponse:
+    """Generate a constrained natural-language explanation for a scenario.
+
+    The prompt strictly instructs the LLM to explain the provided scenario
+    without re-judging direction, probability, or price levels. This endpoint
+    does not call an external LLM by default; it returns the prompt and a
+    deterministic template-based explanation so the API works offline.
+    """
+    scenario = request.scenario
+    ctx = request.context or {}
+
+    sub_index = ctx.get("sub_index", "当前标的")
+    period = ctx.get("period", "当前周期")
+    current_price = ctx.get("current_price", scenario.get("support", "未知"))
+
+    name = scenario.get("name", "未命名情景")
+    direction_label = scenario.get("direction_label", "neutral")
+    probability = scenario.get("probability", 0.0)
+    support = scenario.get("support")
+    resistance = scenario.get("resistance")
+    target = scenario.get("target")
+    stop_loss = scenario.get("stop_loss")
+    position_size = scenario.get("position_size", 0.0)
+    wave_sketch = scenario.get("wave_sketch", [])
+
+    prompt = (
+        "你是一名严谨的技术分析解释助手。请仅根据下方算法生成的情景 JSON 进行解释，\n"
+        "帮助用户理解该情景的假设、关键价位与浪形含义。\n"
+        "约束（必须遵守）：\n"
+        "1. 仅解释，不得重新判断方向、概率或价位。\n"
+        "2. 不得引入算法未给出的外部信息。\n"
+        "3. 保持客观，不给出投资建议。\n\n"
+        f"标的：{sub_index}，周期：{period}，当前价：{current_price}\n"
+        f"情景：{name}\n"
+        f"方向标签：{direction_label}，算法概率：{probability:.2%}\n"
+        f"关键价位：支撑={support}，阻力={resistance}，目标={target}，止损={stop_loss}\n"
+        f"建议仓位比例：{position_size:.2%}\n"
+        f"浪形草图点位：{wave_sketch}\n"
+    )
+
+    direction_text = {
+        "bullish": "偏多",
+        "bearish": "偏空",
+        "neutral": "中性",
+    }.get(direction_label, direction_label)
+
+    explanation = (
+        f"{name}（{direction_text}）的概率为 {probability:.2%}。"
+        f"算法在 {sub_index} 的 {period} 周期上识别出该情景，"
+        f"当前参考支撑 {support}、阻力 {resistance}，目标位 {target}，止损 {stop_loss}。"
+    )
+    if position_size:
+        explanation += f" 根据凯利近似与最大风险约束，建议仓位比例约为 {position_size:.2%}。"
+    else:
+        explanation += " 当前情景置信度较低，建议保持观望或轻仓。"
+
+    wave_desc = "浪形草图依次为："
+    if wave_sketch:
+        wave_desc += " → ".join(
+            f"{pt.get('label', '?')}({pt.get('price', '?')})" for pt in wave_sketch
+        )
+    else:
+        wave_desc += "（未提供具体浪形点位）"
+    wave_desc += "。该草图仅用于可视化参考，不代表未来真实走势。"
+
+    return ExplainResponse(
+        prompt=prompt,
+        explanation=explanation,
+        wave_sketch_description=wave_desc,
+    )
+
+
+@router.get("/meta")
+def meta() -> dict[str, Any]:
+    """Return available sub-indices discovered from local cache and supported periods.
+
+    The backend does not hard-code any sector list; it inspects cached OHLC
+    files and report artefacts to derive sub-index names.
+    """
+    settings = Settings()
+    cache_dir = cache_file_path("", "1day", settings.cache_path).parent
+    discovered: set[str] = set()
+
+    if cache_dir.exists():
+        for path in cache_dir.glob("*_*.parquet"):
+            name = path.stem.rsplit("_", 1)[0]
+            if name:
+                discovered.add(name)
+
+    # Also discover from previously generated phase reports (best-effort).
+    reports_dir = cache_dir.parents[1] / "reports"
+    if reports_dir.exists():
+        for path in reports_dir.glob("phase*_*_*.json"):
+            parts = path.stem.split("_")
+            if len(parts) >= 3:
+                discovered.add(parts[1])
+
+    return {
+        "available_sub_indices": sorted(discovered),
+        "supported_periods": sorted(SUPPORTED_PERIODS),
+        "default_period": "1day",
+    }

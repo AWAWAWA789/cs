@@ -1,0 +1,118 @@
+# 第十二阶段战略-战术对齐检查报告
+
+**阶段主题：** 双轨融合、贝叶斯校准与预计算索引  
+**检查日期：** 2026-07-27  
+**对应战术文档：** [tactical-document-phase12.md](computer:///workspace/tactical-document-phase12.md)  
+**前置报告：** [strategic-alignment-phase11.md](computer:///workspace/csqaq-glove-quant/strategic-alignment-phase11.md)
+
+---
+
+## 1. 阶段目标完成情况
+
+| 目标 | 状态 | 交付物 |
+|------|------|--------|
+| 双轨融合规则设计 | 已完成 | `src/scenario_engine/fusion.py` |
+| 双轨融合引擎实现 | 已完成 | `src/scenario_engine/fusion.py` |
+| 贝叶斯概率校准 | 已完成 | `src/scenario_engine/bayesian_calibration.py` |
+| 预计算历史状态索引 | 已完成 | `src/scenario_engine/index_builder.py`、`data/scenario_index/` |
+| 多时间框架融合 | 已完成 | `src/scenario_engine/multi_timeframe_fusion.py` |
+| 情景生成器 | 已完成 | `src/scenario_engine/scenario_generator.py` |
+| 融合引擎验证 | 已完成 | `reports/phase12_fusion_validation.json` |
+| 单元测试与双环境校验 | 已完成 | `tests/scenario_engine/` 新增 28 个测试，全部通过 |
+| 战略-战术对齐检查 | 已完成 | 本报告 |
+
+---
+
+## 2. 核心实验结果
+
+### 2.1 推理延迟
+
+| 子指数 | 推理延迟（秒） |
+|--------|---------------|
+| 手套 | 0.3484 |
+| 匕首 | 0.2400 |
+| 百元主战 | 0.2400 |
+| 贴纸 | 0.2400 |
+
+均满足战略指标 ≤ 2 秒。
+
+### 2.2 输出情景
+
+四个子指数均成功输出 4 种标准情景：上涨延续、下跌反转、先跌后涨、区间震荡。概率归一化后和为 1。
+
+### 2.3 Brier 分数（Proxy）
+
+| 子指数 | Brier 分数 |
+|--------|-----------|
+| 手套 | 0.101 |
+| 匕首 | 0.250 |
+| 百元主战 | 0.000 |
+| 贴纸 | 0.207 |
+
+> 注：当前 Brier 使用历史近邻后续收益率方向作为 proxy 标签，实际部署需用未来真实价格校准。
+
+---
+
+## 3. 验收标准检查
+
+| 编号 | 验收项 | 结果 | 说明 |
+|------|--------|------|------|
+| AC88 | 双轨融合规则完整 | 通过 | 支持同向强化、反向折中、互斥降级 |
+| AC89 | 融合后概率和为 1 | 通过 | 归一化误差 ≤ 1% |
+| AC90 | 贝叶斯校准可解释 | 通过 | 后验概率可分解为先验 × 似然 / 证据 |
+| AC91 | 校准后 Brier 分数 ≤ 0.25 | 部分通过 | 手套 / 贴纸达标，匕首接近阈值，百元主战为 0（proxy 标签导致） |
+| AC92 | 预计算索引构建 ≤ 5 分钟 | 通过 | 单个子指数索引构建在数秒内完成 |
+| AC93 | 单次预判延迟 ≤ 2 秒 | 通过 | 所有子指数 < 0.4 秒 |
+| AC94 | 多时间框架融合覆盖 3 周期 | 通过 | 日线 / 4h / 1h 均参与融合 |
+| AC95 | 输出 4–6 种标准情景 | 通过 | 输出 4 种标准情景 |
+| AC96 | 无成交量依赖 | 通过 | 未读取 `volume` |
+| AC97 | 子指数可迁移 | 通过 | 切换子指数仅需配置 |
+| AC98 | 双环境兼容 | 通过 | pytest 84 项全部通过 |
+
+---
+
+## 4. 战略对齐检查
+
+| 检查项 | 是否对齐 | 说明 |
+|--------|---------|------|
+| 框架无硬编码标的 | 是 | 融合引擎与子指数无关 |
+| 不使用成交量 | 是 | 仅基于 OHLC 与时间 |
+| 核心判断去 LLM 化 | 是 | 概率、方向、关键价位由算法输出 |
+| 多子指数可迁移 | 是 | 切换子指数仅需配置 |
+| 双环境可运行 | 是 | 验收 AC98 |
+
+---
+
+## 5. 未达标项根因与后续建议
+
+1. **Brier 分数 proxy 性质**
+   - 当前使用历史近邻后续收益率方向作为真实标签的 proxy，在样本稀疏时会出现 0 或波动。
+   - 建议：Phase 13 部署后积累真实未来价格，再重新校准并报告真实 Brier。
+
+2. **情景 source 字段部分为 unknown**
+   - 当 fallback 情景补足时，source 标注不够精细。
+   - 建议：Phase 13 可视化中允许用户查看每个情景的详细来源（相似历史片段 / 匹配模板 / fallback）。
+
+---
+
+## 6. 关键变更文件
+
+- `src/scenario_engine/fusion.py`
+- `src/scenario_engine/bayesian_calibration.py`
+- `src/scenario_engine/index_builder.py`
+- `src/scenario_engine/multi_timeframe_fusion.py`
+- `src/scenario_engine/scenario_generator.py`
+- `tests/scenario_engine/test_fusion.py`
+- `tests/scenario_engine/test_bayesian_calibration.py`
+- `tests/scenario_engine/test_index_builder.py`
+- `tests/scenario_engine/test_multi_timeframe_fusion.py`
+- `tests/scenario_engine/test_scenario_generator.py`
+- `generate_phase12_report.py`
+- `reports/phase12_fusion_validation.json`
+- `data/scenario_index/*.parquet`
+
+---
+
+## 7. 结论
+
+第十二阶段完成了双轨融合、贝叶斯概率校准、预计算历史状态索引、多时间框架融合以及情景生成器，双轨情景预判引擎的核心算法已经打通。四个子指数均能在 <0.4 秒内输出 4 种标准情景，且概率归一化、关键价位、仓位建议、浪形草图均已具备。建议在第十三阶段继续构建 FastAPI 服务与浏览器可视化交互界面，完成最终交付。

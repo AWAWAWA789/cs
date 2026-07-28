@@ -1,0 +1,22 @@
+[Unit]
+Description=CSQAQ Glove Quant Scenario API
+After=network.target
+
+[Service]
+Type=simple
+User=csqaq
+Group=csqaq
+WorkingDirectory=/opt/csqaq-glove-quant
+Environment=CSQAQ_HOST=0.0.0.0
+Environment=CSQAQ_PORT=8000
+Environment=CSQAQ_CACHE_PATH=/opt/csqaq-glove-quant/data/cache
+Environment=CSQAQ_LOG_FORMAT=json
+# Load additional secrets (e.g. CSQAQ_API_TOKEN) from an env file.
+EnvironmentFile=-/etc/csqaq/csqaq.env
+ExecStart=/opt/csqaq-glove-quant/.venv/bin/python -m uvicorn run_scenario_server:app --host 0.0.0.0 --port 8000
+ExecStartPre=/opt/csqaq-glove-quant/.venv/bin/python -m pytest tests --tb=short --quiet
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

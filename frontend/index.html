@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSQAQ Glove Quant - 情景分析</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <h1>CSQAQ Glove Quant · Phase 13 情景分析</h1>
+    <div class="controls">
+      <label for="subIndexSelect">子指数</label>
+      <select id="subIndexSelect"></select>
+      <label for="periodSelect">周期</label>
+      <select id="periodSelect">
+        <option value="1day" selected>日线</option>
+        <option value="4hour">4小时</option>
+        <option value="1hour">1小时</option>
+      </select>
+      <button id="refreshBtn" class="btn primary">手动刷新</button>
+      <label class="toggle">
+        <input type="checkbox" id="autoRefreshToggle">
+        <span>自动刷新（5分钟）</span>
+      </label>
+      <span id="statusText" class="status"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel chart-panel">
+      <div id="chartContainer"></div>
+      <div id="highlightInfo" class="highlight-info"></div>
+    </section>
+
+    <aside class="panel side-panel">
+      <h2>情景概率</h2>
+      <div id="scenarioBars"></div>
+
+      <h2>交易建议</h2>
+      <div id="tradeAdvice" class="advice-card"></div>
+
+      <h2>相似历史片段</h2>
+      <ul id="historyList" class="history-list"></ul>
+
+      <h2>模板匹配</h2>
+      <div id="templateCards" class="template-grid"></div>
+    </aside>
+
+    <section class="panel bottom-panel">
+      <div class="explanation-grid">
+        <div>
+          <h2>浪形草图</h2>
+          <svg id="waveSketch" viewBox="0 0 600 200" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+        <div>
+          <h2>LLM 解释</h2>
+          <div id="llmExplanation" class="explanation-box"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
