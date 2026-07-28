@@ -336,16 +336,35 @@ def _normalize_probabilities(scenarios: list[dict[str, Any]]) -> list[dict[str, 
 
 def _select_high_probability_scenarios(
     scenarios: list[dict[str, Any]],
+    df: pd.DataFrame,
     min_scenarios: int = 2,
     max_scenarios: int = 4,
+    target_scenarios: int = 3,
 ) -> list[dict[str, Any]]:
-    """按动态概率门槛筛选情景，确保数量在 [min, max] 之间，并做概率重归一化。"""
+    """按动态概率门槛筛选情景，确保数量在 [min, max] 之间，并做概率重归一化。
+
+    流程：
+    1. 按 scenario_key 去重，保留概率最高者；
+    2. 计算动态概率门槛，筛选高概率情景；
+    3. 若数量不足目标值，依次补足次高概率情景（不低于 5% 绝对硬底）；
+    4. 若仍不足最小值，从标准情景集合中补充 fallback 情景，fallback 概率固定为 0.20；
+    5. 若超过最大值，截断到前 max_scenarios；
+    6. 重归一化概率，使总和为 1。
+    """
     if not scenarios:
         return []
 
-    # 按概率降序排列，便于后续截取。
+    # 按 scenario_key 去重，保留概率最高者。
+    by_key: dict[str, dict[str, Any]] = {}
+    for s in scenarios:
+        key = s.get("scenario_key", "")
+        if key not in by_key or s["probability"] > by_key[key]["probability"]:
+            by_key[key] = dict(s)
+    unique_scenarios = list(by_key.values())
+
+    # 按概率降序排列。
     sorted_scenarios = sorted(
-        scenarios, key=lambda x: x["probability"], reverse=True
+        unique_scenarios, key=lambda x: x["probability"], reverse=True
     )
     probabilities = [s["probability"] for s in sorted_scenarios]
     threshold = _compute_probability_threshold(probabilities)
@@ -353,9 +372,56 @@ def _select_high_probability_scenarios(
     # 先按门槛筛选。
     selected = [s for s in sorted_scenarios if s["probability"] >= threshold]
 
-    # 兜底：不足 min_scenarios 时按概率排名补足。
-    if len(selected) < min_scenarios:
-        selected = sorted_scenarios[:min_scenarios]
+    # 补足到目标数量：允许低于动态门槛但不低于 5% 硬底的情景入选。
+    absolute_floor = 0.05
+    remaining = [
+        s for s in sorted_scenarios
+        if s not in selected and s["probability"] >= absolute_floor
+    ]
+    while len(selected) < target_scenarios and remaining:
+        selected.append(remaining.pop(0))
+
+    # 兜底：仍不足目标数量时，从标准情景集合补充 fallback。
+    if len(selected) < target_scenarios:
+        present_keys = {s["scenario_key"] for s in selected}
+        fallback_prob = 0.20
+        for key in STANDARD_SCENARIOS:
+            if len(selected) >= target_scenarios:
+                break
+            if key not in present_keys:
+                meta = STANDARD_SCENARIOS[key]
+                levels = _compute_price_levels(
+                    df, meta["direction"], None, None, None, None
+                )
+                close = float(df["close"].iloc[-1])
+                fallback = {
+                    "name": meta["display_name"],
+                    "scenario_key": key,
+                    "probability": fallback_prob,
+                    "direction": meta["direction"],
+                    "direction_label": _label_for_direction(meta["direction"]),
+                    "support": levels["support"],
+                    "resistance": levels["resistance"],
+                    "target": levels["target"],
+                    "stop_loss": levels["stop_loss"],
+                    "position_size": _compute_position_size(
+                        fallback_prob,
+                        levels["target"] or close,
+                        levels["stop_loss"] or close,
+                        close,
+                    ),
+                    "wave_sketch": _build_wave_sketch(
+                        df,
+                        meta["direction"],
+                        levels["support"] or close,
+                        levels["resistance"] or close,
+                        levels["target"] or close,
+                    ),
+                    "description": meta["description"],
+                    "source": "fallback",
+                }
+                selected.append(fallback)
+                present_keys.add(key)
 
     # 截断：超过 max_scenarios 时只保留前 max_scenarios。
     if len(selected) > max_scenarios:
@@ -633,7 +699,9 @@ def generate_scenarios(
     base_period = "1day" if "1day" in df_by_period else next(iter(df_by_period))
     base_df = df_by_period[base_period]
     scenarios = [_map_to_standard_scenario(c, base_df) for c in multi_tf]
-    scenarios = _select_high_probability_scenarios(scenarios, min_scenarios=min_scenarios, max_scenarios=max_scenarios)
+    scenarios = _select_high_probability_scenarios(
+        scenarios, base_df, min_scenarios=min_scenarios, max_scenarios=max_scenarios
+    )
 
     return {
         "scenarios": scenarios,
