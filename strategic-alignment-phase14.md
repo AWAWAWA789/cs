@@ -69,7 +69,7 @@ Brier 框架已可用，但当前数值高于 0.25 目标，需后续继续校�
 | AC114 | 日志完整 | 通过 | `/scenario/*` 各端点均记录子指数、周期、延迟、异常、结果摘要 |
 | AC115 | 部署脚本可用 | 通过 | `deploy.sh` 一键安装、测试、构建索引、启动服务并健康检查 |
 | AC116 | pytest 全部通过 | 通过 | 260 项测试通过 |
-| AC117 | git 提交规范 | 待执行 | 需按 Conventional Commits 提交 |
+| AC117 | git 提交规范 | 通过 | 已按 Conventional Commits 提交，commit `a36de1a` |
 | AC118 | 无成交量依赖 | 通过 | 新增逻辑未读取 `volume` |
 
 ---
