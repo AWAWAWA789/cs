@@ -21,6 +21,7 @@ from src.api.cache import SCENARIO_CACHE
 from src.api.client import CSQAQClient
 from src.api.endpoints import get_current_data_init, get_sub_kline
 from src.api.logging import get_logger, log_request
+from src.api.monitoring import record_request
 from src.config import Settings
 from src.data.cache import cache_file_path, load as load_cache, save as save_cache
 from src.data.pipeline import filter_from_2024, normalize_kline
@@ -218,6 +219,7 @@ def generate(
             latency_ms=latency_ms,
             error=str(exc),
         )
+        record_request("/scenario/generate", latency_ms, error=True)
         raise HTTPException(status_code=500, detail=f"Scenario generation failed: {exc}") from exc
 
     SCENARIO_CACHE.set(sub_index, period, payload)
@@ -231,6 +233,7 @@ def generate(
         cached=False,
         scenario_count=len(payload.get("scenarios", [])),
     )
+    record_request("/scenario/generate", latency_ms, error=False)
     return {**payload, "cached": False}
 
 
@@ -242,7 +245,13 @@ def ohlc(
     """Return the raw OHLC series used by the scenario pipeline."""
     period = _normalize_period(period)
     start = time.perf_counter()
-    df = _load_ohlc(sub_index, period)
+    try:
+        df = _load_ohlc(sub_index, period)
+    except Exception as exc:
+        latency_ms = (time.perf_counter() - start) * 1000
+        record_request("/scenario/ohlc", latency_ms, error=True)
+        raise HTTPException(status_code=500, detail=f"OHLC load failed: {exc}") from exc
+
     latency_ms = (time.perf_counter() - start) * 1000
     log_request(
         LOGGER,
@@ -252,6 +261,7 @@ def ohlc(
         latency_ms=latency_ms,
         extra={"bar_count": len(df)},
     )
+    record_request("/scenario/ohlc", latency_ms, error=False)
 
     records = []
     for _, row in df.iterrows():
@@ -301,6 +311,7 @@ def history(
             error=str(exc),
             extra={"method": method},
         )
+        record_request("/scenario/history", latency_ms, error=True)
         raise HTTPException(status_code=500, detail=f"Similarity search failed: {exc}") from exc
 
     latency_ms = (time.perf_counter() - start) * 1000
@@ -312,6 +323,7 @@ def history(
         latency_ms=latency_ms,
         extra={"method": method, "match_count": len(matches)},
     )
+    record_request("/scenario/history", latency_ms, error=False)
     return {
         "sub_index": sub_index,
         "period": period,
@@ -344,6 +356,7 @@ def templates(
             error=str(exc),
             extra={"min_confidence": min_confidence},
         )
+        record_request("/scenario/templates", latency_ms, error=True)
         raise HTTPException(status_code=500, detail=f"Template matching failed: {exc}") from exc
 
     latency_ms = (time.perf_counter() - start) * 1000
@@ -355,6 +368,7 @@ def templates(
         latency_ms=latency_ms,
         extra={"min_confidence": min_confidence, "match_count": len(matches)},
     )
+    record_request("/scenario/templates", latency_ms, error=False)
     return {
         "sub_index": sub_index,
         "period": period,
@@ -443,6 +457,7 @@ def meta() -> dict[str, Any]:
     The backend does not hard-code any sector list; it inspects cached OHLC
     files and report artefacts to derive sub-index names.
     """
+    start = time.perf_counter()
     settings = Settings()
     cache_dir = cache_file_path("", "1day", settings.cache_path).parent
     discovered: set[str] = set()
@@ -461,6 +476,8 @@ def meta() -> dict[str, Any]:
             if len(parts) >= 3:
                 discovered.add(parts[1])
 
+    latency_ms = (time.perf_counter() - start) * 1000
+    record_request("/scenario/meta", latency_ms, error=False)
     return {
         "available_sub_indices": sorted(discovered),
         "supported_periods": sorted(SUPPORTED_PERIODS),
