@@ -37,13 +37,14 @@ def test_compute_probability_threshold_dynamic_floor():
 
 
 def test_select_high_probability_scenarios_enforces_min_and_max():
+    df = _make_ohlc(50)
     scenarios = [
         {"scenario_key": "bullish_continuation", "probability": 0.5, "direction": 1},
         {"scenario_key": "bearish_reversal", "probability": 0.3, "direction": -1},
         {"scenario_key": "dip_then_rise", "probability": 0.15, "direction": 1},
         {"scenario_key": "range_bound", "probability": 0.05, "direction": 0},
     ]
-    selected = _select_high_probability_scenarios(scenarios)
+    selected = _select_high_probability_scenarios(scenarios, df)
     assert 2 <= len(selected) <= 4
     total = sum(s["probability"] for s in selected)
     assert abs(total - 1.0) < 1e-6
