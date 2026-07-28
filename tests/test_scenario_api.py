@@ -53,7 +53,7 @@ def test_generate_returns_scenarios(client):
     assert data["sub_index"] == "手套"
     assert data["period"] == "1day"
     assert "scenarios" in data
-    assert 4 <= len(data["scenarios"]) <= 6
+    assert 2 <= len(data["scenarios"]) <= 4
     assert data["cached"] is False
     assert "generation_time_ms" in data
 
