@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from src.features.swing import identify_swing_points
+from src.scenario_engine.adaptive_calibration import load_temperature
 from src.scenario_engine.bayesian_calibration import calibrate_probabilities
 from src.scenario_engine.fusion import fuse_results
 from src.scenario_engine.multi_timeframe_fusion import fuse_timeframes
@@ -415,6 +416,7 @@ def _generate_single_period(
     min_confidence: float,
     similarity_weight: float,
     template_weight: float,
+    temperature: float,
     precompute_state: bool,
     provided_similarity: list[dict[str, Any]] | None,
     provided_templates: list[dict[str, Any]] | None,
@@ -449,7 +451,9 @@ def _generate_single_period(
         similarity_weight=similarity_weight,
         template_weight=template_weight,
     )
-    calibrated = calibrate_probabilities(fused, similarity_results)
+    calibrated = calibrate_probabilities(
+        fused, similarity_results, temperature=temperature
+    )
 
     per_period = {
         "similarity_count": len(similarity_results),
@@ -462,11 +466,13 @@ def _generate_single_period(
 def generate_scenarios(
     df_by_period: dict[str, pd.DataFrame],
     *,
+    sub_index: str | None = None,
     n_neighbors: int = 10,
     min_confidence: float = 0.5,
     similarity_weight: float = 0.45,
     template_weight: float = 0.55,
     temperature: float = 0.8,
+    use_adaptive_temperature: bool = True,
     period_weights: dict[str, float] | None = None,
     max_scenarios: int = 6,
     min_scenarios: int = 4,
@@ -500,6 +506,10 @@ def generate_scenarios(
     per_period: dict[str, dict[str, Any]] = {}
     fused_by_period: dict[str, list[dict[str, Any]]] = {}
 
+    effective_temperature = temperature
+    if use_adaptive_temperature and sub_index:
+        effective_temperature = load_temperature(sub_index)
+
     if enable_parallel and len(df_by_period) > 1:
         # 多进程并行：模板匹配是纯 Python 循环，受 GIL 限制，进程级并行
         # 能真正利用多核缩短多周期冷生成时间。
@@ -515,6 +525,7 @@ def generate_scenarios(
                     min_confidence=min_confidence,
                     similarity_weight=similarity_weight,
                     template_weight=template_weight,
+                    temperature=effective_temperature,
                     precompute_state=precompute_state,
                     provided_similarity=similarity_results_by_period.get(period),
                     provided_templates=template_results_by_period.get(period),
@@ -533,6 +544,7 @@ def generate_scenarios(
                 min_confidence=min_confidence,
                 similarity_weight=similarity_weight,
                 template_weight=template_weight,
+                temperature=effective_temperature,
                 precompute_state=precompute_state,
                 provided_similarity=similarity_results_by_period.get(period),
                 provided_templates=template_results_by_period.get(period),
