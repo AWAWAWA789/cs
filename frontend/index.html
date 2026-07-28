@@ -9,16 +9,31 @@
 </head>
 <body>
   <header class="app-header">
-    <h1>CSQAQ Glove Quant · Phase 13 情景分析</h1>
+    <h1>CSQAQ Glove Quant · Phase 16 情景分析</h1>
     <div class="controls">
       <label for="subIndexSelect">子指数</label>
       <select id="subIndexSelect"></select>
+
       <label for="periodSelect">周期</label>
       <select id="periodSelect">
         <option value="1day" selected>日线</option>
         <option value="4hour">4小时</option>
         <option value="1hour">1小时</option>
       </select>
+
+      <label for="methodSelect">相似方法</label>
+      <select id="methodSelect">
+        <option value="knn" selected>KNN</option>
+        <option value="dtw">DTW</option>
+        <option value="cluster">Cluster</option>
+      </select>
+
+      <label for="nNeighborsInput">近邻数</label>
+      <input id="nNeighborsInput" type="number" min="1" max="100" value="10">
+
+      <label for="minConfidenceInput">模板置信度</label>
+      <input id="minConfidenceInput" type="number" min="0" max="1" step="0.05" value="0.5">
+
       <button id="refreshBtn" class="btn primary">手动刷新</button>
       <label class="toggle">
         <input type="checkbox" id="autoRefreshToggle">
@@ -26,37 +41,82 @@
       </label>
       <span id="statusText" class="status"></span>
     </div>
+    <div class="monitoring-summary" id="monitoringSummary"></div>
   </header>
 
   <main class="layout">
     <section class="panel chart-panel">
-      <div id="chartContainer"></div>
+      <div class="chart-tabs">
+        <button class="chart-tab active" data-chart="price">价格</button>
+        <button class="chart-tab" data-chart="equity">净值</button>
+      </div>
+      <div id="chartContainer" class="chart-content active"></div>
+      <div id="equityChartContainer" class="chart-content"></div>
       <div id="highlightInfo" class="highlight-info"></div>
     </section>
 
     <aside class="panel side-panel">
       <h2>情景概率</h2>
-      <div id="scenarioBars"></div>
+      <div class="panel-body" id="scenarioBarsBody">
+        <div id="scenarioBars" class="panel-content"></div>
+        <div class="skeleton" id="scenarioBarsSkeleton" aria-hidden="true">
+          <div class="skeleton-bar"></div>
+          <div class="skeleton-bar"></div>
+          <div class="skeleton-bar"></div>
+        </div>
+      </div>
 
       <h2>交易建议</h2>
-      <div id="tradeAdvice" class="advice-card"></div>
+      <div class="panel-body" id="tradeAdviceBody">
+        <div id="tradeAdvice" class="panel-content advice-card"></div>
+        <div class="skeleton" id="tradeAdviceSkeleton" aria-hidden="true">
+          <div class="skeleton-bar" style="width: 80%"></div>
+          <div class="skeleton-bar" style="width: 60%"></div>
+        </div>
+      </div>
 
       <h2>相似历史片段</h2>
-      <ul id="historyList" class="history-list"></ul>
+      <div class="panel-body" id="historyListBody">
+        <ul id="historyList" class="panel-content history-list"></ul>
+        <div class="skeleton" id="historyListSkeleton" aria-hidden="true">
+          <div class="skeleton-bar"></div>
+          <div class="skeleton-bar"></div>
+          <div class="skeleton-bar"></div>
+        </div>
+      </div>
 
       <h2>模板匹配</h2>
-      <div id="templateCards" class="template-grid"></div>
+      <div class="panel-body" id="templateCardsBody">
+        <div id="templateCards" class="panel-content template-grid"></div>
+        <div class="skeleton" id="templateCardsSkeleton" aria-hidden="true">
+          <div class="skeleton-bar"></div>
+          <div class="skeleton-bar"></div>
+        </div>
+      </div>
     </aside>
 
     <section class="panel bottom-panel">
+      <div class="trade-summary" id="tradeSummary"></div>
       <div class="explanation-grid">
         <div>
           <h2>浪形草图</h2>
-          <svg id="waveSketch" viewBox="0 0 600 200" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="panel-body" id="waveSketchBody">
+            <svg id="waveSketch" class="panel-content" viewBox="0 0 600 200" preserveAspectRatio="xMidYMid meet"></svg>
+            <div class="skeleton" id="waveSketchSkeleton" aria-hidden="true">
+              <div class="skeleton-bar" style="height: 120px"></div>
+            </div>
+          </div>
         </div>
         <div>
           <h2>LLM 解释</h2>
-          <div id="llmExplanation" class="explanation-box"></div>
+          <div class="panel-body" id="llmExplanationBody">
+            <div id="llmExplanation" class="panel-content explanation-box"></div>
+            <div class="skeleton" id="llmExplanationSkeleton" aria-hidden="true">
+              <div class="skeleton-bar"></div>
+              <div class="skeleton-bar" style="width: 90%"></div>
+              <div class="skeleton-bar" style="width: 70%"></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
