@@ -38,11 +38,11 @@ def _label_for_direction(direction: int) -> str:
 
 
 def _scenario_key(candidate: dict[str, Any]) -> str:
-    """根据候选方向生成一个可聚合的情景键。"""
-    direction = _direction_to_int(candidate.get("direction", 0))
+    """根据候选名称生成情景键；无名称时回退到方向标签。"""
     tmpl_name = candidate.get("template_name") or candidate.get("name", "")
     if tmpl_name:
-        return f"{tmpl_name}_{_label_for_direction(direction)}"
+        return tmpl_name
+    direction = _direction_to_int(candidate.get("direction", 0))
     return _label_for_direction(direction)
 
 
@@ -65,36 +65,76 @@ def _laplace_smooth(counts: np.ndarray, alpha: float) -> np.ndarray:
 
 def build_evidence_histogram(
     similarity_results: list[dict[str, Any]],
+    candidates: list[dict[str, Any]] | None = None,
     horizon: int = DEFAULT_HORIZON,
 ) -> dict[str, dict[str, Any]]:
     """从历史相似片段中统计各方向情景实际发生的频率。
 
-    每个方向键（bullish / bearish / neutral）的似然等于所有历史片段中
-    未来收益实际落在该方向的比例。
+    若提供 candidates，则按 ``{scenario_key}_{direction}`` 键统计，
+    区分不同 bullish / bearish 情景；否则按方向级聚合。
 
     Args:
         similarity_results: Phase 10 相似性搜索结果列表。
+        candidates: 可选的候选情景列表，用于生成情景键。
         horizon: 用于计算收益率的 K 线数量。
 
     Returns:
         每个情景键对应的统计字典，包含 ``occurred``、``total`` 与
         ``likelihood``。
     """
-    key_returns: dict[str, list[float]] = {}
+    key_returns: dict[str, list[tuple[float, int]]] = {}
     key = f"future_return_{horizon}"
+
     labels = ("bullish", "bearish", "neutral")
 
-    for r in similarity_results:
-        ret = r.get(key)
-        if ret is None:
-            continue
-        for label in labels:
-            key_returns.setdefault(label, []).append(float(ret))
+    if candidates:
+        candidate_keys = {_scenario_key(c): c for c in candidates}
+        direction_only_keys = set(candidate_keys.keys()) <= set(labels)
+
+        if direction_only_keys:
+            # 候选未提供名称时回退到方向级聚合，保持与旧逻辑一致。
+            for r in similarity_results:
+                ret = r.get(key)
+                if ret is None:
+                    continue
+                for label in labels:
+                    key_returns.setdefault(label, []).append(
+                        (float(ret), _direction_to_int(label))
+                    )
+        else:
+            for r in similarity_results:
+                ret = r.get(key)
+                if ret is None:
+                    continue
+                ret_direction_int = _direction_to_int(ret)
+                ret_direction = _label_for_direction(ret_direction_int)
+                matched = r.get("matched_scenario") or r.get("scenario_key")
+                if matched and matched in candidate_keys:
+                    label = matched
+                    expected_direction = _direction_to_int(
+                        candidate_keys[matched].get("direction", 0)
+                    )
+                else:
+                    label = ret_direction
+                    expected_direction = ret_direction_int
+                key_returns.setdefault(label, []).append(
+                    (float(ret), expected_direction)
+                )
+    else:
+        for r in similarity_results:
+            ret = r.get(key)
+            if ret is None:
+                continue
+            for label in labels:
+                key_returns.setdefault(label, []).append(
+                    (float(ret), _direction_to_int(label))
+                )
 
     histogram: dict[str, dict[str, Any]] = {}
-    for label, returns in key_returns.items():
-        direction = _direction_to_int(label)
-        occurred = sum(1 for r in returns if _direction_to_int(r) == direction)
+    for label, entries in key_returns.items():
+        returns = [r for r, _ in entries]
+        expected_direction = entries[0][1]
+        occurred = sum(1 for r in returns if _direction_to_int(r) == expected_direction)
         total = len(returns)
         histogram[label] = {
             "occurred": occurred,
@@ -135,7 +175,9 @@ def calibrate_probabilities(
     if not candidates:
         return []
 
-    histogram = build_evidence_histogram(similarity_results, horizon=horizon)
+    histogram = build_evidence_histogram(
+        similarity_results, candidates=candidates, horizon=horizon
+    )
 
     priors: list[float] = []
     likelihoods: list[float] = []
@@ -152,7 +194,10 @@ def calibrate_probabilities(
 
         direction = _direction_to_int(cand.get("direction", 0))
         label = _label_for_direction(direction)
-        evidence_info = histogram.get(label, {"total": 0, "likelihood": 0.5})
+        key = _scenario_key(cand)
+        evidence_info = histogram.get(
+            key, histogram.get(label, {"total": 0, "likelihood": 0.5})
+        )
         total = evidence_info.get("total", 0)
         raw_likelihood = evidence_info.get("likelihood", 0.5)
 
