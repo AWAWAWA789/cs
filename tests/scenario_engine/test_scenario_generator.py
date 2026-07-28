@@ -6,7 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.scenario_engine.scenario_generator import generate_scenarios
+from src.scenario_engine.scenario_generator import (
+    _compute_probability_threshold,
+    _select_high_probability_scenarios,
+    generate_scenarios,
+)
 
 
 def _make_ohlc(n: int = 200) -> pd.DataFrame:
@@ -23,11 +27,33 @@ def _make_ohlc(n: int = 200) -> pd.DataFrame:
     )
 
 
-def test_generate_scenarios_returns_four_to_six():
+def test_compute_probability_threshold_dynamic_floor():
+    probs = [0.5, 0.3, 0.15, 0.05]
+    threshold = _compute_probability_threshold(probs)
+    # relative floor = max(1/4, 0.10) = 0.25
+    # dynamic floor = 0.15 * 0.5 = 0.075
+    # absolute floor = 0.05
+    assert threshold == pytest.approx(0.25, abs=1e-6)
+
+
+def test_select_high_probability_scenarios_enforces_min_and_max():
+    scenarios = [
+        {"scenario_key": "bullish_continuation", "probability": 0.5, "direction": 1},
+        {"scenario_key": "bearish_reversal", "probability": 0.3, "direction": -1},
+        {"scenario_key": "dip_then_rise", "probability": 0.15, "direction": 1},
+        {"scenario_key": "range_bound", "probability": 0.05, "direction": 0},
+    ]
+    selected = _select_high_probability_scenarios(scenarios)
+    assert 2 <= len(selected) <= 4
+    total = sum(s["probability"] for s in selected)
+    assert abs(total - 1.0) < 1e-6
+
+
+def test_generate_scenarios_returns_two_to_four():
     df = _make_ohlc(250)
     result = generate_scenarios({"1day": df})
     scenarios = result["scenarios"]
-    assert 4 <= len(scenarios) <= 6
+    assert 2 <= len(scenarios) <= 4
 
 
 def test_scenario_probabilities_sum_to_one():
@@ -64,7 +90,7 @@ def test_multi_timeframe_input_generates_scenarios():
             "1hour": df,
         }
     )
-    assert 4 <= len(result["scenarios"]) <= 6
+    assert 2 <= len(result["scenarios"]) <= 4
     assert result["per_period"]
 
 
@@ -75,14 +101,6 @@ def test_position_size_is_within_bounds():
         assert 0.0 <= s["position_size"] <= 1.0
 
 
-def test_standard_scenario_names_present():
-    df = _make_ohlc(250)
-    result = generate_scenarios({"1day": df})
-    names = {s["name"] for s in result["scenarios"]}
-    required = {"上涨延续", "下跌反转", "先跌后涨", "区间震荡"}
-    assert required.issubset(names)
-
-
 def test_generate_scenarios_uses_adaptive_temperature():
     df = _make_ohlc(250)
     result = generate_scenarios(
@@ -90,4 +108,4 @@ def test_generate_scenarios_uses_adaptive_temperature():
         sub_index="test_glove",
         use_adaptive_temperature=True,
     )
-    assert 4 <= len(result["scenarios"]) <= 6
+    assert 2 <= len(result["scenarios"]) <= 4

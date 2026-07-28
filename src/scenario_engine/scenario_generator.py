@@ -294,6 +294,81 @@ def _map_to_standard_scenario(candidate: dict[str, Any], df: pd.DataFrame) -> di
     }
 
 
+def _compute_probability_threshold(probabilities: list[float]) -> float:
+    """计算动态概率入选门槛。
+
+    规则：
+    - 相对下界 = max(1 / n, 0.10)，n 为候选情景数；
+    - 动态下界 = 第 3 大概率（若存在）的 50%；
+    - 绝对硬底 = 0.05；
+    - 最终门槛 = 三者最大值。
+    """
+    n = len(probabilities)
+    if n == 0:
+        return 0.0
+
+    sorted_probs = sorted(probabilities, reverse=True)
+    relative_floor = max(1.0 / n, 0.10)
+    dynamic_floor = sorted_probs[2] * 0.5 if n >= 3 else 0.0
+    absolute_floor = 0.05
+
+    return float(max(relative_floor, dynamic_floor, absolute_floor))
+
+
+def _normalize_probabilities(scenarios: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """对情景概率做重归一化，使总和为 1。"""
+    total = sum(s["probability"] for s in scenarios)
+    if total <= 0:
+        equal = round(1.0 / len(scenarios), 6) if scenarios else 0.0
+        for s in scenarios:
+            s["probability"] = equal
+        return scenarios
+
+    for s in scenarios:
+        s["probability"] = round(s["probability"] / total, 6)
+
+    # 修正浮点误差：将余量加到最后一个元素。
+    remainder = 1.0 - sum(s["probability"] for s in scenarios)
+    if scenarios:
+        scenarios[-1]["probability"] = round(scenarios[-1]["probability"] + remainder, 6)
+    return scenarios
+
+
+def _select_high_probability_scenarios(
+    scenarios: list[dict[str, Any]],
+    min_scenarios: int = 2,
+    max_scenarios: int = 4,
+) -> list[dict[str, Any]]:
+    """按动态概率门槛筛选情景，确保数量在 [min, max] 之间，并做概率重归一化。"""
+    if not scenarios:
+        return []
+
+    # 按概率降序排列，便于后续截取。
+    sorted_scenarios = sorted(
+        scenarios, key=lambda x: x["probability"], reverse=True
+    )
+    probabilities = [s["probability"] for s in sorted_scenarios]
+    threshold = _compute_probability_threshold(probabilities)
+
+    # 先按门槛筛选。
+    selected = [s for s in sorted_scenarios if s["probability"] >= threshold]
+
+    # 兜底：不足 min_scenarios 时按概率排名补足。
+    if len(selected) < min_scenarios:
+        selected = sorted_scenarios[:min_scenarios]
+
+    # 截断：超过 max_scenarios 时只保留前 max_scenarios。
+    if len(selected) > max_scenarios:
+        selected = selected[:max_scenarios]
+
+    return _normalize_probabilities(selected)
+
+
+def _count_unique_directions(scenarios: list[dict[str, Any]]) -> int:
+    """统计不同方向的数量。"""
+    return len({s["direction"] for s in scenarios})
+
+
 def _ensure_diversity(
     scenarios: list[dict[str, Any]],
     df: pd.DataFrame,
@@ -474,8 +549,8 @@ def generate_scenarios(
     temperature: float = 0.8,
     use_adaptive_temperature: bool = True,
     period_weights: dict[str, float] | None = None,
-    max_scenarios: int = 6,
-    min_scenarios: int = 4,
+    max_scenarios: int = 4,
+    min_scenarios: int = 2,
     similarity_results_by_period: dict[str, list[dict[str, Any]]] | None = None,
     template_results_by_period: dict[str, list[dict[str, Any]]] | None = None,
     enable_parallel: bool = True,
@@ -491,8 +566,8 @@ def generate_scenarios(
         template_weight: 模板轨道融合权重。
         temperature: 多周期融合 softmax 温度。
         period_weights: 多周期权重，默认日线 0.5、4h 0.3、1h 0.2。
-        max_scenarios: 最多输出情景数。
-        min_scenarios: 最少输出情景数。
+        max_scenarios: 最多输出情景数（默认 4）。
+        min_scenarios: 最少输出情景数（默认 2）。
         similarity_results_by_period: 可选的预计算相似性搜索结果，用于降低延迟。
         template_results_by_period: 可选的预计算模板匹配结果，用于降低延迟。
         enable_parallel: 是否在线程池中并行处理多个周期的情景生成。
@@ -558,7 +633,7 @@ def generate_scenarios(
     base_period = "1day" if "1day" in df_by_period else next(iter(df_by_period))
     base_df = df_by_period[base_period]
     scenarios = [_map_to_standard_scenario(c, base_df) for c in multi_tf]
-    scenarios = _ensure_diversity(scenarios, base_df, min_scenarios=min_scenarios, max_scenarios=max_scenarios)
+    scenarios = _select_high_probability_scenarios(scenarios, min_scenarios=min_scenarios, max_scenarios=max_scenarios)
 
     return {
         "scenarios": scenarios,
