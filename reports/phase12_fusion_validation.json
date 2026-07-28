@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-07-27T20:29:40.782961+00:00",
+  "generated_at": "2026-07-28T00:40:49.042237+00:00",
   "sub_indices": [
-    "手套",
     "匕首",
+    "手套",
     "百元主战",
     "贴纸"
   ],
@@ -12,269 +12,6 @@
     "1hour"
   ],
   "per_sub_index": {
-    "手套": {
-      "bars": {
-        "1day": 1153,
-        "4hour": 750,
-        "1hour": 1153
-      },
-      "index_paths": {
-        "1day": "data/scenario_index/手套_1day_state_index.parquet",
-        "4hour": "data/scenario_index/手套_4hour_state_index.parquet",
-        "1hour": "data/scenario_index/手套_1hour_state_index.parquet"
-      },
-      "inference_latency_seconds": 0.3484,
-      "scenarios": [
-        {
-          "name": "先跌后涨",
-          "scenario_key": "dip_then_rise",
-          "probability": 0.505791,
-          "direction": 1,
-          "direction_label": "bullish",
-          "support": 869.976667,
-          "resistance": 889.18,
-          "target": 908.383333,
-          "stop_loss": 867.726935,
-          "position_size": 0.080323,
-          "wave_sketch": [
-            {
-              "label": "current",
-              "price": 694.74,
-              "type": "current"
-            },
-            {
-              "label": "high",
-              "price": 754.91,
-              "type": "high",
-              "idx": 1134
-            },
-            {
-              "label": "high",
-              "price": 726.71,
-              "type": "high",
-              "idx": 1141
-            },
-            {
-              "label": "low",
-              "price": 686.43,
-              "type": "low",
-              "idx": 1147
-            },
-            {
-              "label": "high",
-              "price": 716.58,
-              "type": "high",
-              "idx": 1149
-            },
-            {
-              "label": "support",
-              "price": 869.976667,
-              "type": "support"
-            },
-            {
-              "label": "resistance",
-              "price": 889.18,
-              "type": "resistance"
-            },
-            {
-              "label": "target",
-              "price": 908.383333,
-              "type": "target"
-            }
-          ],
-          "description": "短线回调后继续上行，形成 higher low。",
-          "source": "unknown"
-        },
-        {
-          "name": "下跌反转",
-          "scenario_key": "bearish_reversal",
-          "probability": 0.474601,
-          "direction": -1,
-          "direction_label": "bearish",
-          "support": 940.54,
-          "resistance": 962.09,
-          "target": 918.99,
-          "stop_loss": 963.800665,
-          "position_size": 0.0,
-          "wave_sketch": [
-            {
-              "label": "current",
-              "price": 694.74,
-              "type": "current"
-            },
-            {
-              "label": "high",
-              "price": 754.91,
-              "type": "high",
-              "idx": 1134
-            },
-            {
-              "label": "high",
-              "price": 726.71,
-              "type": "high",
-              "idx": 1141
-            },
-            {
-              "label": "low",
-              "price": 686.43,
-              "type": "low",
-              "idx": 1147
-            },
-            {
-              "label": "high",
-              "price": 716.58,
-              "type": "high",
-              "idx": 1149
-            },
-            {
-              "label": "resistance",
-              "price": 962.09,
-              "type": "resistance"
-            },
-            {
-              "label": "support",
-              "price": 940.54,
-              "type": "support"
-            },
-            {
-              "label": "target",
-              "price": 918.99,
-              "type": "target"
-            }
-          ],
-          "description": "当前出现顶部信号，预计价格转头向下。",
-          "source": "unknown"
-        },
-        {
-          "name": "上涨延续",
-          "scenario_key": "bullish_continuation",
-          "probability": 0.009804,
-          "direction": 1,
-          "direction_label": "bullish",
-          "support": 686.43,
-          "resistance": 754.91,
-          "target": 707.205,
-          "stop_loss": 682.75725,
-          "position_size": 0.0,
-          "wave_sketch": [
-            {
-              "label": "current",
-              "price": 694.74,
-              "type": "current"
-            },
-            {
-              "label": "high",
-              "price": 754.91,
-              "type": "high",
-              "idx": 1134
-            },
-            {
-              "label": "high",
-              "price": 726.71,
-              "type": "high",
-              "idx": 1141
-            },
-            {
-              "label": "low",
-              "price": 686.43,
-              "type": "low",
-              "idx": 1147
-            },
-            {
-              "label": "high",
-              "price": 716.58,
-              "type": "high",
-              "idx": 1149
-            },
-            {
-              "label": "support",
-              "price": 686.43,
-              "type": "support"
-            },
-            {
-              "label": "resistance",
-              "price": 754.91,
-              "type": "resistance"
-            },
-            {
-              "label": "target",
-              "price": 707.205,
-              "type": "target"
-            }
-          ],
-          "description": "当前趋势向上，预计价格沿原方向继续运行。",
-          "source": "fallback"
-        },
-        {
-          "name": "区间震荡",
-          "scenario_key": "range_bound",
-          "probability": 0.009804,
-          "direction": 0,
-          "direction_label": "neutral",
-          "support": 686.43,
-          "resistance": 754.91,
-          "target": 720.67,
-          "stop_loss": 682.75725,
-          "position_size": 0.0,
-          "wave_sketch": [
-            {
-              "label": "current",
-              "price": 694.74,
-              "type": "current"
-            },
-            {
-              "label": "high",
-              "price": 754.91,
-              "type": "high",
-              "idx": 1134
-            },
-            {
-              "label": "high",
-              "price": 726.71,
-              "type": "high",
-              "idx": 1141
-            },
-            {
-              "label": "low",
-              "price": 686.43,
-              "type": "low",
-              "idx": 1147
-            },
-            {
-              "label": "high",
-              "price": 716.58,
-              "type": "high",
-              "idx": 1149
-            },
-            {
-              "label": "support",
-              "price": 686.43,
-              "type": "support"
-            },
-            {
-              "label": "resistance",
-              "price": 754.91,
-              "type": "resistance"
-            },
-            {
-              "label": "mid",
-              "price": 720.67,
-              "type": "mid"
-            }
-          ],
-          "description": "多空力量均衡，价格在支撑与阻力之间波动。",
-          "source": "fallback"
-        }
-      ],
-      "brier_by_period": {
-        "1day": 0.0,
-        "4hour": 0.302929,
-        "1hour": 0.0
-      },
-      "mean_brier": 0.100976,
-      "multi_timeframe_candidate_count": 2,
-      "daily_similarity_count": 10
-    },
     "匕首": {
       "bars": {
         "1day": 1153,
@@ -286,7 +23,7 @@
         "4hour": "data/scenario_index/匕首_4hour_state_index.parquet",
         "1hour": "data/scenario_index/匕首_1hour_state_index.parquet"
       },
-      "inference_latency_seconds": 0.2379,
+      "inference_latency_seconds": 0.2808,
       "scenarios": [
         {
           "name": "先跌后涨",
@@ -294,11 +31,11 @@
           "probability": 0.488926,
           "direction": 1,
           "direction_label": "bullish",
-          "support": 859.47,
-          "resistance": 913.99,
-          "target": 968.51,
-          "stop_loss": 857.118323,
-          "position_size": 0.034868,
+          "support": 544.45,
+          "resistance": 553.63,
+          "target": 545.05,
+          "stop_loss": 544.10225,
+          "position_size": 0.0,
           "wave_sketch": [
             {
               "label": "current",
@@ -331,22 +68,22 @@
             },
             {
               "label": "support",
-              "price": 859.47,
+              "price": 544.45,
               "type": "support"
             },
             {
               "label": "resistance",
-              "price": 913.99,
+              "price": 553.63,
               "type": "resistance"
             },
             {
               "label": "target",
-              "price": 968.51,
+              "price": 545.05,
               "type": "target"
             }
           ],
           "description": "短线回调后继续上行，形成 higher low。",
-          "source": "unknown"
+          "source": "fusion"
         },
         {
           "name": "先跌后涨",
@@ -354,11 +91,11 @@
           "probability": 0.481948,
           "direction": 1,
           "direction_label": "bullish",
-          "support": 859.47,
-          "resistance": 920.11,
-          "target": 980.75,
-          "stop_loss": 857.606442,
-          "position_size": 0.034814,
+          "support": 544.45,
+          "resistance": 553.63,
+          "target": 545.05,
+          "stop_loss": 544.10225,
+          "position_size": 0.0,
           "wave_sketch": [
             {
               "label": "current",
@@ -391,22 +128,22 @@
             },
             {
               "label": "support",
-              "price": 859.47,
+              "price": 544.45,
               "type": "support"
             },
             {
               "label": "resistance",
-              "price": 920.11,
+              "price": 553.63,
               "type": "resistance"
             },
             {
               "label": "target",
-              "price": 980.75,
+              "price": 545.05,
               "type": "target"
             }
           ],
           "description": "短线回调后继续上行，形成 higher low。",
-          "source": "unknown"
+          "source": "fusion"
         },
         {
           "name": "上涨延续",
@@ -598,6 +335,269 @@
       "multi_timeframe_candidate_count": 2,
       "daily_similarity_count": 10
     },
+    "手套": {
+      "bars": {
+        "1day": 1153,
+        "4hour": 750,
+        "1hour": 1153
+      },
+      "index_paths": {
+        "1day": "data/scenario_index/手套_1day_state_index.parquet",
+        "4hour": "data/scenario_index/手套_4hour_state_index.parquet",
+        "1hour": "data/scenario_index/手套_1hour_state_index.parquet"
+      },
+      "inference_latency_seconds": 0.2196,
+      "scenarios": [
+        {
+          "name": "先跌后涨",
+          "scenario_key": "dip_then_rise",
+          "probability": 0.505791,
+          "direction": 1,
+          "direction_label": "bullish",
+          "support": 686.43,
+          "resistance": 754.91,
+          "target": 707.205,
+          "stop_loss": 682.75725,
+          "position_size": 0.048587,
+          "wave_sketch": [
+            {
+              "label": "current",
+              "price": 694.74,
+              "type": "current"
+            },
+            {
+              "label": "high",
+              "price": 754.91,
+              "type": "high",
+              "idx": 1134
+            },
+            {
+              "label": "high",
+              "price": 726.71,
+              "type": "high",
+              "idx": 1141
+            },
+            {
+              "label": "low",
+              "price": 686.43,
+              "type": "low",
+              "idx": 1147
+            },
+            {
+              "label": "high",
+              "price": 716.58,
+              "type": "high",
+              "idx": 1149
+            },
+            {
+              "label": "support",
+              "price": 686.43,
+              "type": "support"
+            },
+            {
+              "label": "resistance",
+              "price": 754.91,
+              "type": "resistance"
+            },
+            {
+              "label": "target",
+              "price": 707.205,
+              "type": "target"
+            }
+          ],
+          "description": "短线回调后继续上行，形成 higher low。",
+          "source": "fusion"
+        },
+        {
+          "name": "下跌反转",
+          "scenario_key": "bearish_reversal",
+          "probability": 0.474601,
+          "direction": -1,
+          "direction_label": "bearish",
+          "support": 686.43,
+          "resistance": 754.91,
+          "target": 604.485,
+          "stop_loss": 758.58275,
+          "position_size": 0.08429,
+          "wave_sketch": [
+            {
+              "label": "current",
+              "price": 694.74,
+              "type": "current"
+            },
+            {
+              "label": "high",
+              "price": 754.91,
+              "type": "high",
+              "idx": 1134
+            },
+            {
+              "label": "high",
+              "price": 726.71,
+              "type": "high",
+              "idx": 1141
+            },
+            {
+              "label": "low",
+              "price": 686.43,
+              "type": "low",
+              "idx": 1147
+            },
+            {
+              "label": "high",
+              "price": 716.58,
+              "type": "high",
+              "idx": 1149
+            },
+            {
+              "label": "resistance",
+              "price": 754.91,
+              "type": "resistance"
+            },
+            {
+              "label": "support",
+              "price": 686.43,
+              "type": "support"
+            },
+            {
+              "label": "target",
+              "price": 604.485,
+              "type": "target"
+            }
+          ],
+          "description": "当前出现顶部信号，预计价格转头向下。",
+          "source": "fusion"
+        },
+        {
+          "name": "上涨延续",
+          "scenario_key": "bullish_continuation",
+          "probability": 0.009804,
+          "direction": 1,
+          "direction_label": "bullish",
+          "support": 686.43,
+          "resistance": 754.91,
+          "target": 707.205,
+          "stop_loss": 682.75725,
+          "position_size": 0.0,
+          "wave_sketch": [
+            {
+              "label": "current",
+              "price": 694.74,
+              "type": "current"
+            },
+            {
+              "label": "high",
+              "price": 754.91,
+              "type": "high",
+              "idx": 1134
+            },
+            {
+              "label": "high",
+              "price": 726.71,
+              "type": "high",
+              "idx": 1141
+            },
+            {
+              "label": "low",
+              "price": 686.43,
+              "type": "low",
+              "idx": 1147
+            },
+            {
+              "label": "high",
+              "price": 716.58,
+              "type": "high",
+              "idx": 1149
+            },
+            {
+              "label": "support",
+              "price": 686.43,
+              "type": "support"
+            },
+            {
+              "label": "resistance",
+              "price": 754.91,
+              "type": "resistance"
+            },
+            {
+              "label": "target",
+              "price": 707.205,
+              "type": "target"
+            }
+          ],
+          "description": "当前趋势向上，预计价格沿原方向继续运行。",
+          "source": "fallback"
+        },
+        {
+          "name": "区间震荡",
+          "scenario_key": "range_bound",
+          "probability": 0.009804,
+          "direction": 0,
+          "direction_label": "neutral",
+          "support": 686.43,
+          "resistance": 754.91,
+          "target": 720.67,
+          "stop_loss": 682.75725,
+          "position_size": 0.0,
+          "wave_sketch": [
+            {
+              "label": "current",
+              "price": 694.74,
+              "type": "current"
+            },
+            {
+              "label": "high",
+              "price": 754.91,
+              "type": "high",
+              "idx": 1134
+            },
+            {
+              "label": "high",
+              "price": 726.71,
+              "type": "high",
+              "idx": 1141
+            },
+            {
+              "label": "low",
+              "price": 686.43,
+              "type": "low",
+              "idx": 1147
+            },
+            {
+              "label": "high",
+              "price": 716.58,
+              "type": "high",
+              "idx": 1149
+            },
+            {
+              "label": "support",
+              "price": 686.43,
+              "type": "support"
+            },
+            {
+              "label": "resistance",
+              "price": 754.91,
+              "type": "resistance"
+            },
+            {
+              "label": "mid",
+              "price": 720.67,
+              "type": "mid"
+            }
+          ],
+          "description": "多空力量均衡，价格在支撑与阻力之间波动。",
+          "source": "fallback"
+        }
+      ],
+      "brier_by_period": {
+        "1day": 0.0,
+        "4hour": 0.302929,
+        "1hour": 0.0
+      },
+      "mean_brier": 0.100976,
+      "multi_timeframe_candidate_count": 2,
+      "daily_similarity_count": 10
+    },
     "百元主战": {
       "bars": {
         "1day": 1153,
@@ -609,7 +609,7 @@
         "4hour": "data/scenario_index/百元主战_4hour_state_index.parquet",
         "1hour": "data/scenario_index/百元主战_1hour_state_index.parquet"
       },
-      "inference_latency_seconds": 0.1889,
+      "inference_latency_seconds": 0.229,
       "scenarios": [
         {
           "name": "下跌反转",
@@ -617,11 +617,11 @@
           "probability": 0.970874,
           "direction": -1,
           "direction_label": "bearish",
-          "support": 915.36,
-          "resistance": 1006.42,
-          "target": 824.3,
-          "stop_loss": 1012.435652,
-          "position_size": 0.030318,
+          "support": 2914.79,
+          "resistance": 3256.61,
+          "target": 2552.21,
+          "stop_loss": 3278.19675,
+          "position_size": 0.196135,
           "wave_sketch": [
             {
               "label": "current",
@@ -654,22 +654,22 @@
             },
             {
               "label": "resistance",
-              "price": 1006.42,
+              "price": 3256.61,
               "type": "resistance"
             },
             {
               "label": "support",
-              "price": 915.36,
+              "price": 2914.79,
               "type": "support"
             },
             {
               "label": "target",
-              "price": 824.3,
+              "price": 2552.21,
               "type": "target"
             }
           ],
           "description": "当前出现顶部信号，预计价格转头向下。",
-          "source": "unknown"
+          "source": "fusion"
         },
         {
           "name": "上涨延续",
@@ -872,7 +872,7 @@
         "4hour": "data/scenario_index/贴纸_4hour_state_index.parquet",
         "1hour": "data/scenario_index/贴纸_1hour_state_index.parquet"
       },
-      "inference_latency_seconds": 0.1851,
+      "inference_latency_seconds": 0.3189,
       "scenarios": [
         {
           "name": "下跌反转",
@@ -880,10 +880,70 @@
           "probability": 0.518019,
           "direction": -1,
           "direction_label": "bearish",
-          "support": 935.34,
-          "resistance": 1017.71,
-          "target": 852.97,
-          "stop_loss": 1022.77242,
+          "support": 488.63,
+          "resistance": 534.18,
+          "target": 422.805,
+          "stop_loss": 535.3765,
+          "position_size": 0.140694,
+          "wave_sketch": [
+            {
+              "label": "current",
+              "price": 489.63,
+              "type": "current"
+            },
+            {
+              "label": "low",
+              "price": 547.46,
+              "type": "low",
+              "idx": 1117
+            },
+            {
+              "label": "low",
+              "price": 548.65,
+              "type": "low",
+              "idx": 1120
+            },
+            {
+              "label": "high",
+              "price": 560.24,
+              "type": "high",
+              "idx": 1122
+            },
+            {
+              "label": "low",
+              "price": 516.15,
+              "type": "low",
+              "idx": 1140
+            },
+            {
+              "label": "resistance",
+              "price": 534.18,
+              "type": "resistance"
+            },
+            {
+              "label": "support",
+              "price": 488.63,
+              "type": "support"
+            },
+            {
+              "label": "target",
+              "price": 422.805,
+              "type": "target"
+            }
+          ],
+          "description": "当前出现顶部信号，预计价格转头向下。",
+          "source": "fusion"
+        },
+        {
+          "name": "先跌后涨",
+          "scenario_key": "dip_then_rise",
+          "probability": 0.462374,
+          "direction": 1,
+          "direction_label": "bullish",
+          "support": 488.63,
+          "resistance": 534.18,
+          "target": 491.13,
+          "stop_loss": 487.4335,
           "position_size": 0.0,
           "wave_sketch": [
             {
@@ -916,83 +976,23 @@
               "idx": 1140
             },
             {
-              "label": "resistance",
-              "price": 1017.71,
-              "type": "resistance"
-            },
-            {
               "label": "support",
-              "price": 935.34,
-              "type": "support"
-            },
-            {
-              "label": "target",
-              "price": 852.97,
-              "type": "target"
-            }
-          ],
-          "description": "当前出现顶部信号，预计价格转头向下。",
-          "source": "unknown"
-        },
-        {
-          "name": "先跌后涨",
-          "scenario_key": "dip_then_rise",
-          "probability": 0.462374,
-          "direction": 1,
-          "direction_label": "bullish",
-          "support": 892.39,
-          "resistance": 996.19,
-          "target": 1099.99,
-          "stop_loss": 881.435156,
-          "position_size": 0.024994,
-          "wave_sketch": [
-            {
-              "label": "current",
-              "price": 489.63,
-              "type": "current"
-            },
-            {
-              "label": "low",
-              "price": 547.46,
-              "type": "low",
-              "idx": 1117
-            },
-            {
-              "label": "low",
-              "price": 548.65,
-              "type": "low",
-              "idx": 1120
-            },
-            {
-              "label": "high",
-              "price": 560.24,
-              "type": "high",
-              "idx": 1122
-            },
-            {
-              "label": "low",
-              "price": 516.15,
-              "type": "low",
-              "idx": 1140
-            },
-            {
-              "label": "support",
-              "price": 892.39,
+              "price": 488.63,
               "type": "support"
             },
             {
               "label": "resistance",
-              "price": 996.19,
+              "price": 534.18,
               "type": "resistance"
             },
             {
               "label": "target",
-              "price": 1099.99,
+              "price": 491.13,
               "type": "target"
             }
           ],
           "description": "短线回调后继续上行，形成 higher low。",
-          "source": "unknown"
+          "source": "fusion"
         },
         {
           "name": "上涨延续",

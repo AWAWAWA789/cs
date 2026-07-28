@@ -24,8 +24,24 @@ from src.scenario_engine.state_vector import get_state_columns
 from src.scenario_engine.template_matcher import match_templates
 
 
-SUB_INDICES = ["手套", "匕首", "百元主战", "贴纸"]
 PERIODS = ["1day", "4hour", "1hour"]
+
+
+def _discover_sub_indices(settings: Settings) -> list[str]:
+    """Discover sub-index names from the 1-day cache directory.
+
+    Falls back to the four canonical indices if no cache files are found.
+    """
+    cache_dir = Path(settings.cache_path)
+    discovered: set[str] = set()
+    if cache_dir.exists():
+        for path in cache_dir.glob("*_1d.parquet"):
+            name = path.stem.rsplit("_", 1)[0]
+            if name:
+                discovered.add(name)
+    if discovered:
+        return sorted(discovered)
+    return ["手套", "匕首", "百元主战", "贴纸"]
 
 
 def _load_period_df(
@@ -168,13 +184,14 @@ def main() -> None:
     report_dir = Path("reports")
     report_dir.mkdir(parents=True, exist_ok=True)
 
+    sub_indices = _discover_sub_indices(settings)
     per_subindex: dict[str, dict[str, Any]] = {}
-    for sub_index_name in SUB_INDICES:
+    for sub_index_name in sub_indices:
         per_subindex[sub_index_name] = _run_sub_index(sub_index_name, settings)
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "sub_indices": SUB_INDICES,
+        "sub_indices": sub_indices,
         "periods": PERIODS,
         "per_sub_index": per_subindex,
     }
