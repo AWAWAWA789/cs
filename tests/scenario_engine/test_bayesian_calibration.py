@@ -27,8 +27,12 @@ def _similarity(direction: int, horizon: int = 5, n: int = 10) -> list[dict]:
 def test_build_evidence_histogram_counts_matches():
     sim = _similarity(1, n=8) + _similarity(-1, n=4)
     hist = build_evidence_histogram(sim, horizon=5)
-    assert hist["bullish"]["total"] == 8
-    assert hist["bearish"]["total"] == 4
+    # 每个方向键都包含全部历史片段，统计该方向实际发生的比例。
+    assert hist["bullish"]["total"] == 12
+    assert hist["bullish"]["occurred"] == 8
+    assert hist["bearish"]["total"] == 12
+    assert hist["bearish"]["occurred"] == 4
+    assert abs(hist["bullish"]["likelihood"] - 8 / 12) < 1e-9
 
 
 def test_calibrate_probabilities_sum_to_one():
@@ -76,3 +80,13 @@ def test_evaluate_calibration_returns_brier_score():
     metrics = evaluate_calibration(calibrated, sim)
     assert "brier_score" in metrics
     assert 0.0 <= metrics["brier_score"] <= 1.0
+
+
+def test_likelihood_computed_without_truncation():
+    """似然计数应保留浮点精度，避免 int() 截断。"""
+    cands = [{"direction": 1, "probability": 0.6}]
+    # 12 个历史片段，7 个同方向 -> raw_likelihood = 7/12
+    sim = [{"future_return_5": 0.03} if i < 7 else {"future_return_5": -0.02} for i in range(12)]
+    calibrated = calibrate_probabilities(cands, sim, laplace_alpha=1.0)
+    # (7 + 1) / (12 + 2) = 8/14
+    assert calibrated[0]["likelihood"] == pytest.approx(8 / 14, abs=1e-6)

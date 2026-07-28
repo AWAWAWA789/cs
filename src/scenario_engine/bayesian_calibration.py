@@ -69,6 +69,9 @@ def build_evidence_histogram(
 ) -> dict[str, dict[str, Any]]:
     """从历史相似片段中统计各方向情景实际发生的频率。
 
+    每个方向键（bullish / bearish / neutral）的似然等于所有历史片段中
+    未来收益实际落在该方向的比例。
+
     Args:
         similarity_results: Phase 10 相似性搜索结果列表。
         horizon: 用于计算收益率的 K 线数量。
@@ -79,18 +82,19 @@ def build_evidence_histogram(
     """
     key_returns: dict[str, list[float]] = {}
     key = f"future_return_{horizon}"
+    labels = ("bullish", "bearish", "neutral")
 
     for r in similarity_results:
         ret = r.get(key)
         if ret is None:
             continue
-        direction = _direction_to_int(ret)
-        label = _label_for_direction(direction)
-        key_returns.setdefault(label, []).append(float(ret))
+        for label in labels:
+            key_returns.setdefault(label, []).append(float(ret))
 
     histogram: dict[str, dict[str, Any]] = {}
     for label, returns in key_returns.items():
-        occurred = sum(1 for r in returns if _direction_to_int(r) == _direction_to_int(label))
+        direction = _direction_to_int(label)
+        occurred = sum(1 for r in returns if _direction_to_int(r) == direction)
         total = len(returns)
         histogram[label] = {
             "occurred": occurred,
@@ -155,7 +159,7 @@ def calibrate_probabilities(
         if total == 0:
             likelihood = raw_likelihood
         else:
-            occurred = int(raw_likelihood * total)
+            occurred = float(raw_likelihood * total)
             counts = np.array([occurred, total - occurred], dtype=float)
             smoothed = _laplace_smooth(counts, laplace_alpha)
             likelihood = float(smoothed[0])
