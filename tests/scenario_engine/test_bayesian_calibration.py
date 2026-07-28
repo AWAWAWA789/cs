@@ -90,3 +90,23 @@ def test_likelihood_computed_without_truncation():
     calibrated = calibrate_probabilities(cands, sim, laplace_alpha=1.0)
     # (7 + 1) / (12 + 2) = 8/14
     assert calibrated[0]["likelihood"] == pytest.approx(8 / 14, abs=1e-6)
+
+
+def test_scenario_key_level_likelihood():
+    """不同 bullish 情景在提供 matched_scenario 时应拥有不同似然。"""
+    candidates = [
+        {"name": "bullish_continuation", "direction": 1, "probability": 0.5},
+        {"name": "dip_then_rise", "direction": 1, "probability": 0.5},
+    ]
+    similarity = [
+        {"future_return_5": 0.05, "matched_scenario": "bullish_continuation"},
+        {"future_return_5": 0.02, "matched_scenario": "dip_then_rise"},
+        {"future_return_5": -0.01, "matched_scenario": "dip_then_rise"},
+    ]
+    result = calibrate_probabilities(candidates, similarity, laplace_alpha=0.0)
+    cont_likelihood = next(r["likelihood"] for r in result if r["name"] == "bullish_continuation")
+    dip_likelihood = next(r["likelihood"] for r in result if r["name"] == "dip_then_rise")
+    # bullish_continuation 在 1 个样本中命中 1 次
+    assert cont_likelihood == pytest.approx(1.0, abs=1e-6)
+    # dip_then_rise 在 2 个样本中命中 1 次
+    assert dip_likelihood == pytest.approx(0.5, abs=1e-6)
