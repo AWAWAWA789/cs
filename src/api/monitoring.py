@@ -7,9 +7,11 @@ Exposes aggregated metrics and logs alerts when thresholds are breached.
 from __future__ import annotations
 
 import dataclasses
+import json
 import threading
 import time
 from collections import deque
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
@@ -48,6 +50,7 @@ class MetricsCollector:
         self._lock = threading.Lock()
         self._thresholds = AlertThresholds()
         self._brier_baseline: float | None = None
+        self._brier_baseline_path: Path | None = None
 
     def record(
         self,
@@ -70,6 +73,23 @@ class MetricsCollector:
     def update_brier_baseline(self, brier_score: float) -> None:
         """Set the current Brier baseline for drift detection."""
         self._brier_baseline = float(brier_score)
+
+    def set_brier_baseline_path(self, path: Path | str | None) -> None:
+        """Set the directory from which to load a persisted Brier baseline."""
+        self._brier_baseline_path = Path(path) if path else None
+
+    def _load_brier_baseline(self) -> float | None:
+        """Return the Brier baseline from memory or from disk."""
+        if self._brier_baseline is not None:
+            return self._brier_baseline
+        if self._brier_baseline_path is None:
+            return None
+        path = self._brier_baseline_path / "brier_baseline.json"
+        if not path.exists():
+            return None
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return float(data.get("brier_score", data.get("value", 0.0)))
 
     def _evict_old(self, now: float) -> None:
         cutoff = now - self._window_seconds
@@ -128,37 +148,51 @@ class MetricsCollector:
             "per_endpoint": per_endpoint,
         }
 
-    def check_alerts(self) -> list[dict[str, Any]]:
+    def check_alerts(self, current_brier: float | None = None) -> list[dict[str, Any]]:
         """Check thresholds and return active alerts."""
         records = self._recent_records()
         alerts: list[dict[str, Any]] = []
-        if not records:
-            return alerts
 
-        latencies = sorted(r.latency_ms for r in records)
-        failure_count = sum(1 for r in records if r.error)
-        failure_rate = failure_count / len(records)
-        p99_idx = int(len(latencies) * 0.99) or len(latencies) - 1
-        p99 = latencies[p99_idx]
+        if records:
+            latencies = sorted(r.latency_ms for r in records)
+            failure_count = sum(1 for r in records if r.error)
+            failure_rate = failure_count / len(records)
+            p99_idx = int(len(latencies) * 0.99) or len(latencies) - 1
+            p99 = latencies[p99_idx]
 
-        if failure_rate > self._thresholds.failure_rate:
-            alerts.append(
-                {
-                    "metric": "failure_rate",
-                    "value": round(failure_rate, 4),
-                    "threshold": self._thresholds.failure_rate,
-                    "severity": "critical",
-                }
-            )
-        if p99 > self._thresholds.latency_p99_ms:
-            alerts.append(
-                {
-                    "metric": "latency_p99_ms",
-                    "value": round(p99, 3),
-                    "threshold": self._thresholds.latency_p99_ms,
-                    "severity": "warning",
-                }
-            )
+            if failure_rate > self._thresholds.failure_rate:
+                alerts.append(
+                    {
+                        "metric": "failure_rate",
+                        "value": round(failure_rate, 4),
+                        "threshold": self._thresholds.failure_rate,
+                        "severity": "critical",
+                    }
+                )
+            if p99 > self._thresholds.latency_p99_ms:
+                alerts.append(
+                    {
+                        "metric": "latency_p99_ms",
+                        "value": round(p99, 3),
+                        "threshold": self._thresholds.latency_p99_ms,
+                        "severity": "warning",
+                    }
+                )
+
+        baseline = self._load_brier_baseline()
+        if baseline is not None and current_brier is not None:
+            drift = current_brier - baseline
+            if drift > self._thresholds.brier_drift:
+                alerts.append(
+                    {
+                        "metric": "brier_drift",
+                        "value": round(drift, 4),
+                        "threshold": self._thresholds.brier_drift,
+                        "current_brier": round(current_brier, 4),
+                        "baseline": round(baseline, 4),
+                        "severity": "warning",
+                    }
+                )
         return alerts
 
     def log_alerts(self) -> None:
