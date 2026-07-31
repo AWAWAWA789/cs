@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api.backtest_endpoints import router as backtest_router
+from src.api.ensemble_endpoints import router as ensemble_router
 from src.api.monitoring import monitoring_router
 from src.api.scenario_endpoints import router as scenario_router
 
@@ -29,6 +30,7 @@ app = FastAPI(
 
 app.include_router(scenario_router)
 app.include_router(backtest_router)
+app.include_router(ensemble_router)
 app.include_router(monitoring_router)
 
 frontend_dir = Path(__file__).parent / "frontend" / "dist"

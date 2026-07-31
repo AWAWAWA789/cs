@@ -88,6 +88,15 @@ def _normalize_period(period: str) -> str:
     return normalized
 
 
+def _to_iso(value: object) -> str | None:
+    """Convert a timestamp-like value to an ISO string, or None."""
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
 def _resolve_sub_index_id(client: CSQAQClient, sub_index_name: str) -> str:
     """Resolve a Chinese sub-index name to its API id."""
     payload = get_current_data_init(client, skip_rate_limit=True)

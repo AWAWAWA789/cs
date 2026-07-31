@@ -124,3 +124,7 @@ def log_request(
         logger.error("%s request failed", endpoint, extra={"request_context": context})
     else:
         logger.info("%s request completed", endpoint, extra={"request_context": context})
+
+
+# Module-level shared logger for API endpoints that do not need a custom name.
+LOGGER = get_logger("csqaq.api")
