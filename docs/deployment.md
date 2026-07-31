@@ -30,7 +30,7 @@ cs/
 │   ├── backtest/            # 回测引擎
 │   ├── analysis/            # 绩效指标
 │   └── scenario_engine/     # 情景生成引擎
-├── frontend/                # 可视化前端（HTML/JS）
+├── frontend/                # React + Vite 可视化前端
 ├── config/                  # 情景模板与 JSON Schema
 ├── tests/                   # 单元测试
 ├── 战术文档/                 # 战略文档与各阶段战术文档
@@ -138,10 +138,38 @@ python run_scenario_server.py
 
 | 地址 | 说明 |
 |------|------|
-| `http://localhost:8000/` | 前端可视化界面 |
+| `http://localhost:8000/` | React 可视化前端界面 |
 | `http://localhost:8000/docs` | FastAPI 自动生成的交互式 API 文档 |
 | `http://localhost:8000/scenario/meta` | 可用子指数与周期列表 |
-| `http://localhost:8000/scenario/generate?sub_index=手套&period=1day` | 生成情景分析 |
+
+### 构建前端（首次使用或更新代码后）
+
+前端使用 React + Vite + Tailwind CSS 构建，需先安装 Node.js 依赖并打包：
+
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+构建产物输出到 `frontend/dist/`，服务启动后自动挂载为静态站点根目录。
+若未构建前端，访问根路径会返回 "前端未构建" 提示。
+
+### 中文参数说明
+
+所有接收中文 `sub_index`（如 `手套`、`匕首`）的端点同时支持 GET 和 POST 两种方式。
+**推荐使用 POST**，通过 JSON Body 传递参数，可避免 URL 编码问题：
+
+```bash
+# POST 方式（推荐）
+curl -X POST http://localhost:8000/scenario/generate \
+  -H "Content-Type: application/json" \
+  -d '{"sub_index":"手套","period":"1day"}'
+
+# GET 方式（同样支持）
+curl "http://localhost:8000/scenario/generate?sub_index=手套&period=1day"
+```
 
 API 端点的详细说明参见 [情景 API 文档](scenario_api.md)。
 
@@ -186,7 +214,7 @@ API 端点按以下优先级加载 OHLC 数据：
 删除 `data/cache/` 目录，或在 API 请求中加上 `refresh=true` 参数强制刷新。
 
 **服务启动后前端页面空白？**
-确认 `frontend/` 目录存在且包含 `index.html`。`run_scenario_server.py` 会自动挂载该目录为静态文件根目录。
+确认已执行前端构建步骤：`cd frontend && npm install && npm run build`。构建产物在 `frontend/dist/` 目录，服务启动时自动挂载。
 
 **测试失败怎么办？**
 确认已激活虚拟环境并执行了 `pip install -e .`，然后运行 `pytest tests -v` 查看具体失败用例。

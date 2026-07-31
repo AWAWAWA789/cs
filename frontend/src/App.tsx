@@ -1,7 +1,8 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { Spinner } from "./components/ui/misc";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Code splitting: each page is loaded on demand
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -23,22 +24,24 @@ function PageLoader() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Layout>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/scenario" element={<ScenarioPage />} />
-            <Route path="/backtest" element={<BacktestPage />} />
-            <Route path="/ensemble" element={<EnsemblePage />} />
-            <Route path="/trend-scan" element={<TrendScanPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/data" element={<DataPage />} />
-            <Route path="/monitoring" element={<MonitoringPage />} />
-            <Route path="*" element={<Dashboard />} />
-          </Routes>
-        </Suspense>
-      </Layout>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <HashRouter>
+        <Layout>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/scenario" element={<ScenarioPage />} />
+              <Route path="/backtest" element={<BacktestPage />} />
+              <Route path="/ensemble" element={<EnsemblePage />} />
+              <Route path="/trend-scan" element={<TrendScanPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/data" element={<DataPage />} />
+              <Route path="/monitoring" element={<MonitoringPage />} />
+              <Route path="*" element={<Dashboard />} />
+            </Routes>
+          </Suspense>
+        </Layout>
+      </HashRouter>
+    </ErrorBoundary>
   );
 }

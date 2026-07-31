@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from src.analysis.metrics import summarize
 from src.api.logging import LOGGER, log_request
@@ -20,6 +21,18 @@ from src.strategy.trend_following_strategy import (
 )
 
 router = APIRouter(prefix="/ensemble", tags=["ensemble"])
+
+
+# --- Request body for POST variant ----------------------------------------
+# Mirrors the Query parameters of the GET endpoint so callers can pass Chinese
+# ``sub_index`` values in a JSON body, avoiding URL-encoding issues with
+# uvicorn's HTTP parser.
+
+class EnsembleRunRequest(BaseModel):
+    """Request body for POST /ensemble/run."""
+
+    sub_index: str
+    period: str = "1day"
 
 
 def _run_single_strategy(
@@ -85,3 +98,9 @@ def run_ensemble(
         "pullback": pullback_result,
         "trend_following": trend_result,
     }
+
+
+@router.post("/run")
+def run_ensemble_post(request: EnsembleRunRequest) -> dict[str, Any]:
+    """POST version of /ensemble/run (accepts body to avoid URL encoding issues)."""
+    return run_ensemble(request.sub_index, request.period)

@@ -27,16 +27,28 @@ python run_scenario_server.py
 | period     | string | 否   | 周期，支持 `1day`、`4hour`、`1hour`、`7day` 及别名 `1d`、`4h` 等，默认 `1day`。 |
 | refresh    | bool   | 否   | 仅 `/generate` 支持，为 `true` 时清除缓存并重新生成。 |
 
+> **中文参数传递方式**：所有接收 `sub_index` 的端点同时支持 GET（Query 参数）和 POST（JSON Body）两种方式。
+> 推荐使用 POST 避免 URL 编码问题，前端已全部切换为 POST 调用。
+
 ## 端点列表
 
 ### GET /scenario/generate
+### POST /scenario/generate
 
 返回当前最新情景集合（调用 Phase 12 `scenario_generator`）。
 
-**示例请求**
+**GET 示例**
 
 ```bash
 curl "http://localhost:8000/scenario/generate?sub_index=手套&period=1day"
+```
+
+**POST 示例（推荐）**
+
+```bash
+curl -X POST http://localhost:8000/scenario/generate \
+  -H "Content-Type: application/json" \
+  -d '{"sub_index":"手套","period":"1day","refresh":false}'
 ```
 
 **响应字段**
@@ -48,7 +60,7 @@ curl "http://localhost:8000/scenario/generate?sub_index=手套&period=1day"
 | generated_at       | string | ISO 8601 生成时间。                   |
 | generation_time_ms | float  | 算法耗时（毫秒）。                    |
 | cached             | bool   | 是否命中内存缓存。                    |
-| scenarios          | array  | 标准情景列表，4-6 条，概率之和为 1。  |
+| scenarios          | array  | 标准情景列表，2-4 条，概率之和为 1。  |
 | per_period         | object | 各周期原始候选统计。                  |
 
 **scenario 对象字段**
@@ -72,13 +84,22 @@ curl "http://localhost:8000/scenario/generate?sub_index=手套&period=1day"
 ---
 
 ### GET /scenario/history
+### POST /scenario/history
 
 返回历史相似片段（调用 Phase 10 `similarity_search`）。
 
-**示例请求**
+**GET 示例**
 
 ```bash
 curl "http://localhost:8000/scenario/history?sub_index=手套&period=1day&method=knn&n_neighbors=10"
+```
+
+**POST 示例（推荐）**
+
+```bash
+curl -X POST http://localhost:8000/scenario/history \
+  -H "Content-Type: application/json" \
+  -d '{"sub_index":"手套","period":"1day","method":"knn","n_neighbors":10}'
 ```
 
 **参数**
@@ -100,13 +121,22 @@ curl "http://localhost:8000/scenario/history?sub_index=手套&period=1day&method
 ---
 
 ### GET /scenario/templates
+### POST /scenario/templates
 
 返回当前匹配的模板列表（调用 Phase 11 `template_matcher`）。
 
-**示例请求**
+**GET 示例**
 
 ```bash
 curl "http://localhost:8000/scenario/templates?sub_index=手套&period=1day&min_confidence=0.5"
+```
+
+**POST 示例（推荐）**
+
+```bash
+curl -X POST http://localhost:8000/scenario/templates \
+  -H "Content-Type: application/json" \
+  -d '{"sub_index":"手套","period":"1day","min_confidence":0.5}'
 ```
 
 **参数**
@@ -126,13 +156,22 @@ curl "http://localhost:8000/scenario/templates?sub_index=手套&period=1day&min_
 ---
 
 ### GET /scenario/ohlc
+### POST /scenario/ohlc
 
 返回当前分析使用的原始 OHLC 序列，供前端 K 线图绘制。
 
-**示例请求**
+**GET 示例**
 
 ```bash
 curl "http://localhost:8000/scenario/ohlc?sub_index=手套&period=1day"
+```
+
+**POST 示例（推荐）**
+
+```bash
+curl -X POST http://localhost:8000/scenario/ohlc \
+  -H "Content-Type: application/json" \
+  -d '{"sub_index":"手套","period":"1day"}'
 ```
 
 **响应字段**
@@ -216,13 +255,21 @@ Prompt 中明确包含以下约束：
 
 ## 前端界面
 
-`frontend/index.html` 提供单页可视化界面，包含：
+前端采用 React + Vite + Tailwind CSS + ECharts 构建的单页应用（SPA），包含：
 
-- 子指数与周期选择
-- Lightweight Charts K 线图
-- 相似历史片段列表（点击高亮）
-- 模板匹配卡片
-- 情景概率条与交易建议面板
-- 浪形草图 SVG
-- LLM 解释区域
-- 手动刷新与 5 分钟自动刷新开关
+- 仪表盘：系统概览与快速入口
+- 情景分析：K 线图、情景概率条、浪形草图 SVG、LLM 解释
+- 回测可视化：权益曲线、交易标记、绩效指标
+- 集成策略：多策略对比（Pullback / Trend Following / Ensemble）
+- 趋势扫描：异步任务队列，实时进度展示
+- 报告管理：历史报告列表与查看
+- 数据管理：缓存状态与刷新
+- 系统监控：请求指标与健康检查
+
+**构建前端**
+
+```bash
+cd frontend && npm install && npm run build
+```
+
+构建产物在 `frontend/dist/`，服务启动时自动挂载。

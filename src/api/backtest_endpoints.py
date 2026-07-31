@@ -12,6 +12,7 @@ from typing import Any
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from src.analysis.metrics import summarize
 from src.api.logging import get_logger, log_request
@@ -22,6 +23,25 @@ from src.strategy.signal import SignalParams, generate_signals
 
 LOGGER = get_logger("csqaq.backtest_api")
 router = APIRouter(prefix="/backtest", tags=["backtest"])
+
+
+# --- Request bodies for POST variants -------------------------------------
+# These mirror the Query parameters of the GET endpoints so callers can pass
+# Chinese ``sub_index`` values in a JSON body, avoiding URL-encoding issues
+# with uvicorn's HTTP parser.
+
+class EquityRequest(BaseModel):
+    """Request body for POST /backtest/equity."""
+
+    sub_index: str
+    period: str = "1day"
+
+
+class MvpRequest(BaseModel):
+    """Request body for POST /backtest/mvp."""
+
+    sub_index: str
+    period: str = "1day"
 
 
 def _to_iso(value: object) -> str | None:
@@ -116,6 +136,12 @@ def equity(
     }
 
 
+@router.post("/equity")
+def equity_post(request: EquityRequest) -> dict[str, Any]:
+    """POST version of /backtest/equity (accepts body to avoid URL encoding issues)."""
+    return equity(request.sub_index, request.period)
+
+
 def _summarize_metrics(result: Any) -> dict[str, Any]:
     """Return a summary of backtest metrics for API responses."""
     return summarize(result)
@@ -180,3 +206,9 @@ def mvp_backtest(
         "equity_curve": equity_records,
         "trades": trade_records,
     }
+
+
+@router.post("/mvp")
+def mvp_backtest_post(request: MvpRequest) -> dict[str, Any]:
+    """POST version of /backtest/mvp (accepts body to avoid URL encoding issues)."""
+    return mvp_backtest(request.sub_index, request.period)

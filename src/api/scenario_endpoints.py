@@ -77,6 +77,43 @@ class ExplainResponse(BaseModel):
     wave_sketch_description: str
 
 
+# --- Request bodies for POST variants -------------------------------------
+# These mirror the Query parameters of the GET endpoints so callers can pass
+# Chinese ``sub_index`` values in a JSON body, avoiding URL-encoding issues
+# with uvicorn's HTTP parser.
+
+class GenerateRequest(BaseModel):
+    """Request body for POST /scenario/generate."""
+
+    sub_index: str
+    period: str = "1day"
+    refresh: bool = False
+
+
+class OhlcRequest(BaseModel):
+    """Request body for POST /scenario/ohlc."""
+
+    sub_index: str
+    period: str = "1day"
+
+
+class HistoryRequest(BaseModel):
+    """Request body for POST /scenario/history."""
+
+    sub_index: str
+    period: str = "1day"
+    method: str = "knn"
+    n_neighbors: int = Field(10, ge=1, le=100)
+
+
+class TemplatesRequest(BaseModel):
+    """Request body for POST /scenario/templates."""
+
+    sub_index: str
+    period: str = "1day"
+    min_confidence: float = Field(0.5, ge=0.0, le=1.0)
+
+
 def _normalize_period(period: str) -> str:
     """Convert a period alias to the internal period name."""
     normalized = _PERIOD_ALIASES.get(str(period).strip().lower())
@@ -246,6 +283,17 @@ def generate(
     return {**payload, "cached": False}
 
 
+@router.post("/generate")
+def generate_post(request: GenerateRequest) -> dict[str, Any]:
+    """POST version of /scenario/generate.
+
+    Accepts the same parameters in a JSON body to avoid URL-encoding issues
+    with Chinese ``sub_index`` values in query strings. Delegates to the GET
+    handler so the internal logic stays identical.
+    """
+    return generate(request.sub_index, request.period, request.refresh)
+
+
 @router.get("/ohlc")
 def ohlc(
     sub_index: str = Query(..., description="Sub-index Chinese name."),
@@ -295,6 +343,12 @@ def ohlc(
     }
 
 
+@router.post("/ohlc")
+def ohlc_post(request: OhlcRequest) -> dict[str, Any]:
+    """POST version of /scenario/ohlc (accepts body to avoid URL encoding issues)."""
+    return ohlc(request.sub_index, request.period)
+
+
 @router.get("/history")
 def history(
     sub_index: str = Query(..., description="Sub-index Chinese name."),
@@ -341,6 +395,17 @@ def history(
     }
 
 
+@router.post("/history")
+def history_post(request: HistoryRequest) -> dict[str, Any]:
+    """POST version of /scenario/history (accepts body to avoid URL encoding issues)."""
+    return history(
+        request.sub_index,
+        request.period,
+        request.method,
+        request.n_neighbors,
+    )
+
+
 @router.get("/templates")
 def templates(
     sub_index: str = Query(..., description="Sub-index Chinese name."),
@@ -384,6 +449,16 @@ def templates(
         "min_confidence": min_confidence,
         "matches": matches,
     }
+
+
+@router.post("/templates")
+def templates_post(request: TemplatesRequest) -> dict[str, Any]:
+    """POST version of /scenario/templates (accepts body to avoid URL encoding issues)."""
+    return templates(
+        request.sub_index,
+        request.period,
+        request.min_confidence,
+    )
 
 
 @router.post("/explain", response_model=ExplainResponse)
