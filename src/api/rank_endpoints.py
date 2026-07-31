@@ -35,6 +35,11 @@ def _handle_api_error(exc: CSQAQAPIError) -> None:
             status_code=503,
             detail="CSQAQ API 未授权(401)。请在 .env 中配置有效的 API Token 并绑定 IP。",
         ) from exc
+    if exc.code == 429:
+        raise HTTPException(
+            status_code=429,
+            detail="请求过于频繁，请稍等几秒后再试。",
+        ) from exc
     raise HTTPException(
         status_code=502,
         detail=f"CSQAQ API 错误(code={exc.code}): {exc}",

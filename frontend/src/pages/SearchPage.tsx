@@ -8,7 +8,7 @@ import { useGlobalStore } from "../store/globalStore";
 import type { SearchSuggestItem, SearchSuggestResponse } from "../types/csqaq";
 
 /** 搜索防抖延迟（毫秒）。 */
-const DEBOUNCE_MS = 300;
+const DEBOUNCE_MS = 600;
 
 /**
  * 判断是否为请求被取消（AbortError）。

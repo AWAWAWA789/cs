@@ -6,7 +6,7 @@ import { Spinner } from "./ui/misc";
 import type { SearchSuggestItem, SearchSuggestResponse } from "../types/csqaq";
 
 /** 输入防抖延迟（毫秒）。 */
-const DEBOUNCE_MS = 300;
+const DEBOUNCE_MS = 600;
 /** 失焦后关闭下拉的延迟（毫秒），留出时间让下拉项的点击事件触发。 */
 const BLUR_CLOSE_MS = 160;
 
