@@ -36,6 +36,8 @@ export interface OhlcBar {
   high: number;
   low: number;
   close: number;
+  /** 成交量（可选，部分数据源不提供）。 */
+  volume?: number;
 }
 
 export interface OhlcResponse {
