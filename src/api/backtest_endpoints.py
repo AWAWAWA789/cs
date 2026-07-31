@@ -13,6 +13,7 @@ from typing import Any
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 
+from src.analysis.metrics import summarize
 from src.api.logging import get_logger, log_request
 from src.api.scenario_endpoints import _load_ohlc, _normalize_period
 from src.backtest.engine import BacktestParams, run_backtest
@@ -112,4 +113,70 @@ def equity(
         "period": period,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         **payload,
+    }
+
+
+def _summarize_metrics(result: Any) -> dict[str, Any]:
+    """Return a summary of backtest metrics for API responses."""
+    return summarize(result)
+
+
+@router.get("/mvp")
+def mvp_backtest(
+    sub_index: str = Query(..., description="Sub-index Chinese name."),
+    period: str = Query("1day", description="K-line period."),
+) -> dict[str, Any]:
+    """Run the MVP pullback strategy backtest and return metrics + equity + trades."""
+    period = _normalize_period(period)
+    start = time.perf_counter()
+    try:
+        df = _load_ohlc(sub_index, period)
+        df_with_signals = generate_signals(
+            df,
+            SignalParams(
+                use_smart_money=True,
+                use_trend_following=True,
+            ),
+        )
+        result = run_backtest(df_with_signals, BacktestParams())
+        metrics = _summarize_metrics(result)
+
+        equity_records = [
+            {"timestamp": _to_iso(ts), "equity": round(float(val), 4)}
+            for ts, val in result.equity_curve.items()
+        ]
+        trade_records = [
+            {
+                "entry_index": t.entry_index,
+                "entry_time": _to_iso(t.entry_time),
+                "entry_price": round(float(t.entry_price), 6),
+                "exit_time": _to_iso(t.exit_time) if t.exit_time else None,
+                "exit_price": round(float(t.exit_price), 6) if t.exit_price else None,
+                "exit_reason": t.exit_reason,
+                "pnl": round(float(t.pnl), 4),
+                "return_pct": round(float(t.return_pct), 6),
+            }
+            for t in result.trades
+        ]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"MVP backtest failed: {exc}") from exc
+
+    latency_ms = (time.perf_counter() - start) * 1000
+    log_request(
+        LOGGER,
+        endpoint="/backtest/mvp",
+        sub_index=sub_index,
+        period=period,
+        latency_ms=latency_ms,
+        extra={"trade_count": metrics["total_trades"]},
+    )
+    return {
+        "sub_index": sub_index,
+        "period": period,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "metrics": metrics,
+        "equity_curve": equity_records,
+        "trades": trade_records,
     }
