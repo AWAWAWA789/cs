@@ -127,3 +127,7 @@ class TaskQueue:
     def shutdown(self) -> None:
         """Shut down the thread pool."""
         self._executor.shutdown(wait=False)
+
+
+# 全局单例
+TASK_QUEUE = TaskQueue(ttl_seconds=3600.0, max_workers=4)
