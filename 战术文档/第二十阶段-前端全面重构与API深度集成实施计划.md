@@ -1,6 +1,6 @@
 # 第二十阶段：前端全面重构与 CSQAQ API 深度集成实施计划
 
-> **目标：** 将平台从"草皮房"升级为生产级全功能可视化终端——全部操作在前端完成，零命令行依赖，集成 CSQAQ 全部 25+ API 端点，覆盖饰品指数、单品详情、排行榜、挂刀行情、库存监控、热门系列等完整数据维度。
+> **目标：** 将平台从"草皮房"升级为生产级全功能可视化终端——全部操作在前端完成，零命令行依赖，集成 CSQAQ 全部 24 个 API 端点，覆盖饰品指数、单品详情、排行榜、库存监控、热门系列等完整数据维度。
 
 ---
 
@@ -28,25 +28,24 @@
 | F5 | wave_sketch 仅文字展示 | 未绘制为波形图 |
 | F6 | 无排行榜 | CSQAQ 排行榜 API 未集成 |
 | F7 | 无单品详情页 | 无法查看单个饰品的K线、多平台价格 |
-| F8 | 无挂刀行情页 | CSQAQ 挂刀套利数据未集成 |
-| F9 | 无库存监控页 | CSQAQ 库存监控 7 个 API 全未集成 |
-| F10 | 无热门系列页 | CSQAQ 热门系列 API 未集成 |
-| F11 | 无饰品列表筛选页 | CSQAQ 饰品列表筛选功能未集成 |
-| F12 | 无存世量走势 | CSQAQ 存世量 API 未集成 |
-| F13 | 无批量价格查询 | CSQAQ 批量价格 API 未集成 |
-| F14 | 无导出功能 | 交易记录、扫描结果、报告均不可导出 |
-| F15 | 无设置页 | API Token 等配置需改 .env 文件，未在前端管理 |
-| F16 | 无 404 页面 | 兜底路由直接渲染 Dashboard |
+| F8 | 无库存监控页 | CSQAQ 库存监控 7 个 API 全未集成 |
+| F9 | 无热门系列页 | CSQAQ 热门系列 API 未集成 |
+| F10 | 无饰品列表筛选页 | CSQAQ 饰品列表筛选功能未集成 |
+| F11 | 无存世量走势 | CSQAQ 存世量 API 未集成 |
+| F12 | 无批量价格查询 | CSQAQ 批量价格 API 未集成 |
+| F13 | 无导出功能 | 交易记录、扫描结果、报告均不可导出 |
+| F14 | 无设置页 | API Token 等配置需改 .env 文件，未在前端管理 |
+| F15 | 无 404 页面 | 兜底路由直接渲染 Dashboard |
 
 ### 1.3 后端 API 覆盖不足
 
-当前仅封装了 CSQAQ 的 **3 个** API 端点（`bind_local_ip`、`current_data`、`sub/kline`），而 CSQAQ 提供了 **25+** 个可用端点，大量数据源未被利用。
+当前仅封装了 CSQAQ 的 **3 个** API 端点（`bind_local_ip`、`current_data`、`sub/kline`），而 CSQAQ 提供了 **24** 个可用端点，大量数据源未被利用。
 
 ---
 
 ## 二、CSQAQ 完整 API 目录
 
-> 以下为本次计划需要集成的全部 CSQAQ API 端点，按功能模块分类，共 **25 个端点**，覆盖 7 大数据域。
+> 以下为本次计划需要集成的全部 CSQAQ API 端点，按功能模块分类，共 **24 个端点**，覆盖 6 大数据域。
 
 ### 2.1 饰品指数模块（3 个端点）
 
@@ -109,50 +108,34 @@
 - 类别：普通/纪念品/StatTrak™/★/★ StatTrak™
 - 磨损：崭新出厂/略有磨损/久经沙场/破损不堪/战痕累累/无涂装
 
-### 2.4 挂刀行情模块（1 个端点）
+### 2.4 库存监控模块（7 个端点）
 
 | # | API文档 | 方法 | CSQAQ路径 | 用途 | 认证 |
 |---|---------|------|-----------|------|------|
-| 15 | api-187131823 | POST | `/api/v1/info/exchange_detail` | 挂刀行情：平台购买饰品→Steam卖出获取余额（挂刀），或反向操作（反向挂刀），支持多平台/价格区间/成交量筛选 | 需要 |
-
-**挂刀行情 (api-187131823) 参数：**
-- `res`: 0-Steam余额(挂刀) / 1-平台余额(反向挂刀)
-- `platforms`: BUFF-YYYP / BUFF / YYYP
-- `sort_by`: 0-Steam挂底价出售 / 1-Steam丢求购出售
-- `buy`:（仅 res=1 时）0-Steam在售底价购买 / 1-Steam求购购买
-- `min_price` / `max_price`: 价格区间筛选
-- `text`: 饰品名称关键字
-- `turnover`: Steam日成交量下限筛选
-- 返回：饰品ID/名称/图片 + 各平台在售/求购价格和数量 + Steam成交量 + 套现比例(max_price)
-
-### 2.5 库存监控模块（7 个端点）
-
-| # | API文档 | 方法 | CSQAQ路径 | 用途 | 认证 |
-|---|---------|------|-----------|------|------|
-| 16 | api-187131810 | POST | `/api/v1/monitor/get_task_list` | 监控任务列表：支持搜索Steam用户名/ID，按热度/创建时间/库存数量/变动时间/库存价值排序 | 需要 |
-| 17 | api-187131809 | POST | `/api/v1/monitor/get_task_trends` | 库存变动动态：全站最新变动，或按 good_id 筛选特定饰品变动 | 需要 |
-| 18 | api-187131813 | POST | `/api/v1/monitor/get_good_rank` | 饰品持有量排行榜：按 good_id 查询，返回持有该饰品的用户排行 | 需要 |
-| 19 | api-187131814 | POST | `/api/v1/monitor/get_task_info` | 单个用户信息：需 task_id，返回用户详情 | 需要 |
-| 20 | api-358158458 | POST | `/api/v1/monitor/get_task_trends_detail` | 单个用户库存动态：需 task_id，返回该用户的库存变动历史 | 需要 |
-| 21 | api-187131815 | POST | `/api/v1/task/get_task_all` | 单个用户全部库存：需 task_id，支持快照 ID 查看历史库存 | 需要 |
-| 22 | api-343919624 | POST | `/api/v1/monitor/get_snapshot_list` | 库存快照列表：返回用户的历史库存快照，用于对比不同日期的库存变化 | 需要 |
+| 15 | api-187131810 | POST | `/api/v1/monitor/get_task_list` | 监控任务列表：支持搜索Steam用户名/ID，按热度/创建时间/库存数量/变动时间/库存价值排序 | 需要 |
+| 16 | api-187131809 | POST | `/api/v1/monitor/get_task_trends` | 库存变动动态：全站最新变动，或按 good_id 筛选特定饰品变动 | 需要 |
+| 17 | api-187131813 | POST | `/api/v1/monitor/get_good_rank` | 饰品持有量排行榜：按 good_id 查询，返回持有该饰品的用户排行 | 需要 |
+| 18 | api-187131814 | POST | `/api/v1/monitor/get_task_info` | 单个用户信息：需 task_id，返回用户详情 | 需要 |
+| 19 | api-358158458 | POST | `/api/v1/monitor/get_task_trends_detail` | 单个用户库存动态：需 task_id，返回该用户的库存变动历史 | 需要 |
+| 20 | api-187131815 | POST | `/api/v1/task/get_task_all` | 单个用户全部库存：需 task_id，支持快照 ID 查看历史库存 | 需要 |
+| 21 | api-343919624 | POST | `/api/v1/monitor/get_snapshot_list` | 库存快照列表：返回用户的历史库存快照，用于对比不同日期的库存变化 | 需要 |
 
 **库存变动类型 (type 字段)：** 0-默认库存 / 1-买入 / 2-卖出 / 3-存入 / 4-取出 / 5-CD恢复 / 6-取出/恢复 / 7-卖出/存入
 
-### 2.6 实时成交数据模块（2 个端点，暂停更新）
+### 2.5 实时成交数据模块（2 个端点，暂停更新）
 
 | # | API文档 | 方法 | CSQAQ路径 | 用途 | 认证 |
 |---|---------|------|-----------|------|------|
-| 23 | api-187131821 | GET | `/api/v1/vol/current` | 平台实时成交量数据（暂停更新） | 需要 |
-| 24 | api-187131822 | GET | `/api/v1/vol/detail?id={vol_id}` | 单品实时成交量历史图表和磨损数据（暂停更新） | 需要 |
+| 22 | api-187131821 | GET | `/api/v1/vol/current` | 平台实时成交量数据（暂停更新） | 需要 |
+| 23 | api-187131822 | GET | `/api/v1/vol/detail?id={vol_id}` | 单品实时成交量历史图表和磨损数据（暂停更新） | 需要 |
 
 > **注意：** 实时成交数据模块已暂停更新，前端集成时标注"数据暂停更新"状态，不影响其他功能。
 
-### 2.7 系统设置模块（1 个端点）
+### 2.6 系统设置模块（1 个端点）
 
 | # | API文档 | 方法 | CSQAQ路径 | 用途 | 认证 |
 |---|---------|------|-----------|------|------|
-| 25 | api-342090738 | POST | `/api/v1/sys/bind_local_ip` | 绑定本机白名单 IP（频率限制 30秒/次），适用于非固定 IP 场景 | 需要 |
+| 24 | api-342090738 | POST | `/api/v1/sys/bind_local_ip` | 绑定本机白名单 IP（频率限制 30秒/次），适用于非固定 IP 场景 | 需要 |
 
 ---
 
@@ -181,7 +164,6 @@ src/api/
 ├── market_endpoints.py       # 新增：大盘指数端点（扩展现有 current_data）
 ├── item_endpoints.py         # 新增：饰品搜索、详情、图表、存世量、批量价格
 ├── ranking_endpoints.py      # 新增：排行榜、饰品列表、热门系列
-├── exchange_endpoints.py     # 新增：挂刀行情端点
 ├── monitor_endpoints.py      # 新增：库存监控7个端点
 ├── volume_endpoints.py       # 新增：实时成交数据端点（标注暂停）
 ├── settings_endpoints.py     # 新增：设置管理端点（读写 .env + IP绑定）
@@ -206,7 +188,6 @@ src/api/
 | info/get_page_list | `/rankings/items` | POST | /rankings |
 | info/get_series_list | `/rankings/series` | POST | /rankings |
 | info/get_series_detail | `/rankings/series-detail` | POST | /rankings |
-| info/exchange_detail | `/exchange/detail` | POST | /exchange |
 | monitor/get_task_list | `/monitor/tasks` | POST | /monitor |
 | monitor/get_task_trends | `/monitor/trends` | POST | /monitor |
 | monitor/get_good_rank | `/monitor/good-rank` | POST | /monitor |
@@ -238,7 +219,6 @@ src/api/
   /item-list           → 饰品列表（类型/品质/类别/磨损筛选 + 分页 + 搜索）
   /series              → 热门系列（系列卡片 + 涨跌幅 + 15天走势 + 点击进详情）
   /series/:seriesId    → 系列详情（系列内全部饰品列表 + 价格对比）
-  /exchange            → 挂刀行情（挂刀/反向挂刀切换 + 平台选择 + 价格/成交量筛选 + 套现比例排行）
   /monitor             → 库存监控（任务列表 + 变动动态 + 用户详情 + 全部库存 + 快照对比）
   /monitor/:taskId     → 监控用户详情（用户信息 + 库存动态 + 全部库存 + 快照列表）
   /settings            → 系统设置（API Token + IP绑定 + 缓存清理 + 主题配置）
@@ -274,7 +254,7 @@ src/api/
 | T1.5 修复 Select 值不匹配 | `frontend/src/components/Selector.tsx` | meta 加载后校验当前值是否在列表中，否则自动选第一项 |
 | T1.6 URL 状态持久化 | `frontend/src/App.tsx` | 用 URLSearchParams 同步 subIndex/period/itemGoodId，支持分享/刷新 |
 | T1.7 添加 404 页面 | `frontend/src/pages/NotFound.tsx` | 替换兜底路由的 Dashboard |
-| T1.8 前端 TypeScript 类型定义 | `frontend/src/types/csqaq.ts` | 为全部 25 个 CSQAQ API 响应定义 TypeScript 接口 |
+| T1.8 前端 TypeScript 类型定义 | `frontend/src/types/csqaq.ts` | 为全部 24 个 CSQAQ API 响应定义 TypeScript 接口 |
 
 ### 第二阶段：K线图与走势预测增强（核心体验）
 
@@ -319,63 +299,53 @@ src/api/
 | T4.8 前端：系列详情页 | `frontend/src/pages/SeriesDetailPage.tsx` | 系列内全部饰品列表 + 价格对比 + 涨跌排行 |
 | T4.9 路由更新 | `frontend/src/App.tsx` | 添加 `/rankings`、`/item-list`、`/series`、`/series/:seriesId` 路由 |
 
-### 第五阶段：挂刀行情页（CSQAQ 挂刀 API 集成）
+### 第五阶段：库存监控页（CSQAQ 库存监控 API 集成）
 
 | 任务 | 文件 | 内容 |
 |------|------|------|
-| T5.1 后端：挂刀行情端点 | `src/api/exchange_endpoints.py` | 封装 CSQAQ `/info/exchange_detail`，新增 `POST /exchange/detail`，支持挂刀/反向挂刀、平台选择、价格/成交量筛选 |
-| T5.2 前端：挂刀行情页 | `frontend/src/pages/ExchangePage.tsx` | 挂刀/反向挂刀模式切换 + 平台选择(BUFF/YYYP/双平台) + 出售方案选择 + 价格区间滑块 + 成交量筛选 + 搜索框 |
-| T5.3 前端：套现比例排行表 | `frontend/src/components/ExchangeTable.tsx` | 套现比例排序表格 + 各平台价格对比 + Steam成交量 + 点击跳转单品详情 |
-| T5.4 前端：挂刀计算器 | `frontend/src/components/ExchangeCalculator.tsx` | 输入饰品价格 → 自动计算各平台套现比例和利润 |
-| T5.5 路由更新 | `frontend/src/App.tsx` | 添加 `/exchange` 路由 |
+| T5.1 后端：任务列表端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_task_list`，新增 `POST /monitor/tasks`，支持搜索和 5 种排序 |
+| T5.2 后端：变动动态端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_task_trends`，新增 `POST /monitor/trends`，支持全站动态或按 good_id 筛选 |
+| T5.3 后端：持有量排行端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_good_rank`，新增 `POST /monitor/good-rank` |
+| T5.4 后端：用户信息端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_task_info`，新增 `POST /monitor/user-info` |
+| T5.5 后端：用户动态端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_task_trends_detail`，新增 `POST /monitor/user-trends` |
+| T5.6 后端：用户库存端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/task/get_task_all`，新增 `POST /monitor/user-inventory`，支持快照 ID |
+| T5.7 后端：快照列表端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_snapshot_list`，新增 `POST /monitor/snapshots` |
+| T5.8 前端：库存监控主页 | `frontend/src/pages/MonitorPage.tsx` | 任务列表（含搜索/排序）+ 最新变动动态流 + 变动类型图标和颜色标识 |
+| T5.9 前端：监控用户详情页 | `frontend/src/pages/MonitorDetailPage.tsx` | 用户信息卡片 + 库存动态时间线 + 全部库存列表（分页）+ 快照列表 + 快照对比 |
+| T5.10 前端：持有量排行组件 | `frontend/src/components/HoldingsRankTable.tsx` | 输入 good_id → 显示持有该饰品的用户排行 |
+| T5.11 前端：库存变动类型标识 | `frontend/src/components/TrendTypeBadge.tsx` | 7 种变动类型（买入/卖出/存入/取出/CD恢复等）的颜色和图标标识 |
+| T5.12 路由更新 | `frontend/src/App.tsx` | 添加 `/monitor` 和 `/monitor/:taskId` 路由 |
 
-### 第六阶段：库存监控页（CSQAQ 库存监控 API 集成）
-
-| 任务 | 文件 | 内容 |
-|------|------|------|
-| T6.1 后端：任务列表端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_task_list`，新增 `POST /monitor/tasks`，支持搜索和 5 种排序 |
-| T6.2 后端：变动动态端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_task_trends`，新增 `POST /monitor/trends`，支持全站动态或按 good_id 筛选 |
-| T6.3 后端：持有量排行端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_good_rank`，新增 `POST /monitor/good-rank` |
-| T6.4 后端：用户信息端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_task_info`，新增 `POST /monitor/user-info` |
-| T6.5 后端：用户动态端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_task_trends_detail`，新增 `POST /monitor/user-trends` |
-| T6.6 后端：用户库存端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/task/get_task_all`，新增 `POST /monitor/user-inventory`，支持快照 ID |
-| T6.7 后端：快照列表端点 | `src/api/monitor_endpoints.py` | 封装 CSQAQ `/monitor/get_snapshot_list`，新增 `POST /monitor/snapshots` |
-| T6.8 前端：库存监控主页 | `frontend/src/pages/MonitorPage.tsx` | 任务列表（含搜索/排序）+ 最新变动动态流 + 变动类型图标和颜色标识 |
-| T6.9 前端：监控用户详情页 | `frontend/src/pages/MonitorDetailPage.tsx` | 用户信息卡片 + 库存动态时间线 + 全部库存列表（分页）+ 快照列表 + 快照对比 |
-| T6.10 前端：持有量排行组件 | `frontend/src/components/HoldingsRankTable.tsx` | 输入 good_id → 显示持有该饰品的用户排行 |
-| T6.11 前端：库存变动类型标识 | `frontend/src/components/TrendTypeBadge.tsx` | 7 种变动类型（买入/卖出/存入/取出/CD恢复等）的颜色和图标标识 |
-| T6.12 路由更新 | `frontend/src/App.tsx` | 添加 `/monitor` 和 `/monitor/:taskId` 路由 |
-
-### 第七阶段：大盘指数增强与实时成交（CSQAQ 指数 + 成交 API 集成）
+### 第六阶段：大盘指数增强与实时成交（CSQAQ 指数 + 成交 API 集成）
 
 | 任务 | 文件 | 内容 |
 |------|------|------|
-| T7.1 后端：大盘指数扩展端点 | `src/api/market_endpoints.py` | 扩展 `/current_data` 使用，新增 `GET /market/overview` 和 `POST /market/data`（支持 hours/kline/lease 类型） |
-| T7.2 后端：实时成交端点 | `src/api/volume_endpoints.py` | 封装 CSQAQ `/vol/current` 和 `/vol/detail`，新增 `GET /volume/current` 和 `GET /volume/detail`（标注暂停更新） |
-| T7.3 前端：仪表盘全面增强 | `frontend/src/pages/Dashboard.tsx` | 子指数卡片网格（含涨跌幅色标）+ 涨跌分布图（按类型/价格区间）+ 在线人数实时显示 + 热门排行 Top10 + 快速导航 |
-| T7.4 前端：子指数K线增强 | `frontend/src/pages/ScenarioPage.tsx` | K线图支持多周期切换(1h/4h/1d/7d) + 子指数切换时保持图表不闪烁 |
-| T7.5 前端：实时成交页 | `frontend/src/pages/VolumePage.tsx` | 标注"数据暂停更新" + 展示历史成交量数据 + 单品成交量历史图表 |
-| T7.6 前端：涨跌分布可视化 | `frontend/src/components/ChgDistributionChart.tsx` | 按类型（印花/步枪/匕首/手套等）和价格区间（大件/小件等）的涨跌分布柱状图 |
-| T7.7 前端：在线人数组件 | `frontend/src/components/OnlineNumberCard.tsx` | 当前在线/今日峰值/本月峰值/月活/涨跌幅，自动刷新 |
-| T7.8 路由更新 | `frontend/src/App.tsx` | 添加 `/volume` 路由 |
+| T6.1 后端：大盘指数扩展端点 | `src/api/market_endpoints.py` | 扩展 `/current_data` 使用，新增 `GET /market/overview` 和 `POST /market/data`（支持 hours/kline/lease 类型） |
+| T6.2 后端：实时成交端点 | `src/api/volume_endpoints.py` | 封装 CSQAQ `/vol/current` 和 `/vol/detail`，新增 `GET /volume/current` 和 `GET /volume/detail`（标注暂停更新） |
+| T6.3 前端：仪表盘全面增强 | `frontend/src/pages/Dashboard.tsx` | 子指数卡片网格（含涨跌幅色标）+ 涨跌分布图（按类型/价格区间）+ 在线人数实时显示 + 热门排行 Top10 + 快速导航 |
+| T6.4 前端：子指数K线增强 | `frontend/src/pages/ScenarioPage.tsx` | K线图支持多周期切换(1h/4h/1d/7d) + 子指数切换时保持图表不闪烁 |
+| T6.5 前端：实时成交页 | `frontend/src/pages/VolumePage.tsx` | 标注"数据暂停更新" + 展示历史成交量数据 + 单品成交量历史图表 |
+| T6.6 前端：涨跌分布可视化 | `frontend/src/components/ChgDistributionChart.tsx` | 按类型（印花/步枪/匕首/手套等）和价格区间（大件/小件等）的涨跌分布柱状图 |
+| T6.7 前端：在线人数组件 | `frontend/src/components/OnlineNumberCard.tsx` | 当前在线/今日峰值/本月峰值/月活/涨跌幅，自动刷新 |
+| T6.8 路由更新 | `frontend/src/App.tsx` | 添加 `/volume` 路由 |
 
-### 第八阶段：系统设置、数据导出与零命令行
+### 第七阶段：系统设置、数据导出与零命令行
 
 | 任务 | 文件 | 内容 |
 |------|------|------|
-| T8.1 后端：设置管理端点 | `src/api/settings_endpoints.py` | `GET/POST /settings` 读写 .env 配置（apiToken, baseUrl 等） |
-| T8.2 后端：IP 绑定端点 | `src/api/settings_endpoints.py` | 封装 CSQAQ `/sys/bind_local_ip`，新增 `POST /settings/bind-ip`（30秒频率限制提示） |
-| T8.3 后端：服务控制端点 | `src/api/settings_endpoints.py` | `POST /settings/restart` 重启服务，`GET /settings/status` 健康检查 |
-| T8.4 后端：数据导出端点 | `src/api/export_endpoints.py` | `POST /export/trades` 导出交易记录，`POST /export/scan` 导出扫描结果，`GET /export/report/:id` 下载报告 |
-| T8.5 前端：设置页 | `frontend/src/pages/SettingsPage.tsx` | API Token 配置 + IP 绑定（一键绑定+频率提示）+ 缓存清理 + 服务重启 + 主题切换 |
-| T8.6 前端：交易记录导出 | `frontend/src/pages/BacktestPage.tsx` | 导出 CSV/Excel：交易明细 + 权益曲线 |
-| T8.7 前端：扫描结果导出 | `frontend/src/pages/TrendScanPage.tsx` | 导出 CSV：Top10/Bottom10 参数组合 |
-| T8.8 前端：报告格式化展示 | `frontend/src/pages/ReportsPage.tsx` | JSON 美化 + 折叠树 + 下载 |
-| T8.9 前端：策略参数自定义 | `frontend/src/pages/BacktestPage.tsx` | 可调参数面板：初始资金、止损比例、信号阈值等 |
-| T8.10 前端：多平台价格对比表 | `frontend/src/components/PlatformPriceTable.tsx` | BUFF / 悠悠有品 / Steam / C5 / IGXE / ECOSteam / R8GAME 七平台价格对比 |
-| T8.11 前端：租赁收益分析 | `frontend/src/components/LeaseAnalysisChart.tsx` | 短租/长租收益率图表 + 年化收益计算 + 过户底价展示 |
-| T8.12 一键启动脚本 | `start.sh` / `start.bat` | 双击启动：检查环境 → 安装依赖 → 构建前端 → 启动服务 → 打开浏览器 |
-| T8.13 路由更新 | `frontend/src/App.tsx` | 添加 `/settings` 路由 |
+| T7.1 后端：设置管理端点 | `src/api/settings_endpoints.py` | `GET/POST /settings` 读写 .env 配置（apiToken, baseUrl 等） |
+| T7.2 后端：IP 绑定端点 | `src/api/settings_endpoints.py` | 封装 CSQAQ `/sys/bind_local_ip`，新增 `POST /settings/bind-ip`（30秒频率限制提示） |
+| T7.3 后端：服务控制端点 | `src/api/settings_endpoints.py` | `POST /settings/restart` 重启服务，`GET /settings/status` 健康检查 |
+| T7.4 后端：数据导出端点 | `src/api/export_endpoints.py` | `POST /export/trades` 导出交易记录，`POST /export/scan` 导出扫描结果，`GET /export/report/:id` 下载报告 |
+| T7.5 前端：设置页 | `frontend/src/pages/SettingsPage.tsx` | API Token 配置 + IP 绑定（一键绑定+频率提示）+ 缓存清理 + 服务重启 + 主题切换 |
+| T7.6 前端：交易记录导出 | `frontend/src/pages/BacktestPage.tsx` | 导出 CSV/Excel：交易明细 + 权益曲线 |
+| T7.7 前端：扫描结果导出 | `frontend/src/pages/TrendScanPage.tsx` | 导出 CSV：Top10/Bottom10 参数组合 |
+| T7.8 前端：报告格式化展示 | `frontend/src/pages/ReportsPage.tsx` | JSON 美化 + 折叠树 + 下载 |
+| T7.9 前端：策略参数自定义 | `frontend/src/pages/BacktestPage.tsx` | 可调参数面板：初始资金、止损比例、信号阈值等 |
+| T7.10 前端：多平台价格对比表 | `frontend/src/components/PlatformPriceTable.tsx` | BUFF / 悠悠有品 / Steam / C5 / IGXE / ECOSteam / R8GAME 七平台价格对比 |
+| T7.11 前端：租赁收益分析 | `frontend/src/components/LeaseAnalysisChart.tsx` | 短租/长租收益率图表 + 年化收益计算 + 过户底价展示 |
+| T7.12 一键启动脚本 | `start.sh` / `start.bat` | 双击启动：检查环境 → 安装依赖 → 构建前端 → 启动服务 → 打开浏览器 |
+| T7.13 路由更新 | `frontend/src/App.tsx` | 添加 `/settings` 路由 |
 
 ---
 
@@ -440,10 +410,6 @@ src/api/
   ├── 饰品列表（类型/品质/类别/磨损筛选）
   └── 热门系列（涨跌幅 + 15天走势 + 系列详情）
 
-挂刀行情层（Exchange）
-  ├── 挂刀（平台买→Steam卖，获取Steam余额）
-  └── 反向挂刀（Steam买→平台卖，获取平台余额）
-
 库存监控层（Inventory Monitor）
   ├── 任务列表（搜索/排序）
   ├── 变动动态（全站/按饰品筛选）
@@ -465,12 +431,11 @@ src/api/
 | M2 | 第二阶段：K线增强 + 走势预测 | 3天 |
 | M3 | 第三阶段：单品搜索 + 详情页（7个API集成） | 4天 |
 | M4 | 第四阶段：排行榜 + 饰品列表 + 热门系列（4个API集成） | 3天 |
-| M5 | 第五阶段：挂刀行情页（1个API集成） | 2天 |
-| M6 | 第六阶段：库存监控页（7个API集成） | 4天 |
-| M7 | 第七阶段：大盘指数增强 + 实时成交（5个API集成） | 2天 |
-| M8 | 第八阶段：系统设置 + 导出 + 零命令行 | 2天 |
+| M5 | 第五阶段：库存监控页（7个API集成） | 4天 |
+| M6 | 第六阶段：大盘指数增强 + 实时成交（5个API集成） | 2天 |
+| M7 | 第七阶段：系统设置 + 导出 + 零命令行 | 2天 |
 
-**总计约 22 个工作日，集成全部 25 个 CSQAQ API 端点，可按里程碑分批交付。**
+**总计约 20 个工作日，集成全部 24 个 CSQAQ API 端点，可按里程碑分批交付。**
 
 ---
 
@@ -507,13 +472,6 @@ src/api/
 - [ ] 热门系列页显示涨跌幅和 15 天走势
 - [ ] 系列详情页展示系列内全部饰品
 
-### 挂刀行情验收
-- [ ] 支持挂刀/反向挂刀模式切换
-- [ ] 支持平台选择（BUFF/YYYP/双平台）
-- [ ] 支持价格区间和成交量筛选
-- [ ] 套现比例排行表正确展示
-- [ ] 点击饰品可跳转单品详情
-
 ### 库存监控验收
 - [ ] 任务列表支持搜索和 5 种排序方式
 - [ ] 变动动态展示 7 种变动类型（图标和颜色区分）
@@ -537,7 +495,7 @@ src/api/
 - [ ] 全部操作在前端完成，无需命令行
 
 ### API 覆盖率验收
-- [ ] 25 个 CSQAQ API 端点全部集成
-- [ ] 7 个后端端点文件全部创建
-- [ ] 13 个前端页面全部实现
+- [ ] 24 个 CSQAQ API 端点全部集成
+- [ ] 6 个后端端点文件全部创建
+- [ ] 12 个前端页面全部实现
 - [ ] 实时成交页标注"暂停更新"状态
