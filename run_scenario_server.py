@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from src.api.backtest_endpoints import router as backtest_router
 from src.api.ensemble_endpoints import router as ensemble_router
 from src.api.monitoring import monitoring_router
+from src.api.report_endpoints import router as report_router
 from src.api.scenario_endpoints import router as scenario_router
 from src.api.trend_scan_endpoints import router as trend_scan_router
 
@@ -33,6 +34,7 @@ app.include_router(scenario_router)
 app.include_router(backtest_router)
 app.include_router(ensemble_router)
 app.include_router(trend_scan_router)
+app.include_router(report_router)
 app.include_router(monitoring_router)
 
 frontend_dir = Path(__file__).parent / "frontend" / "dist"
