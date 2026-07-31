@@ -553,29 +553,44 @@ def explain(request: ExplainRequest) -> ExplainResponse:
 
 @router.get("/meta")
 def meta() -> dict[str, Any]:
-    """Return available sub-indices discovered from local cache and supported periods.
+    """Return available sub-indices and supported periods.
 
-    The backend does not hard-code any sector list; it inspects cached OHLC
-    files and report artefacts to derive sub-index names.
+    Tries to fetch the real sub-index list from the CSQAQ API first.
+    Falls back to scanning local cache files, then to a built-in default list.
     """
     start = time.perf_counter()
     settings = Settings()
-    cache_dir = cache_file_path("", "1day", settings.cache_path).parent
     discovered: set[str] = set()
 
-    if cache_dir.exists():
-        for path in cache_dir.glob("*_*.parquet"):
-            name = path.stem.rsplit("_", 1)[0]
-            if name:
-                discovered.add(name)
+    # 1. Try fetching from CSQAQ API (if token is configured).
+    if settings.api_token:
+        try:
+            client = CSQAQClient(settings)
+            payload = get_current_data_init(client, skip_rate_limit=True)
+            sub_index_data = payload.get("sub_index_data", [])
+            for item in sub_index_data:
+                name = item.get("name")
+                if name:
+                    discovered.add(name)
+            LOGGER.info("meta: discovered %d sub-indices from API", len(discovered))
+        except Exception as exc:
+            LOGGER.warning("meta: API fetch failed, falling back to cache: %s", exc)
 
-    # Also discover from previously generated phase reports (best-effort).
-    reports_dir = cache_dir.parents[1] / "reports"
-    if reports_dir.exists():
-        for path in reports_dir.glob("phase*_*_*.json"):
-            parts = path.stem.split("_")
-            if len(parts) >= 3:
-                discovered.add(parts[1])
+    # 2. Scan local cache files.
+    if not discovered:
+        cache_dir = cache_file_path("", "1day", settings.cache_path).parent
+        if cache_dir.exists():
+            for path in cache_dir.glob("*_*.parquet"):
+                name = path.stem.rsplit("_", 1)[0]
+                if name:
+                    discovered.add(name)
+
+    # 3. Built-in defaults covering all CSQAQ sub-indices.
+    if not discovered:
+        discovered = {
+            "手套", "刀", "步枪", "手枪", "狙击枪",
+            "微型冲锋枪", "重型武器", "贴纸", "音乐盒", "物品",
+        }
 
     latency_ms = (time.perf_counter() - start) * 1000
     record_request("/scenario/meta", latency_ms, error=False)
