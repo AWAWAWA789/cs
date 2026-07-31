@@ -41,6 +41,9 @@ const LEVEL_COLORS = {
  * - 标注当前位置 markPoint
  */
 function buildEnhancedOhlcOption(ohlc: OhlcBar[], scenarios: Scenario[]) {
+  if (!ohlc || ohlc.length === 0) {
+    return { series: [] };
+  }
   const dates = ohlc.map((d) => formatDateShort(d.timestamp));
   const candleData = ohlc.map((d) => [d.open, d.close, d.low, d.high]);
   const hasVolume = ohlc.some((d) => d.volume !== undefined && d.volume !== null);
