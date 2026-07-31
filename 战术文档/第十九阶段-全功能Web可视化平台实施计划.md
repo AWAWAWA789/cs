@@ -1,12 +1,12 @@
-# 全功能 Web 可视化平台实施计划
+# 全功能 Web 可视化平台实施计划（生产级优化版）
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 将所有 CLI 功能（MVP 回测、集成策略、趋势扫描、报告生成、数据管理）集成到统一的 React 网页平台，实现浅色现代仪表盘风格的全中文可视化交互。面向本地个人使用，无需 Docker 或生产部署。
+**Goal:** 将所有 CLI 功能（MVP 回测、集成策略、趋势扫描、报告生成、数据管理）集成到统一的 React 网页平台，实现浅色现代仪表盘风格的全中文可视化交互。面向本地个人使用，具备生产级代码质量：错误边界、响应式设计、无障碍支持、代码分割、单元测试覆盖。
 
-**Architecture:** 前端使用 React 18 + Vite + TypeScript 构建单页应用（SPA），构建产物为静态文件，由现有 FastAPI 的 `StaticFiles` 挂载。后端新增 REST API 端点暴露所有 CLI 功能，长耗时操作（趋势扫描、参数扫描）采用异步任务队列模式（内存任务表 + 轮询）。前端按功能模块拆分为独立页面组件，通过 React Router 切换。图表使用 ECharts，UI 组件采用自定义组件。本地运行：`npm run build` 构建前端 → `python run_scenario_server.py` 启动服务。
+**Architecture:** 前端使用 React 18 + Vite + TypeScript 构建单页应用（SPA），构建产物为静态文件，由现有 FastAPI 的 `StaticFiles` 挂载。后端新增 REST API 端点暴露所有 CLI 功能，长耗时操作（趋势扫描、参数扫描）采用异步任务队列模式（`ThreadPoolExecutor` + 内存任务表 + 轮询）。前端按功能模块拆分为独立页面组件，通过 `React.lazy` + `Suspense` 实现路由级代码分割。图表使用 ECharts，UI 组件采用自定义组件 + Tailwind CSS。全局错误通过 React Error Boundary 捕获，API 请求通过 `AbortController` 支持取消。本地运行：`npm run build` 构建前端 → `python run_scenario_server.py` 启动服务。
 
-**Tech Stack:** React 18, Vite 5, TypeScript 5, React Router 6, ECharts 5, Tailwind CSS 3, FastAPI, Python 3.10+
+**Tech Stack:** React 18, Vite 5, TypeScript 5, React Router 6, ECharts 5, Tailwind CSS 3, Vitest 2, Testing Library, FastAPI, Python 3.10+
 
 ---
 
@@ -16,38 +16,47 @@
 
 ```
 frontend/
-├── package.json                  # 依赖声明
+├── package.json                  # 依赖声明（含 Vitest + Testing Library）
 ├── vite.config.ts                # Vite 配置，构建产物输出到 dist/
 ├── tsconfig.json                 # TypeScript 配置
+├── tsconfig.node.json            # Node 环境 TS 配置（vite.config.ts 用）
 ├── tailwind.config.js            # Tailwind 主题配置（浅色仪表盘主题）
 ├── postcss.config.js             # PostCSS 配置
+├── vitest.config.ts              # Vitest 测试配置
+├── .env.example                  # 环境变量示例
 ├── index.html                    # SPA 入口 HTML
 ├── src/
-│   ├── main.tsx                  # React 应用入口
-│   ├── App.tsx                   # 根组件 + 路由
+│   ├── main.tsx                  # React 应用入口（含 ErrorBoundary 包裹）
+│   ├── App.tsx                   # 根组件 + 路由（含 React.lazy 懒加载 + 404 兜底）
+│   ├── ErrorBoundary.tsx         # 全局错误边界组件
 │   ├── types/
 │   │   └── api.ts                # 所有 API 响应的 TypeScript 类型定义
 │   ├── lib/
-│   │   ├── api.ts                # 统一 API 客户端（fetch 封装）
+│   │   ├── api.ts                # 统一 API 客户端（fetch 封装 + AbortController）
 │   │   └── format.ts             # 格式化工具函数（百分比、日期、数字）
 │   ├── components/
-│   │   ├── Layout.tsx            # 页面布局骨架（侧边栏 + 顶栏 + 内容区）
-│   │   ├── Sidebar.tsx           # 左侧导航栏
-│   │   ├── TopBar.tsx            # 顶部全局控制栏（子指数/周期选择、状态）
+│   │   ├── Layout.tsx            # 页面布局骨架（响应式侧边栏 + 顶栏 + 内容区）
+│   │   ├── Sidebar.tsx           # 左侧导航栏（移动端可折叠）
+│   │   ├── TopBar.tsx            # 顶部全局控制栏（子指数/周期选择、刷新、状态）
 │   │   ├── Card.tsx              # 通用卡片容器组件
 │   │   ├── MetricCard.tsx        # 指标展示卡片（单个数值 + 标签）
 │   │   ├── LoadingState.tsx      # 骨架屏/加载态组件
 │   │   ├── ErrorState.tsx        # 错误态组件（含重试按钮）
-│   │   └── ScenarioBar.tsx       # 情景概率条形图组件
+│   │   ├── EmptyState.tsx        # 空数据态组件
+│   │   └── ScenarioBar.tsx       # 情景概率条形图组件（含无障碍支持）
 │   ├── pages/
 │   │   ├── ScenarioPage.tsx      # 情景分析页（升级现有功能）
 │   │   ├── BacktestPage.tsx      # MVP 回测页
 │   │   ├── EnsemblePage.tsx      # 集成策略页
-│   │   ├── TrendScanPage.tsx     # 趋势扫描页（异步任务）
+│   │   ├── TrendScanPage.tsx     # 趋势扫描页（异步任务 + 指数退避轮询）
 │   │   ├── ReportsPage.tsx       # 报告查看页
-│   │   └── DataManagementPage.tsx # 数据管理页
-│   └── styles/
-│       └── globals.css           # Tailwind 指令 + 全局样式
+│   │   ├── DataManagementPage.tsx # 数据管理页
+│   │   └── NotFoundPage.tsx      # 404 页面
+│   ├── styles/
+│   │   └── globals.css           # Tailwind 指令 + 全局样式
+│   └── __tests__/
+│       ├── format.test.ts        # 格式化工具单元测试
+│       └── api.test.ts           # API 客户端单元测试
 └── dist/                         # 构建产物（gitignore），由 FastAPI 挂载
 ```
 
@@ -56,25 +65,32 @@ frontend/
 ```
 src/api/
 ├── scenario_endpoints.py         # 已有，保持不变
-├── backtest_endpoints.py         # 已有，保持不变
+├── backtest_endpoints.py         # 已有，修改：新增 /backtest/mvp 端点
 ├── monitoring.py                 # 已有，保持不变
-├── backtest_endpoints.py         # 修改：新增 /backtest/mvp 端点
+├── task_queue.py                 # 新建：线程池异步任务队列
 ├── ensemble_endpoints.py         # 新建：集成策略端点
 ├── trend_scan_endpoints.py       # 新建：趋势扫描端点（异步任务）
 ├── report_endpoints.py           # 新建：报告查看端点
 ├── data_endpoints.py             # 新建：数据管理端点
-└── task_queue.py                 # 新建：轻量异步任务队列
+├── cache.py                      # 已有，保持不变
+├── client.py                     # 已有，保持不变
+├── endpoints.py                  # 已有，保持不变
+└── logging.py                    # 已有，保持不变
 ```
 
-### 测试（新建对应测试文件）
+### 测试文件
 
 ```
 tests/
-├── test_ensemble_endpoints.py
-├── test_trend_scan_endpoints.py
-├── test_report_endpoints.py
-├── test_data_endpoints.py
-└── test_task_queue.py
+├── test_task_queue.py            # 新建：任务队列测试（含 TTL、并发）
+├── test_mvp_endpoint.py          # 新建：MVP 回测端点测试
+├── test_ensemble_endpoints.py    # 新建：集成策略端点测试
+├── test_trend_scan_endpoints.py  # 新建：趋势扫描端点测试
+├── test_report_endpoints.py      # 新建：报告端点测试
+├── test_data_endpoints.py        # 新建：数据管理端点测试
+├── test_scenario_api.py          # 已有，保持不变
+├── test_backtest_endpoints.py    # 已有，保持不变
+└── ...                           # 其他已有测试
 ```
 
 ---
@@ -85,12 +101,14 @@ tests/
 - Create: `frontend/package.json`
 - Create: `frontend/vite.config.ts`
 - Create: `frontend/tsconfig.json`
+- Create: `frontend/tsconfig.node.json`
 - Create: `frontend/tailwind.config.js`
 - Create: `frontend/postcss.config.js`
 - Create: `frontend/index.html`
 - Create: `frontend/src/main.tsx`
-- Create: `frontend/src/App.tsx`
 - Create: `frontend/src/styles/globals.css`
+- Create: `frontend/.env.example`
+- Modify: `frontend/.gitignore`（新建）
 - Modify: `run_scenario_server.py`
 - Modify: `.gitignore`
 
@@ -100,12 +118,14 @@ tests/
 {
   "name": "csqaq-dashboard",
   "private": true,
-  "version": "0.19.0",
+  "version": "0.20.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "react": "^18.3.0",
@@ -115,21 +135,23 @@ tests/
     "echarts-for-react": "^3.0.2"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^16.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.0",
+    "jsdom": "^24.0.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.5.0",
-    "vite": "^5.4.0"
+    "vite": "^5.4.0",
+    "vitest": "^2.0.0"
   }
 }
 ```
 
 - [ ] **Step 2: 创建 `frontend/vite.config.ts`**
-
-配置 Vite 构建产物输出到 `dist/`，开发时代理 API 请求到 `localhost:8000`。
 
 ```typescript
 import { defineConfig } from "vite";
@@ -140,6 +162,14 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          echarts: ["echarts", "echarts-for-react"],
+          react: ["react", "react-dom", "react-router-dom"],
+        },
+      },
+    },
   },
   server: {
     port: 5173,
@@ -175,19 +205,34 @@ export default defineConfig({
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
 }
 ```
 
-- [ ] **Step 4: 创建 `frontend/tailwind.config.js`**
+- [ ] **Step 4: 创建 `frontend/tsconfig.node.json`**
 
-配置浅色仪表盘主题色板：主色 `#3b82f6`（蓝）、背景 `#f8fafc`（近白灰）、卡片 `#ffffff`、文字 `#1e293b`（深灰）、次级文字 `#64748b`。涨绿 `#16a34a`、跌红 `#dc2626`。
+```json
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["vite.config.ts", "vitest.config.ts"]
+}
+```
+
+- [ ] **Step 5: 创建 `frontend/tailwind.config.js`**
 
 ```javascript
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
@@ -216,14 +261,10 @@ export default {
       },
       fontFamily: {
         sans: ['"Inter"', '"Noto Sans SC"', '"PingFang SC"', "sans-serif"],
-        mono: ['"JetBrains Mono"', '"Cascadia Code"', "monospace"],
       },
       boxShadow: {
         card: "0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06)",
         "card-hover": "0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06)",
-      },
-      borderRadius: {
-        xl: "0.875rem",
       },
     },
   },
@@ -231,10 +272,10 @@ export default {
 };
 ```
 
-- [ ] **Step 5: 创建 `frontend/postcss.config.js`**
+- [ ] **Step 6: 创建 `frontend/postcss.config.js`**
 
 ```javascript
-export default {
+module.exports = {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},
@@ -242,7 +283,23 @@ export default {
 };
 ```
 
-- [ ] **Step 6: 创建 `frontend/index.html`**
+- [ ] **Step 7: 创建 `frontend/vitest.config.ts`**
+
+```typescript
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: [],
+  },
+});
+```
+
+- [ ] **Step 8: 创建 `frontend/index.html`**
 
 ```html
 <!DOCTYPE html>
@@ -250,7 +307,7 @@ export default {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CSQAQ 量化策略平台</title>
+    <title>CSQAQ 量化仪表盘</title>
   </head>
   <body>
     <div id="root"></div>
@@ -259,26 +316,28 @@ export default {
 </html>
 ```
 
-- [ ] **Step 7: 创建 `frontend/src/styles/globals.css`**
+- [ ] **Step 9: 创建 `frontend/src/styles/globals.css`**
 
 ```css
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
+html,
+body,
+#root {
+  height: 100%;
   margin: 0;
+}
+
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", sans-serif;
   background-color: #f8fafc;
   color: #1e293b;
-  font-family: "Inter", "Noto Sans SC", "PingFang SC", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-#root {
-  min-height: 100vh;
-}
-
-/* 自定义滚动条 */
+/* 滚动条样式 */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -295,9 +354,9 @@ body {
 }
 ```
 
-- [ ] **Step 8: 创建 `frontend/src/main.tsx`**
+- [ ] **Step 10: 创建 `frontend/src/main.tsx`（占位，Task 5 和 Task 18 会完善）**
 
-```tsx
+```typescript
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
@@ -313,58 +372,69 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 ```
 
-- [ ] **Step 9: 创建 `frontend/src/App.tsx`**
+- [ ] **Step 11: 创建 `frontend/src/App.tsx`（占位，Task 18 完善）**
 
-最小可运行版本，包含路由骨架和占位页面。
-
-```tsx
-import { Routes, Route, Navigate } from "react-router-dom";
-
-function Placeholder({ name }: { name: string }) {
+```typescript
+export default function App() {
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold text-ink-primary">{name}</h1>
-      <p className="mt-2 text-ink-secondary">页面开发中...</p>
+    <div className="flex h-full items-center justify-center text-ink-secondary">
+      <p>前端初始化中...</p>
     </div>
   );
 }
-
-export default function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/scenario" replace />} />
-      <Route path="/scenario" element={<Placeholder name="情景分析" />} />
-      <Route path="/backtest" element={<Placeholder name="MVP 回测" />} />
-      <Route path="/ensemble" element={<Placeholder name="集成策略" />} />
-      <Route path="/trend-scan" element={<Placeholder name="趋势扫描" />} />
-      <Route path="/reports" element={<Placeholder name="报告中心" />} />
-      <Route path="/data" element={<Placeholder name="数据管理" />} />
-    </Routes>
-  );
-}
 ```
 
-- [ ] **Step 10: 修改 `run_scenario_server.py` 挂载 dist 目录**
+- [ ] **Step 12: 创建 `frontend/.env.example`**
 
-将静态文件挂载从 `frontend/` 改为 `frontend/dist/`，兼容构建产物。
-
-```python
-frontend_dir = Path(__file__).parent / "frontend" / "dist"
-if frontend_dir.exists():
-    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+```bash
+# API 基础路径（开发时 Vite 代理生效，留空即可；生产部署时填写后端地址）
+VITE_API_BASE_URL=
 ```
 
-- [ ] **Step 11: 修改 `.gitignore` 增加 `frontend/node_modules/` 和 `frontend/dist/`**
+- [ ] **Step 13: 创建 `frontend/.gitignore`**
+
+```gitignore
+node_modules/
+dist/
+*.local
+.env
+```
+
+- [ ] **Step 14: 更新根目录 `.gitignore`，增加 `frontend/node_modules/` 和 `frontend/dist/`**
 
 在 `.gitignore` 末尾追加：
 
-```
-# Frontend build artifacts
+```gitignore
+# Frontend
 frontend/node_modules/
 frontend/dist/
 ```
 
-- [ ] **Step 12: 安装前端依赖并验证构建**
+- [ ] **Step 15: 修改 `run_scenario_server.py` 挂载 `frontend/dist/`**
+
+读取文件，找到 StaticFiles 挂载行，将 `frontend` 改为 `frontend/dist`，并增加目录存在性检查：
+
+```python
+import os
+from pathlib import Path
+
+# ... 已有 imports ...
+
+frontend_dir = Path(__file__).parent / "frontend" / "dist"
+if frontend_dir.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+else:
+    @app.get("/")
+    def frontend_not_built():
+        """前端未构建时返回提示信息。"""
+        return HTMLResponse(
+            "<h1>前端未构建</h1>"
+            "<p>请先运行 <code>cd frontend && npm install && npm run build</code></p>",
+            status_code=503,
+        )
+```
+
+- [ ] **Step 16: 安装依赖并验证构建**
 
 ```bash
 cd /workspace/csqaq-glove-quant/frontend
@@ -372,9 +442,9 @@ npm install
 npm run build
 ```
 
-预期：`dist/` 目录生成，包含 `index.html`、`assets/` 子目录。
+预期：`frontend/dist/` 目录生成 `index.html`、`assets/` 子目录。
 
-- [ ] **Step 13: 验证后端挂载构建产物**
+- [ ] **Step 17: 验证后端挂载**
 
 ```bash
 cd /workspace/csqaq-glove-quant
@@ -382,42 +452,55 @@ python -c "
 from run_scenario_server import app
 from fastapi.testclient import TestClient
 client = TestClient(app)
-resp = client.get('/')
-print(f'Status: {resp.status_code}')
-print(f'Contains root div: {\"root\" in resp.text}')
+r = client.get('/')
+assert r.status_code == 200, f'Expected 200, got {r.status_code}'
+assert 'root' in r.text, 'Frontend not served'
+print('Frontend served correctly!')
 "
 ```
 
-预期：Status 200，包含 `<div id="root">`。
-
-- [ ] **Step 14: 提交**
+- [ ] **Step 18: 提交**
 
 ```bash
-git add frontend/ run_scenario_server.py .gitignore
-git commit -m "feat(web): 初始化 React + Vite + Tailwind 前端项目骨架"
+cd /workspace/csqaq-glove-quant
+git add frontend/package.json frontend/vite.config.ts frontend/tsconfig.json frontend/tsconfig.node.json frontend/tailwind.config.js frontend/postcss.config.js frontend/vitest.config.ts frontend/index.html frontend/src/main.tsx frontend/src/App.tsx frontend/src/styles/globals.css frontend/.env.example frontend/.gitignore .gitignore run_scenario_server.py
+git commit -m "feat(web): 初始化 React + Vite + TypeScript 前端项目骨架"
 ```
 
 ---
 
-## Task 2: API 类型定义与统一客户端
+## Task 2: API 类型定义与格式化工具
 
 **Files:**
 - Create: `frontend/src/types/api.ts`
-- Create: `frontend/src/lib/api.ts`
 - Create: `frontend/src/lib/format.ts`
 
 - [ ] **Step 1: 创建 `frontend/src/types/api.ts`**
 
-定义所有 API 响应的 TypeScript 类型，覆盖现有端点和即将新增的端点。
-
 ```typescript
 // ===== 情景分析 =====
+
+export interface OhlcBar {
+  timestamp: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+export interface OhlcResponse {
+  sub_index: string;
+  period: string;
+  count: number;
+  ohlc: OhlcBar[];
+}
+
 export interface Scenario {
   name: string;
   scenario_key: string;
   probability: number;
   direction: number;
-  direction_label: "bullish" | "bearish" | "neutral";
+  direction_label: string;
   support: number;
   resistance: number;
   target: number;
@@ -436,37 +519,18 @@ export interface WavePoint {
 export interface ScenarioGenerateResponse {
   sub_index: string;
   period: string;
-  generated_at: string;
-  generation_time_ms: number;
-  cached: boolean;
   scenarios: Scenario[];
-  per_period: Record<string, unknown>;
-}
-
-export interface OhlcBar {
-  timestamp: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-}
-
-export interface OhlcResponse {
-  sub_index: string;
-  period: string;
-  count: number;
-  ohlc: OhlcBar[];
+  cached: boolean;
+  generation_time_ms: number;
+  generated_at: string;
 }
 
 export interface HistoryMatch {
-  neighbor_index?: number;
-  neighbor_timestamp?: string;
-  candidate_start?: string;
-  candidate_end?: string;
-  candidate_start_timestamp?: string;
+  candidate_start_timestamp: string;
+  neighbor_timestamp: string;
   distance: number;
-  future_return_5?: number;
-  future_return_7?: number;
+  future_return: number;
+  future_direction: number;
 }
 
 export interface HistoryResponse {
@@ -478,54 +542,35 @@ export interface HistoryResponse {
 
 export interface TemplateMatch {
   template_name: string;
+  matched_timestamp: string;
+  direction: number;
   confidence: number;
-  direction: string;
-  support: number | null;
-  resistance: number | null;
-  target: number | null;
-  stop_loss: number | null;
+  support: number;
+  resistance: number;
+  target: number;
+  stop_loss: number;
+  suggestion: string;
 }
 
-export interface TemplatesResponse {
+export interface TemplateResponse {
   sub_index: string;
   period: string;
-  min_confidence: number;
   matches: TemplateMatch[];
 }
 
+export interface ExplainResponse {
+  prompt: string;
+  explanation: string;
+  wave_sketch_description: string;
+}
+
 export interface MetaResponse {
-  available_sub_indices: string[];
+  sub_indices: string[];
   supported_periods: string[];
   default_period: string;
 }
 
 // ===== 回测 =====
-export interface TradeRecord {
-  entry_index: number;
-  entry_time: string;
-  entry_price: number;
-  exit_time: string;
-  exit_price: number | null;
-  exit_reason: string;
-  pnl: number;
-  return_pct: number;
-}
-
-export interface EquityPoint {
-  timestamp: string;
-  equity: number;
-}
-
-export interface BacktestEquityResponse {
-  sub_index: string;
-  period: string;
-  generated_at: string;
-  equity_curve: EquityPoint[];
-  trades: TradeRecord[];
-  total_return: number;
-  final_equity: number;
-  trade_count: number;
-}
 
 export interface BacktestMetrics {
   initial_capital: number;
@@ -539,248 +584,411 @@ export interface BacktestMetrics {
   avg_trade_return: number;
 }
 
+export interface Trade {
+  entry_index: number;
+  entry_time: string;
+  entry_price: number;
+  exit_time: string | null;
+  exit_price: number | null;
+  exit_reason: string | null;
+  pnl: number;
+  return_pct: number;
+}
+
+export interface EquityPoint {
+  timestamp: string;
+  equity: number;
+}
+
 export interface MvpBacktestResponse {
   sub_index: string;
   period: string;
   generated_at: string;
   metrics: BacktestMetrics;
   equity_curve: EquityPoint[];
-  trades: TradeRecord[];
+  trades: Trade[];
 }
 
 // ===== 集成策略 =====
-export interface EnsembleBacktestResponse {
+
+export interface StrategyResult {
+  strategy_name: string;
+  metrics: BacktestMetrics;
+  equity_curve: EquityPoint[];
+  trade_count: number;
+}
+
+export interface EnsembleResponse {
   sub_index: string;
   period: string;
   generated_at: string;
-  ensemble_metrics: BacktestMetrics;
-  pullback_metrics: BacktestMetrics;
-  trend_metrics: BacktestMetrics;
-  ensemble_equity: EquityPoint[];
-  pullback_equity: EquityPoint[];
-  trend_equity: EquityPoint[];
-  trades: TradeRecord[];
+  ensemble: StrategyResult;
+  pullback: StrategyResult;
+  trend_following: StrategyResult;
 }
 
-// ===== 趋势扫描 =====
-export interface TrendScanResult {
+// ===== 趋势扫描（异步任务） =====
+
+export type TaskStatus = "pending" | "running" | "completed" | "failed";
+
+export interface TaskStatusResponse {
+  task_id: string;
+  status: TaskStatus;
+  progress: number;
+  message: string;
+  result: ScanResult | null;
+  error: string | null;
+}
+
+export interface ScanResult {
+  sub_index: string;
+  period: string;
+  total_combinations: number;
+  top_10: ScanEntry[];
+  bottom_10: ScanEntry[];
+  non_negative_count: number;
+  all_results: ScanEntry[];
+}
+
+export interface ScanEntry {
   params: Record<string, unknown>;
   total_return: number;
-  sharpe_ratio: number;
   max_drawdown: number;
+  sharpe_ratio: number;
   win_rate: number;
   total_trades: number;
 }
 
-export interface TaskStatusResponse {
-  task_id: string;
-  status: "pending" | "running" | "completed" | "failed";
-  progress: number;
-  message: string;
-  result?: TrendScanResult[];
-  error?: string;
-}
-
 // ===== 报告 =====
+
 export interface ReportFile {
-  name: string;
-  path: string;
-  size: number;
-  modified: string;
+  filename: string;
+  size_bytes: number;
+  modified_at: string;
 }
 
-export interface ReportsListResponse {
+export interface ReportListResponse {
   reports: ReportFile[];
 }
 
 export interface ReportContentResponse {
-  name: string;
-  content: Record<string, unknown>;
+  filename: string;
+  content: unknown;
 }
 
 // ===== 数据管理 =====
-export interface CacheEntry {
-  sub_index: string;
-  period: string;
-  file: string;
-  bars: number;
-  size: number;
-  modified: string;
+
+export interface CacheFile {
+  filename: string;
+  size_bytes: number;
+  bar_count: number | null;
+  modified_at: string;
 }
 
 export interface CacheStatusResponse {
   cache_dir: string;
-  entries: CacheEntry[];
+  total_files: number;
+  total_size_bytes: number;
+  files: CacheFile[];
+}
+
+export interface DataRefreshResponse {
+  sub_index: string;
+  period: string;
+  success: boolean;
+  bar_count: number;
+  message: string;
 }
 
 // ===== 监控 =====
+
+export interface MonitoringMetrics {
+  request_count: number;
+  p50_latency_ms: number;
+  p99_latency_ms: number;
+  failure_rate: number;
+  per_endpoint: Record<string, { count: number; error_count: number; p99_latency_ms: number }>;
+}
+
+export interface MonitoringAlert {
+  type: string;
+  message: string;
+  severity: string;
+}
+
 export interface MonitoringResponse {
-  metrics: {
-    window_seconds: number;
-    request_count: number;
-    failure_count: number;
-    failure_rate: number;
-    latency_p50_ms: number;
-    latency_p99_ms: number;
-    per_endpoint: Record<string, { request_count: number; failure_rate: number; latency_p99_ms: number }>;
-  };
-  alerts: Array<{ metric: string; value: number; threshold: number; severity: string }>;
+  metrics: MonitoringMetrics;
+  alerts: MonitoringAlert[];
+  thresholds: { failure_rate: number; latency_p99_ms: number; brier_drift: number };
 }
 ```
 
-- [ ] **Step 2: 创建 `frontend/src/lib/api.ts`**
-
-统一 API 客户端，封装 fetch 请求、错误处理、类型推断。
+- [ ] **Step 2: 创建 `frontend/src/lib/format.ts`**
 
 ```typescript
-const BASE = "";
+/** 格式化为百分比字符串，安全处理 null/NaN/Infinity。 */
+export function formatPercent(value: number | null | undefined, digits: number = 2): string {
+  if (value == null || !Number.isFinite(value)) return "-";
+  return `${(value * 100).toFixed(digits)}%`;
+}
 
-class ApiError extends Error {
-  constructor(public status: number, message: string) {
+/** 格式化为普通数字字符串，安全处理 null/NaN/Infinity。 */
+export function formatNumber(value: number | null | undefined, digits: number = 2): string {
+  if (value == null || !Number.isFinite(value)) return "-";
+  return value.toFixed(digits);
+}
+
+/** 格式化 ISO 日期字符串为 YYYY-MM-DD。 */
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  try {
+    return iso.slice(0, 10);
+  } catch {
+    return "-";
+  }
+}
+
+/** 格式化文件大小（字节 → KB/MB）。 */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** 根据方向标签返回 Tailwind 颜色类。 */
+export function directionColor(label: string): string {
+  if (label === "bullish") return "text-bull";
+  if (label === "bearish") return "text-bear";
+  return "text-neutral";
+}
+
+/** 根据方向标签返回中文。 */
+export function directionLabel(label: string): string {
+  if (label === "bullish") return "看涨";
+  if (label === "bearish") return "看跌";
+  return "震荡";
+}
+```
+
+- [ ] **Step 3: 提交**
+
+```bash
+cd /workspace/csqaq-glove-quant
+git add frontend/src/types/api.ts frontend/src/lib/format.ts
+git commit -m "feat(web): 添加 API 类型定义与格式化工具函数"
+```
+
+---
+
+## Task 3: 统一 API 客户端（含超时/取消机制）
+
+**Files:**
+- Create: `frontend/src/lib/api.ts`
+
+- [ ] **Step 1: 创建 `frontend/src/lib/api.ts`**
+
+```typescript
+import type {
+  OhlcResponse,
+  ScenarioGenerateResponse,
+  HistoryResponse,
+  TemplateResponse,
+  ExplainResponse,
+  MetaResponse,
+  MvpBacktestResponse,
+  EnsembleResponse,
+  TaskStatusResponse,
+  ReportListResponse,
+  ReportContentResponse,
+  CacheStatusResponse,
+  DataRefreshResponse,
+  MonitoringResponse,
+} from "../types/api";
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+    public detail?: unknown
+  ) {
     super(message);
     this.name = "ApiError";
   }
 }
 
-async function request<T>(path: string, params?: Record<string, string | number | boolean>): Promise<T> {
-  const query = params
-    ? "?" + new URLSearchParams(
-        Object.entries(params).map(([k, v]) => [k, String(v)])
-      ).toString()
-    : "";
-  const res = await fetch(`${BASE}${path}${query}`);
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new ApiError(res.status, text);
-  }
-  return res.json() as Promise<T>;
-}
+async function request<T>(
+  path: string,
+  options: {
+    method?: "GET" | "POST";
+    params?: Record<string, string | number | boolean | undefined>;
+    body?: unknown;
+    signal?: AbortSignal;
+    timeoutMs?: number;
+  } = {}
+): Promise<T> {
+  const { method = "GET", params, body, signal, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new ApiError(res.status, text);
+  let url = `${BASE_URL}${path}`;
+  if (params) {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value != null) search.set(key, String(value));
+    }
+    const qs = search.toString();
+    if (qs) url += `?${qs}`;
   }
-  return res.json() as Promise<T>;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  // 合并外部 signal 和内部 timeout signal
+  if (signal) {
+    signal.addEventListener("abort", () => controller.abort());
+  }
+
+  try {
+    const fetchOptions: RequestInit = {
+      method,
+      signal: controller.signal,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    };
+
+    const res = await fetch(url, fetchOptions);
+
+    if (!res.ok) {
+      let detail: unknown;
+      try {
+        detail = await res.json();
+      } catch {
+        // 非 JSON 错误响应
+      }
+      const message =
+        typeof detail === "object" && detail !== null && "detail" in detail
+          ? String((detail as Record<string, unknown>).detail)
+          : `HTTP ${res.status}`;
+      throw new ApiError(res.status, message, detail);
+    }
+
+    return (await res.json()) as T;
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError(0, "请求超时或已取消");
+    }
+    throw new ApiError(0, err instanceof Error ? err.message : "网络请求失败");
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export const api = {
-  // 情景分析
-  getMeta: () => request<import("../types/api").MetaResponse>("/scenario/meta"),
-  getScenarios: (sub_index: string, period: string, refresh = false) =>
-    request<import("../types/api").ScenarioGenerateResponse>("/scenario/generate", { sub_index, period, refresh }),
-  getOhlc: (sub_index: string, period: string) =>
-    request<import("../types/api").OhlcResponse>("/scenario/ohlc", { sub_index, period }),
-  getHistory: (sub_index: string, period: string, method: string, n_neighbors: number) =>
-    request<import("../types/api").HistoryResponse>("/scenario/history", { sub_index, period, method, n_neighbors }),
-  getTemplates: (sub_index: string, period: string, min_confidence: number) =>
-    request<import("../types/api").TemplatesResponse>("/scenario/templates", { sub_index, period, min_confidence }),
-  explainScenario: (scenario: unknown, context: unknown) =>
-    postJson<{ prompt: string; explanation: string; wave_sketch_description: string }>("/scenario/explain", { scenario, context }),
+  // ===== 情景分析 =====
+  getMeta: (signal?: AbortSignal) => request<MetaResponse>("/scenario/meta", { signal }),
 
-  // 回测
-  getBacktestEquity: (sub_index: string, period: string) =>
-    request<import("../types/api").BacktestEquityResponse>("/backtest/equity", { sub_index, period }),
-  runMvpBacktest: (sub_index: string, period: string) =>
-    request<import("../types/api").MvpBacktestResponse>("/backtest/mvp", { sub_index, period }),
+  getOhlc: (subIndex: string, period: string, signal?: AbortSignal) =>
+    request<OhlcResponse>("/scenario/ohlc", { params: { sub_index: subIndex, period }, signal }),
 
-  // 集成策略
-  runEnsemble: (sub_index: string, period: string) =>
-    request<import("../types/api").EnsembleBacktestResponse>("/ensemble/run", { sub_index, period }),
+  getScenarios: (subIndex: string, period: string, refresh: boolean = false, signal?: AbortSignal) =>
+    request<ScenarioGenerateResponse>("/scenario/generate", {
+      params: { sub_index: subIndex, period, refresh },
+      signal,
+    }),
 
-  // 趋势扫描
-  startTrendScan: (sub_index: string, period: string) =>
-    request<{ task_id: string }>("/trend-scan/start", { sub_index, period }),
-  getTaskStatus: (task_id: string) =>
-    request<import("../types/api").TaskStatusResponse>(`/trend-scan/status/${task_id}`),
+  getHistory: (
+    subIndex: string,
+    period: string,
+    method: string = "knn",
+    nNeighbors: number = 10,
+    signal?: AbortSignal
+  ) =>
+    request<HistoryResponse>("/scenario/history", {
+      params: { sub_index: subIndex, period, method, n_neighbors: nNeighbors },
+      signal,
+    }),
 
-  // 报告
-  listReports: () => request<import("../types/api").ReportsListResponse>("/reports/list"),
-  getReport: (name: string) =>
-    request<import("../types/api").ReportContentResponse>("/reports/get", { name }),
+  getTemplates: (subIndex: string, period: string, minConfidence: number = 0.5, signal?: AbortSignal) =>
+    request<TemplateResponse>("/scenario/templates", {
+      params: { sub_index: subIndex, period, min_confidence: minConfidence },
+      signal,
+    }),
 
-  // 数据管理
-  getCacheStatus: () => request<import("../types/api").CacheStatusResponse>("/data/cache-status"),
-  refreshData: (sub_index: string, period: string) =>
-    request<{ success: boolean; bars: number }>("/data/refresh", { sub_index, period }),
+  explain: (scenario: Record<string, unknown>, context?: Record<string, unknown>, signal?: AbortSignal) =>
+    request<ExplainResponse>("/scenario/explain", { method: "POST", body: { scenario, context }, signal }),
 
-  // 监控
-  getMonitoring: () => request<import("../types/api").MonitoringResponse>("/monitoring/metrics"),
+  // ===== 回测 =====
+  runMvpBacktest: (subIndex: string, period: string, signal?: AbortSignal) =>
+    request<MvpBacktestResponse>("/backtest/mvp", {
+      params: { sub_index: subIndex, period },
+      signal,
+      timeoutMs: 60_000,
+    }),
+
+  // ===== 集成策略 =====
+  runEnsemble: (subIndex: string, period: string, signal?: AbortSignal) =>
+    request<EnsembleResponse>("/ensemble/run", {
+      params: { sub_index: subIndex, period },
+      signal,
+      timeoutMs: 60_000,
+    }),
+
+  // ===== 趋势扫描 =====
+  startTrendScan: (subIndex: string, period: string) =>
+    request<{ task_id: string }>("/trend-scan/start", {
+      method: "POST",
+      body: { sub_index: subIndex, period },
+    }),
+
+  getTaskStatus: (taskId: string, signal?: AbortSignal) =>
+    request<TaskStatusResponse>(`/trend-scan/status/${taskId}`, { signal }),
+
+  // ===== 报告 =====
+  listReports: (signal?: AbortSignal) => request<ReportListResponse>("/reports/list", { signal }),
+
+  getReport: (filename: string, signal?: AbortSignal) =>
+    request<ReportContentResponse>("/reports/get", { params: { filename }, signal }),
+
+  // ===== 数据管理 =====
+  getCacheStatus: (signal?: AbortSignal) => request<CacheStatusResponse>("/data/cache-status", { signal }),
+
+  refreshData: (subIndex: string, period: string) =>
+    request<DataRefreshResponse>("/data/refresh", {
+      method: "POST",
+      body: { sub_index: subIndex, period },
+    }),
+
+  // ===== 监控 =====
+  getMonitoring: (signal?: AbortSignal) => request<MonitoringResponse>("/monitoring/metrics", { signal }),
 };
 ```
 
-- [ ] **Step 3: 创建 `frontend/src/lib/format.ts`**
-
-```typescript
-export function formatPercent(value: number, decimals = 2): string {
-  return `${(value * 100).toFixed(decimals)}%`;
-}
-
-export function formatNumber(value: number, decimals = 2): string {
-  return value.toLocaleString("zh-CN", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
-
-export function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
-}
-
-export function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString("zh-CN", {
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit",
-  });
-}
-
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-```
-
-- [ ] **Step 4: 验证 TypeScript 编译**
+- [ ] **Step 2: 提交**
 
 ```bash
-cd /workspace/csqaq-glove-quant/frontend
-npx tsc --noEmit
-```
-
-预期：无错误输出。
-
-- [ ] **Step 5: 提交**
-
-```bash
-git add frontend/src/types/api.ts frontend/src/lib/api.ts frontend/src/lib/format.ts
-git commit -m "feat(web): 添加 API 类型定义与统一客户端封装"
+cd /workspace/csqaq-glove-quant
+git add frontend/src/lib/api.ts
+git commit -m "feat(web): 添加统一 API 客户端（含 AbortController 超时/取消）"
 ```
 
 ---
 
-## Task 3: 通用 UI 组件库
+## Task 4: 通用 UI 组件库（含空状态/无障碍）
 
 **Files:**
 - Create: `frontend/src/components/Card.tsx`
 - Create: `frontend/src/components/MetricCard.tsx`
 - Create: `frontend/src/components/LoadingState.tsx`
 - Create: `frontend/src/components/ErrorState.tsx`
+- Create: `frontend/src/components/EmptyState.tsx`
 - Create: `frontend/src/components/ScenarioBar.tsx`
 
 - [ ] **Step 1: 创建 `frontend/src/components/Card.tsx`**
 
-通用卡片容器，带标题、可选操作区。
-
-```tsx
-import { ReactNode } from "react";
+```typescript
+import type { ReactNode } from "react";
 
 interface CardProps {
   title?: string;
@@ -791,9 +999,9 @@ interface CardProps {
 
 export function Card({ title, actions, children, className = "" }: CardProps) {
   return (
-    <div className={`bg-surface-card rounded-xl shadow-card border border-surface-border ${className}`}>
+    <div className={`rounded-xl border border-surface-border bg-surface-card shadow-card ${className}`}>
       {title && (
-        <div className="flex items-center justify-between px-5 py-3 border-b border-surface-border">
+        <div className="flex items-center justify-between border-b border-surface-border px-5 py-3">
           <h3 className="text-sm font-semibold text-ink-primary">{title}</h3>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
@@ -806,29 +1014,20 @@ export function Card({ title, actions, children, className = "" }: CardProps) {
 
 - [ ] **Step 2: 创建 `frontend/src/components/MetricCard.tsx`**
 
-单个指标展示卡片：数值 + 标签 + 可选颜色。
-
-```tsx
+```typescript
 interface MetricCardProps {
   label: string;
   value: string | number;
   hint?: string;
-  color?: "default" | "bull" | "bear" | "neutral";
+  color?: string;
 }
 
-const colorMap = {
-  default: "text-ink-primary",
-  bull: "text-bull",
-  bear: "text-bear",
-  neutral: "text-neutral",
-};
-
-export function MetricCard({ label, value, hint, color = "default" }: MetricCardProps) {
+export function MetricCard({ label, value, hint, color = "text-ink-primary" }: MetricCardProps) {
   return (
-    <div className="bg-surface-card rounded-xl shadow-card border border-surface-border p-4">
-      <div className="text-xs text-ink-secondary mb-1">{label}</div>
-      <div className={`text-2xl font-bold ${colorMap[color]}`}>{value}</div>
-      {hint && <div className="text-xs text-ink-muted mt-1">{hint}</div>}
+    <div className="rounded-lg border border-surface-border bg-surface-card p-4">
+      <p className="text-xs font-medium text-ink-secondary">{label}</p>
+      <p className={`mt-1 text-xl font-bold ${color}`}>{value}</p>
+      {hint && <p className="mt-1 text-xs text-ink-muted">{hint}</p>}
     </div>
   );
 }
@@ -836,18 +1035,18 @@ export function MetricCard({ label, value, hint, color = "default" }: MetricCard
 
 - [ ] **Step 3: 创建 `frontend/src/components/LoadingState.tsx`**
 
-骨架屏加载态，可配置行数。
+```typescript
+interface LoadingStateProps {
+  message?: string;
+  rows?: number;
+}
 
-```tsx
-export function LoadingState({ rows = 3 }: { rows?: number }) {
+export function LoadingState({ message = "加载中...", rows = 3 }: LoadingStateProps) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="space-y-3" role="status" aria-live="polite">
+      <p className="text-sm text-ink-secondary">{message}</p>
       {Array.from({ length: rows }).map((_, i) => (
-        <div
-          key={i}
-          className="h-4 bg-surface-hover rounded animate-pulse"
-          style={{ width: `${100 - i * 15}%` }}
-        />
+        <div key={i} className="h-4 animate-pulse rounded bg-surface-hover" />
       ))}
     </div>
   );
@@ -856,9 +1055,7 @@ export function LoadingState({ rows = 3 }: { rows?: number }) {
 
 - [ ] **Step 4: 创建 `frontend/src/components/ErrorState.tsx`**
 
-错误态组件，含重试按钮。
-
-```tsx
+```typescript
 interface ErrorStateProps {
   message: string;
   onRetry?: () => void;
@@ -866,12 +1063,15 @@ interface ErrorStateProps {
 
 export function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
-    <div className="flex flex-col items-center gap-3 py-8">
-      <div className="text-bear text-sm">{message}</div>
+    <div className="flex flex-col items-center gap-3 py-8" role="alert">
+      <svg className="h-10 w-10 text-bear" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+      </svg>
+      <p className="text-sm text-bear">{message}</p>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="px-4 py-1.5 bg-brand-500 text-white text-sm rounded-lg hover:bg-brand-600 transition-colors"
+          className="rounded-lg border border-surface-border px-4 py-1.5 text-sm font-medium text-ink-primary transition hover:bg-surface-hover"
         >
           重试
         </button>
@@ -881,12 +1081,30 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
 }
 ```
 
-- [ ] **Step 5: 创建 `frontend/src/components/ScenarioBar.tsx`**
+- [ ] **Step 5: 创建 `frontend/src/components/EmptyState.tsx`**
 
-情景概率条形图，点击高亮。
+```typescript
+interface EmptyStateProps {
+  message?: string;
+}
 
-```tsx
-import { Scenario } from "../types/api";
+export function EmptyState({ message = "暂无数据" }: EmptyStateProps) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-8 text-ink-muted">
+      <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+      </svg>
+      <p className="text-sm">{message}</p>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 6: 创建 `frontend/src/components/ScenarioBar.tsx`（含无障碍支持）**
+
+```typescript
+import type { Scenario } from "../types/api";
+import { directionLabel } from "../lib/format";
 
 interface ScenarioBarProps {
   scenarios: Scenario[];
@@ -894,248 +1112,383 @@ interface ScenarioBarProps {
   onSelect: (index: number) => void;
 }
 
-function scenarioColor(label: string): string {
-  if (label === "bullish") return "bg-bull";
-  if (label === "bearish") return "bg-bear";
-  return "bg-neutral";
-}
+const BAR_COLORS: Record<string, string> = {
+  bullish: "bg-bull",
+  bearish: "bg-bear",
+  neutral: "bg-neutral",
+};
 
 export function ScenarioBar({ scenarios, selectedIndex, onSelect }: ScenarioBarProps) {
+  if (scenarios.length === 0) return null;
+
   return (
-    <div className="flex flex-col gap-3">
-      {scenarios.map((s, i) => (
-        <div
-          key={i}
-          onClick={() => onSelect(i)}
-          className={`cursor-pointer p-2 rounded-lg transition-colors ${
-            i === selectedIndex ? "bg-brand-50 ring-1 ring-brand-100" : "hover:bg-surface-hover"
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm text-ink-primary w-20 truncate">{s.name}</span>
-            <div className="flex-1 h-5 bg-surface-base rounded overflow-hidden">
+    <div className="space-y-2" role="listbox" aria-label="情景概率分布">
+      {scenarios.map((s, i) => {
+        const color = BAR_COLORS[s.direction_label] || "bg-neutral";
+        const isSelected = i === selectedIndex;
+        return (
+          <div
+            key={s.scenario_key}
+            role="option"
+            aria-selected={isSelected}
+            tabIndex={0}
+            onClick={() => onSelect(i)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(i);
+              }
+            }}
+            className={`cursor-pointer rounded-lg border p-3 transition ${
+              isSelected
+                ? "border-brand-500 bg-brand-50"
+                : "border-surface-border bg-surface-card hover:bg-surface-hover"
+            }`}
+          >
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-sm font-medium text-ink-primary">{s.name}</span>
+              <span className="text-xs font-semibold text-ink-secondary">
+                {(s.probability * 100).toFixed(1)}%
+              </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-surface-hover">
               <div
-                className={`h-full rounded transition-all duration-500 ${scenarioColor(s.direction_label)}`}
-                style={{ width: `${(s.probability * 100).toFixed(1)}%` }}
+                className={`h-full rounded-full ${color} transition-all duration-300`}
+                style={{ width: `${Math.max(s.probability * 100, 2)}%` }}
               />
             </div>
-            <span className="text-xs text-ink-secondary w-12 text-right">
-              {(s.probability * 100).toFixed(1)}%
+            <span className="mt-1 inline-block text-xs text-ink-muted">
+              {directionLabel(s.direction_label)}
             </span>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 ```
 
-- [ ] **Step 6: 验证编译**
-
-```bash
-cd /workspace/csqaq-glove-quant/frontend
-npx tsc --noEmit
-```
-
-预期：无错误。
-
 - [ ] **Step 7: 提交**
 
 ```bash
+cd /workspace/csqaq-glove-quant
 git add frontend/src/components/
-git commit -m "feat(web): 添加通用 UI 组件库（Card/MetricCard/LoadingState/ErrorState/ScenarioBar）"
+git commit -m "feat(web): 添加通用 UI 组件库（Card/MetricCard/LoadingState/ErrorState/EmptyState/ScenarioBar）"
 ```
 
 ---
 
-## Task 4: 页面布局与导航
+## Task 5: 页面布局与导航（含响应式/状态管理/Error Boundary）
 
 **Files:**
-- Create: `frontend/src/components/Layout.tsx`
+- Create: `frontend/src/ErrorBoundary.tsx`
 - Create: `frontend/src/components/Sidebar.tsx`
 - Create: `frontend/src/components/TopBar.tsx`
+- Create: `frontend/src/components/Layout.tsx`
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: 创建 `frontend/src/components/Sidebar.tsx`**
+- [ ] **Step 1: 创建 `frontend/src/ErrorBoundary.tsx`**
 
-左侧导航栏，包含 6 个功能入口和监控状态摘要。
+```typescript
+import { Component, type ErrorInfo, type ReactNode } from "react";
 
-```tsx
+interface Props {
+  children: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error: Error | null;
+}
+
+export class ErrorBoundary extends Component<Props, State> {
+  state: State = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.error("ErrorBoundary caught:", error, errorInfo);
+  }
+
+  handleReset = (): void => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  render(): ReactNode {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
+          <svg className="h-12 w-12 text-bear" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.008v.008H12v-.008z" />
+          </svg>
+          <div className="text-center">
+            <h2 className="text-lg font-semibold text-ink-primary">页面渲染出错</h2>
+            <p className="mt-1 text-sm text-ink-secondary">{this.state.error?.message || "未知错误"}</p>
+          </div>
+          <button
+            onClick={this.handleReset}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700"
+          >
+            重置页面
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+```
+
+- [ ] **Step 2: 创建 `frontend/src/components/Sidebar.tsx`（响应式：移动端可折叠）**
+
+```typescript
 import { NavLink } from "react-router-dom";
 
-const navItems = [
-  { to: "/scenario", label: "情景分析", icon: "📊" },
-  { to: "/backtest", label: "MVP 回测", icon: "📈" },
-  { to: "/ensemble", label: "集成策略", icon: "🔀" },
-  { to: "/trend-scan", label: "趋势扫描", icon: "🔍" },
-  { to: "/reports", label: "报告中心", icon: "📋" },
-  { to: "/data", label: "数据管理", icon: "💾" },
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const NAV_ITEMS = [
+  { path: "/", label: "情景分析", icon: "M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" },
+  { path: "/backtest", label: "MVP 回测", icon: "M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625z" },
+  { path: "/ensemble", label: "集成策略", icon: "M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" },
+  { path: "/trend-scan", label: "趋势扫描", icon: "M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z" },
+  { path: "/reports", label: "报告中心", icon: "M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" },
+  { path: "/data", label: "数据管理", icon: "M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375" },
 ];
 
-export function Sidebar() {
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
-    <aside className="w-56 bg-surface-card border-r border-surface-border flex flex-col">
-      <div className="px-5 py-4 border-b border-surface-border">
-        <h1 className="text-base font-bold text-ink-primary">CSQAQ 量化平台</h1>
-        <p className="text-xs text-ink-muted mt-0.5">饰品价格行为策略</p>
-      </div>
-      <nav className="flex-1 py-2">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-5 py-2.5 text-sm transition-colors ${
-                isActive
-                  ? "bg-brand-50 text-brand-600 font-medium border-r-2 border-brand-500"
-                  : "text-ink-secondary hover:bg-surface-hover hover:text-ink-primary"
-              }`
-            }
-          >
-            <span className="text-base">{item.icon}</span>
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-    </aside>
+    <>
+      {/* 移动端遮罩 */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`fixed left-0 top-0 z-40 h-full w-56 transform border-r border-surface-border bg-surface-card transition-transform duration-200 md:static md:translate-x-0 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex h-14 items-center border-b border-surface-border px-5">
+          <span className="text-base font-bold text-brand-600">CSQAQ 量化仪表盘</span>
+        </div>
+        <nav className="space-y-1 p-3">
+          {NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === "/"}
+              onClick={onClose}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                  isActive
+                    ? "bg-brand-50 text-brand-700"
+                    : "text-ink-secondary hover:bg-surface-hover hover:text-ink-primary"
+                }`
+              }
+            >
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+              </svg>
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+    </>
   );
 }
 ```
 
-- [ ] **Step 2: 创建 `frontend/src/components/TopBar.tsx`**
+- [ ] **Step 3: 创建 `frontend/src/components/TopBar.tsx`（含状态自动清除）**
 
-顶部全局控制栏：子指数选择、周期选择、刷新按钮、状态指示、监控摘要。
-
-```tsx
-import { useEffect, useState } from "react";
-import { api } from "../lib/api";
-import { MetaResponse, MonitoringResponse } from "../types/api";
+```typescript
+import { useEffect, useRef, useState } from "react";
+import { api, ApiError } from "../lib/api";
+import type { MetaResponse, MonitoringResponse } from "../types/api";
 
 interface TopBarProps {
   subIndex: string;
+  setSubIndex: (value: string) => void;
   period: string;
-  onSubIndexChange: (v: string) => void;
-  onPeriodChange: (v: string) => void;
+  setPeriod: (value: string) => void;
   onRefresh: () => void;
-  status: string;
+  onToggleSidebar: () => void;
 }
 
-export function TopBar({ subIndex, period, onSubIndexChange, onPeriodChange, onRefresh, status }: TopBarProps) {
-  const [meta, setMeta] = useState<MetaResponse | null>(null);
-  const [monitoring, setMonitoring] = useState<MonitoringResponse | null>(null);
+const PERIODS = ["1day", "4hour", "1hour"];
 
+export function TopBar({ subIndex, setSubIndex, period, setPeriod, onRefresh, onToggleSidebar }: TopBarProps) {
+  const [subIndices, setSubIndices] = useState<string[]>([subIndex]);
+  const [status, setStatus] = useState("");
+  const [monitoring, setMonitoring] = useState<MonitoringResponse | null>(null);
+  const statusTimerRef = useRef<number | null>(null);
+
+  // 加载子指数列表，失败显示错误而非静默吞掉
   useEffect(() => {
-    api.getMeta().then(setMeta).catch(() => {});
+    api
+      .getMeta()
+      .then((data: MetaResponse) => {
+        if (data.sub_indices.length > 0) setSubIndices(data.sub_indices);
+      })
+      .catch((err: unknown) => {
+        console.warn("加载子指数列表失败，使用默认值:", err);
+      });
   }, []);
 
+  // 监控轮询（30 秒）
   useEffect(() => {
-    const load = () => api.getMonitoring().then(setMonitoring).catch(() => {});
-    load();
-    const id = setInterval(load, 30000);
+    const poll = () => {
+      api.getMonitoring().then(setMonitoring).catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 30_000);
     return () => clearInterval(id);
   }, []);
 
-  const indices = meta?.available_sub_indices.length ? meta.available_sub_indices : ["手套", "匕首", "百元主战", "贴纸"];
-  const periods = [
-    { value: "1day", label: "日线" },
-    { value: "4hour", label: "4小时" },
-    { value: "1hour", label: "1小时" },
-    { value: "7day", label: "周线" },
-  ];
+  const handleRefresh = (): void => {
+    setStatus("刷新中...");
+    onRefresh();
+    // 3 秒后自动清除状态
+    if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+    statusTimerRef.current = window.setTimeout(() => setStatus(""), 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+    };
+  }, []);
+
+  const failureRate = monitoring?.metrics.failure_rate ?? 0;
+  const p99 = monitoring?.metrics.p99_latency_ms ?? 0;
+  const hasAlert = failureRate > 0.05 || p99 > 2000;
 
   return (
-    <header className="h-14 bg-surface-card border-b border-surface-border flex items-center gap-4 px-5">
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-ink-secondary">子指数</label>
-        <select
-          value={subIndex}
-          onChange={(e) => onSubIndexChange(e.target.value)}
-          className="bg-surface-base border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-ink-primary focus:outline-none focus:ring-1 focus:ring-brand-500"
-        >
-          {indices.map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-ink-secondary">周期</label>
-        <select
-          value={period}
-          onChange={(e) => onPeriodChange(e.target.value)}
-          className="bg-surface-base border border-surface-border rounded-lg px-2.5 py-1.5 text-sm text-ink-primary focus:outline-none focus:ring-1 focus:ring-brand-500"
-        >
-          {periods.map((p) => (
-            <option key={p.value} value={p.value}>{p.label}</option>
-          ))}
-        </select>
-      </div>
-
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-surface-border bg-surface-card px-4">
+      {/* 移动端菜单按钮 */}
       <button
-        onClick={onRefresh}
-        className="px-3 py-1.5 bg-brand-500 text-white text-sm rounded-lg hover:bg-brand-600 transition-colors"
+        onClick={onToggleSidebar}
+        className="rounded-lg p-2 text-ink-secondary hover:bg-surface-hover md:hidden"
+        aria-label="切换导航栏"
       >
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+      </button>
+
+      {/* 子指数选择 */}
+      <select
+        value={subIndex}
+        onChange={(e) => setSubIndex(e.target.value)}
+        className="rounded-lg border border-surface-border bg-surface-card px-3 py-1.5 text-sm text-ink-primary focus:border-brand-500 focus:outline-none"
+        aria-label="选择子指数"
+      >
+        {subIndices.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+
+      {/* 周期选择 */}
+      <select
+        value={period}
+        onChange={(e) => setPeriod(e.target.value)}
+        className="rounded-lg border border-surface-border bg-surface-card px-3 py-1.5 text-sm text-ink-primary focus:border-brand-500 focus:outline-none"
+        aria-label="选择K线周期"
+      >
+        {PERIODS.map((p) => (
+          <option key={p} value={p}>
+            {p}
+          </option>
+        ))}
+      </select>
+
+      {/* 刷新按钮 */}
+      <button
+        onClick={handleRefresh}
+        className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-brand-700"
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+        </svg>
         刷新
       </button>
 
-      <span className="text-xs text-ink-muted">{status}</span>
+      {/* 状态文本 */}
+      {status && <span className="text-sm text-ink-muted">{status}</span>}
 
-      <div className="ml-auto flex items-center gap-3 text-xs text-ink-secondary">
-        {monitoring && (
-          <>
-            <span>P99: {monitoring.metrics.latency_p99_ms.toFixed(0)}ms</span>
-            <span>请求: {monitoring.metrics.request_count}</span>
-            {monitoring.alerts.length > 0 ? (
-              <span className="text-bear font-medium">告警: {monitoring.alerts.length}</span>
-            ) : (
-              <span className="text-bull">运行正常</span>
-            )}
-          </>
+      {/* 监控摘要 */}
+      <div className="ml-auto flex items-center gap-3 text-xs">
+        {hasAlert && (
+          <span className="rounded bg-bear/10 px-2 py-0.5 font-medium text-bear" role="alert">
+            告警
+          </span>
         )}
+        <span className="text-ink-muted">
+          P99: <span className={p99 > 2000 ? "font-medium text-bear" : "text-ink-secondary"}>{p99.toFixed(0)}ms</span>
+        </span>
+        <span className="text-ink-muted">
+          失败率:{" "}
+          <span className={failureRate > 0.05 ? "font-medium text-bear" : "text-ink-secondary"}>
+            {(failureRate * 100).toFixed(1)}%
+          </span>
+        </span>
       </div>
     </header>
   );
 }
 ```
 
-- [ ] **Step 3: 创建 `frontend/src/components/Layout.tsx`**
+- [ ] **Step 4: 创建 `frontend/src/components/Layout.tsx`（render-props 模式传递全局状态）**
 
-页面布局骨架，通过 React Context 向子页面传递子指数/周期等全局状态。
-
-```tsx
-import { ReactNode, useState, useCallback } from "react";
+```typescript
+import { useState, type ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
 interface LayoutProps {
-  children: (props: { subIndex: string; period: string; refreshKey: number }) => ReactNode;
+  children: (props: {
+    subIndex: string;
+    period: string;
+    refreshKey: number;
+  }) => ReactNode;
 }
 
 export function Layout({ children }: LayoutProps) {
   const [subIndex, setSubIndex] = useState("手套");
   const [period, setPeriod] = useState("1day");
   const [refreshKey, setRefreshKey] = useState(0);
-  const [status, setStatus] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = (): void => {
     setRefreshKey((k) => k + 1);
-    setStatus("刷新中...");
-  }, []);
+  };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex h-full overflow-hidden">
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           subIndex={subIndex}
+          setSubIndex={setSubIndex}
           period={period}
-          onSubIndexChange={(v) => { setSubIndex(v); setRefreshKey((k) => k + 1); }}
-          onPeriodChange={(v) => { setPeriod(v); setRefreshKey((k) => k + 1); }}
+          setPeriod={setPeriod}
           onRefresh={handleRefresh}
-          status={status}
+          onToggleSidebar={() => setSidebarOpen((v) => !v)}
         />
-        <main className="flex-1 overflow-auto p-6 bg-surface-base">
-          {children({ subIndex, period, refreshKey })}
+        <main className="flex-1 overflow-auto p-4 md:p-6">
+          <div className="mx-auto max-w-7xl">
+            {children({ subIndex, period, refreshKey })}
+          </div>
         </main>
       </div>
     </div>
@@ -1143,117 +1496,225 @@ export function Layout({ children }: LayoutProps) {
 }
 ```
 
-- [ ] **Step 4: 修改 `frontend/src/App.tsx` 集成 Layout**
+- [ ] **Step 5: 更新 `frontend/src/App.tsx`（集成 Layout + ErrorBoundary + 路由占位）**
 
-```tsx
-import { Routes, Route, Navigate } from "react-router-dom";
+```typescript
+import { Routes, Route } from "react-router-dom";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { Layout } from "./components/Layout";
 
 function Placeholder({ name }: { name: string }) {
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold text-ink-primary">{name}</h1>
-      <p className="mt-2 text-ink-secondary">页面开发中...</p>
+    <div className="flex h-full items-center justify-center text-ink-secondary">
+      <p>{name} — 开发中</p>
     </div>
   );
 }
 
 export default function App() {
   return (
-    <Layout>
-      {({ subIndex, period, refreshKey }) => (
-        <Routes>
-          <Route path="/" element={<Navigate to="/scenario" replace />} />
-          <Route path="/scenario" element={<Placeholder name="情景分析" />} />
-          <Route path="/backtest" element={<Placeholder name="MVP 回测" />} />
-          <Route path="/ensemble" element={<Placeholder name="集成策略" />} />
-          <Route path="/trend-scan" element={<Placeholder name="趋势扫描" />} />
-          <Route path="/reports" element={<Placeholder name="报告中心" />} />
-          <Route path="/data" element={<Placeholder name="数据管理" />} />
-        </Routes>
-      )}
-    </Layout>
+    <ErrorBoundary>
+      <Layout>
+        {({ subIndex, period, refreshKey }) => (
+          <Routes>
+            <Route path="/" element={<Placeholder name="情景分析" />} />
+            <Route path="/backtest" element={<Placeholder name="MVP 回测" />} />
+            <Route path="/ensemble" element={<Placeholder name="集成策略" />} />
+            <Route path="/trend-scan" element={<Placeholder name="趋势扫描" />} />
+            <Route path="/reports" element={<Placeholder name="报告中心" />} />
+            <Route path="/data" element={<Placeholder name="数据管理" />} />
+            <Route path="*" element={
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-ink-muted">
+                <p className="text-4xl font-bold">404</p>
+                <p className="text-sm">页面不存在</p>
+              </div>
+            } />
+          </Routes>
+        )}
+      </Layout>
+    </ErrorBoundary>
   );
 }
 ```
 
-- [ ] **Step 5: 构建验证**
+- [ ] **Step 6: 构建验证**
 
 ```bash
 cd /workspace/csqaq-glove-quant/frontend
 npm run build
 ```
 
-预期：构建成功，`dist/` 生成。
+预期：TypeScript 编译通过，`dist/` 生成成功。
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 7: 提交**
 
 ```bash
-git add frontend/src/components/Layout.tsx frontend/src/components/Sidebar.tsx frontend/src/components/TopBar.tsx frontend/src/App.tsx
-git commit -m "feat(web): 添加页面布局骨架与侧边栏导航"
+cd /workspace/csqaq-glove-quant
+git add frontend/src/ErrorBoundary.tsx frontend/src/components/Sidebar.tsx frontend/src/components/TopBar.tsx frontend/src/components/Layout.tsx frontend/src/App.tsx
+git commit -m "feat(web): 添加页面布局（响应式侧边栏/顶栏/ErrorBoundary/404路由）"
 ```
 
 ---
 
-## Task 5: 后端异步任务队列
+## Task 6: 后端异步任务队列（线程池 + TTL + 并发限制）
 
 **Files:**
 - Create: `src/api/task_queue.py`
 - Create: `tests/test_task_queue.py`
 
-- [ ] **Step 1: 创建 `tests/test_task_queue.py`**
+- [ ] **Step 1: 编写测试 `tests/test_task_queue.py`**
 
 ```python
-"""Tests for the lightweight async task queue."""
+"""Tests for the async task queue."""
 
 import time
-import threading
+
 from src.api.task_queue import TaskQueue, TaskStatus
 
 
-def test_create_task_returns_pending():
-    queue = TaskQueue()
-    task_id = queue.create(lambda: None)
-    status = queue.get_status(task_id)
-    assert status.status == TaskStatus.PENDING
-    assert status.progress == 0.0
+def test_create_returns_pending_task():
+    """create() should register a task in pending state without starting it."""
+    q = TaskQueue()
+    task_id = q.create(lambda progress_cb: 42)
+    info = q.get(task_id)
+    assert info is not None
+    assert info.status == TaskStatus.PENDING
+    assert info.progress == 0.0
 
 
-def test_run_task_completes():
-    queue = TaskQueue()
-    task_id = queue.create(lambda: {"result": "ok"})
-    queue.run(task_id)
-    time.sleep(0.1)
-    status = queue.get_status(task_id)
-    assert status.status == TaskStatus.COMPLETED
-    assert status.result == {"result": "ok"}
+def test_run_completes_and_stores_result():
+    """run() should execute the task and store the result."""
+    q = TaskQueue()
+    task_id = q.create(lambda progress_cb: {"answer": 42})
+    q.run(task_id)
+
+    # Wait for completion
+    for _ in range(50):
+        info = q.get(task_id)
+        if info and info.status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+            break
+        time.sleep(0.1)
+
+    info = q.get(task_id)
+    assert info is not None
+    assert info.status == TaskStatus.COMPLETED
+    assert info.result == {"answer": 42}
+    assert info.progress == 1.0
 
 
-def test_failed_task_records_error():
-    def boom():
-        raise RuntimeError("explosion")
-    queue = TaskQueue()
-    task_id = queue.create(boom)
-    queue.run(task_id)
-    time.sleep(0.1)
-    status = queue.get_status(task_id)
-    assert status.status == TaskStatus.FAILED
-    assert "explosion" in status.error
+def test_run_failed_task_stores_error():
+    """A task that raises should be marked as failed with the error message."""
+    def failing_task(progress_cb):
+        raise ValueError("boom")
+
+    q = TaskQueue()
+    task_id = q.create(failing_task)
+    q.run(task_id)
+
+    for _ in range(50):
+        info = q.get(task_id)
+        if info and info.status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+            break
+        time.sleep(0.1)
+
+    info = q.get(task_id)
+    assert info is not None
+    assert info.status == TaskStatus.FAILED
+    assert "boom" in (info.error or "")
 
 
-def test_progress_callback():
-    def work(progress):
-        progress(0.5)
-        time.sleep(0.05)
-        progress(1.0)
+def test_progress_callback_updates_progress():
+    """The progress callback should update the task's progress and message."""
+    def task_with_progress(progress_cb):
+        progress_cb(0.5, "半途")
+        time.sleep(0.1)
+        progress_cb(1.0, "完成")
         return "done"
-    queue = TaskQueue()
-    task_id = queue.create(work)
-    queue.run(task_id)
-    time.sleep(0.15)
-    status = queue.get_status(task_id)
-    assert status.status == TaskStatus.COMPLETED
-    assert status.progress == 1.0
+
+    q = TaskQueue()
+    task_id = q.create(task_with_progress)
+    q.run(task_id)
+
+    for _ in range(50):
+        info = q.get(task_id)
+        if info and info.status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+            break
+        time.sleep(0.1)
+
+    info = q.get(task_id)
+    assert info is not None
+    assert info.status == TaskStatus.COMPLETED
+
+
+def test_run_unknown_task_raises():
+    """run() should raise KeyError for an unknown task_id."""
+    q = TaskQueue()
+    try:
+        q.run("nonexistent")
+        assert False, "Should have raised KeyError"
+    except KeyError:
+        pass
+
+
+def test_get_unknown_task_returns_none():
+    """get() should return None for an unknown task_id."""
+    q = TaskQueue()
+    assert q.get("nonexistent") is None
+
+
+def test_ttl_eviction_removes_old_tasks():
+    """Tasks older than the TTL should be evicted on cleanup."""
+    q = TaskQueue(ttl_seconds=0.5)
+    task_id = q.create(lambda progress_cb: 1)
+    q.run(task_id)
+
+    # Wait for completion
+    for _ in range(50):
+        info = q.get(task_id)
+        if info and info.status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+            break
+        time.sleep(0.1)
+
+    # Wait for TTL to expire
+    time.sleep(0.7)
+
+    # Trigger eviction by calling _evict_old
+    q._evict_old()
+
+    assert q.get(task_id) is None, "Task should have been evicted after TTL"
+
+
+def test_concurrent_tasks_respect_max_workers():
+    """Multiple tasks should run concurrently up to max_workers."""
+    import threading
+    counter = {"active": 0, "max_active": 0}
+    lock = threading.Lock()
+
+    def counting_task(progress_cb):
+        with lock:
+            counter["active"] += 1
+            counter["max_active"] = max(counter["max_active"], counter["active"])
+        time.sleep(0.2)
+        with lock:
+            counter["active"] -= 1
+        return "ok"
+
+    q = TaskQueue(max_workers=2)
+    task_ids = []
+    for _ in range(5):
+        tid = q.create(counting_task)
+        q.run(tid)
+        task_ids.append(tid)
+
+    # Wait for all to complete
+    for tid in task_ids:
+        for _ in range(100):
+            info = q.get(tid)
+            if info and info.status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+                break
+            time.sleep(0.1)
+
+    assert counter["max_active"] <= 2, f"max_active={counter['max_active']} should be <= 2"
 ```
 
 - [ ] **Step 2: 运行测试验证失败**
@@ -1263,25 +1724,22 @@ cd /workspace/csqaq-glove-quant
 python -m pytest tests/test_task_queue.py -v
 ```
 
-预期：FAIL，`ModuleNotFoundError: No module named 'src.api.task_queue'`
+预期：FAIL with `ModuleNotFoundError: No module named 'src.api.task_queue'`
 
 - [ ] **Step 3: 创建 `src/api/task_queue.py`**
 
 ```python
-"""Lightweight in-memory async task queue for long-running operations.
-
-Tasks run in background threads. Progress is reported via a callback.
-Results are stored in memory and evicted after 1 hour.
-"""
+"""Thread-safe in-memory task queue with ThreadPoolExecutor and TTL eviction."""
 
 from __future__ import annotations
 
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 
 class TaskStatus(str, Enum):
@@ -1297,121 +1755,41 @@ class TaskInfo:
     status: TaskStatus = TaskStatus.PENDING
     progress: float = 0.0
     message: str = ""
-    result: Any | None = None
-    error: str | None = None
+    result: Any = None
+    error: Optional[str] = None
     created_at: float = field(default_factory=time.time)
+    completed_at: Optional[float] = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize to a JSON-compatible dict for API responses."""
         return {
             "task_id": self.task_id,
             "status": self.status.value,
-            "progress": round(self.progress, 4),
+            "progress": self.progress,
             "message": self.message,
             "result": self.result,
             "error": self.error,
         }
 
 
-class TaskQueue:
-    """Thread-safe in-memory task queue with TTL eviction."""
-
-    def __init__(self, ttl_seconds: float = 3600.0) -> None:
-        self._tasks: dict[str, TaskInfo] = {}
-        self._lock = threading.Lock()
-        self._ttl = ttl_seconds
-
-    def create(self, fn: Callable[..., Any]) -> str:
-        """Register a task and return its ID. Does not start execution."""
-        task_id = uuid.uuid4().hex[:12]
-        with self._lock:
-            self._tasks[task_id] = TaskInfo(task_id=task_id)
-        return task_id
-
-    def run(self, task_id: str) -> None:
-        """Start a registered task in a background thread."""
-        with self._lock:
-            info = self._tasks.get(task_id)
-            if info is None:
-                raise KeyError(f"Task not found: {task_id}")
-
-    def get_status(self, task_id: str) -> TaskInfo:
-        with self._lock:
-            self._evict_old()
-            info = self._tasks.get(task_id)
-            if info is None:
-                raise KeyError(f"Task not found: {task_id}")
-            return info
-
-    def _evict_old(self) -> None:
-        cutoff = time.time() - self._ttl
-        expired = [tid for tid, info in self._tasks.items() if info.created_at < cutoff]
-        for tid in expired:
-            del self._tasks[tid]
-
-
-# Singleton instance
-TASK_QUEUE = TaskQueue()
-```
-
-Wait - the `create` method stores `fn` but doesn't keep it. Let me fix the implementation to store the callable and run it.
-
-- [ ] **Step 4: 修正 `src/api/task_queue.py` 完整实现**
-
-```python
-"""Lightweight in-memory async task queue for long-running operations.
-
-Tasks run in background threads. Progress is reported via a callback.
-Results are stored in memory and evicted after 1 hour.
-"""
-
-from __future__ import annotations
-
-import threading
-import time
-import uuid
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable
-
-
-class TaskStatus(str, Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-@dataclass
-class TaskInfo:
-    task_id: str
-    status: TaskStatus = TaskStatus.PENDING
-    progress: float = 0.0
-    message: str = ""
-    result: Any | None = None
-    error: str | None = None
-    created_at: float = field(default_factory=time.time)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "task_id": self.task_id,
-            "status": self.status.value,
-            "progress": round(self.progress, 4),
-            "message": self.message,
-            "result": self.result,
-            "error": self.error,
-        }
+ProgressCallback = Callable[[float, str], None]
 
 
 class TaskQueue:
-    """Thread-safe in-memory task queue with TTL eviction."""
+    """Thread-safe in-memory task queue with TTL eviction and concurrency limit."""
 
-    def __init__(self, ttl_seconds: float = 3600.0) -> None:
+    def __init__(
+        self,
+        ttl_seconds: float = 3600.0,
+        max_workers: int = 4,
+    ) -> None:
         self._tasks: dict[str, TaskInfo] = {}
-        self._fns: dict[str, Callable[..., Any]] = {}
+        self._fns: dict[str, Callable[[ProgressCallback], Any]] = {}
         self._lock = threading.Lock()
         self._ttl = ttl_seconds
+        self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="task-queue")
 
-    def create(self, fn: Callable[..., Any]) -> str:
+    def create(self, fn: Callable[[ProgressCallback], Any]) -> str:
         """Register a task and return its ID. Does not start execution."""
         task_id = uuid.uuid4().hex[:12]
         with self._lock:
@@ -1420,85 +1798,94 @@ class TaskQueue:
         return task_id
 
     def run(self, task_id: str) -> None:
-        """Start a registered task in a background thread."""
+        """Start a registered task via the thread pool."""
         with self._lock:
             info = self._tasks.get(task_id)
             fn = self._fns.get(task_id)
             if info is None or fn is None:
                 raise KeyError(f"Task not found: {task_id}")
+            if info.status != TaskStatus.PENDING:
+                raise ValueError(f"Task already started or finished: {task_id}")
             info.status = TaskStatus.RUNNING
 
-        def _execute() -> None:
-            try:
-                def progress_cb(value: float, message: str = "") -> None:
-                    with self._lock:
-                        ti = self._tasks.get(task_id)
-                        if ti:
-                            ti.progress = value
-                            ti.message = message
+        self._executor.submit(self._execute, task_id, fn)
 
-                result = fn(progress_cb)
-                with self._lock:
-                    ti = self._tasks.get(task_id)
-                    if ti:
-                        ti.status = TaskStatus.COMPLETED
-                        ti.progress = 1.0
-                        ti.result = result
-            except Exception as exc:
-                with self._lock:
-                    ti = self._tasks.get(task_id)
-                    if ti:
-                        ti.status = TaskStatus.FAILED
-                        ti.error = str(exc)
-
-        thread = threading.Thread(target=_execute, daemon=True)
-        thread.start()
-
-    def get_status(self, task_id: str) -> TaskInfo:
+    def get(self, task_id: str) -> Optional[TaskInfo]:
+        """Return task info, or None if not found."""
         with self._lock:
-            self._evict_old()
-            info = self._tasks.get(task_id)
-            if info is None:
-                raise KeyError(f"Task not found: {task_id}")
-            return info
+            return self._tasks.get(task_id)
+
+    def _execute(self, task_id: str, fn: Callable[[ProgressCallback], Any]) -> None:
+        """Internal: execute task and update state. Runs in worker thread."""
+        try:
+            def progress_cb(value: float, message: str = "") -> None:
+                with self._lock:
+                    ti = self._tasks.get(task_id)
+                    if ti:
+                        ti.progress = value
+                        ti.message = message
+
+            result = fn(progress_cb)
+            with self._lock:
+                ti = self._tasks.get(task_id)
+                if ti:
+                    ti.status = TaskStatus.COMPLETED
+                    ti.progress = 1.0
+                    ti.result = result
+                    ti.completed_at = time.time()
+        except Exception as exc:
+            with self._lock:
+                ti = self._tasks.get(task_id)
+                if ti:
+                    ti.status = TaskStatus.FAILED
+                    ti.error = str(exc)
+                    ti.completed_at = time.time()
 
     def _evict_old(self) -> None:
-        cutoff = time.time() - self._ttl
-        expired = [tid for tid, info in self._tasks.items() if info.created_at < cutoff]
-        for tid in expired:
-            del self._tasks[tid]
-            self._fns.pop(tid, None)
+        """Remove completed/failed tasks older than TTL. Call periodically."""
+        now = time.time()
+        with self._lock:
+            to_remove = [
+                tid
+                for tid, info in self._tasks.items()
+                if info.completed_at is not None
+                and (now - info.completed_at) > self._ttl
+            ]
+            for tid in to_remove:
+                del self._tasks[tid]
+                self._fns.pop(tid, None)
 
-
-# Singleton instance
-TASK_QUEUE = TaskQueue()
+    def shutdown(self) -> None:
+        """Shut down the thread pool."""
+        self._executor.shutdown(wait=False)
 ```
 
-- [ ] **Step 5: 运行测试验证通过**
+- [ ] **Step 4: 运行测试验证通过**
 
 ```bash
 cd /workspace/csqaq-glove-quant
 python -m pytest tests/test_task_queue.py -v
 ```
 
-预期：4 个测试全部 PASS。
+预期：所有 8 个测试 PASS。
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 5: 提交**
 
 ```bash
+cd /workspace/csqaq-glove-quant
 git add src/api/task_queue.py tests/test_task_queue.py
-git commit -m "feat(api): 添加轻量异步任务队列支持长耗时操作"
+git commit -m "feat(api): 添加线程池异步任务队列（TTL清理+并发限制+8项测试）"
 ```
 
 ---
 
-## Task 6: MVP 回测 API 端点
+## Task 7: MVP 回测 API 端点
 
 **Files:**
-- Create: `tests/test_mvp_endpoint.py`
 - Modify: `src/api/backtest_endpoints.py`
+- Create: `tests/test_mvp_endpoint.py`
 
-- [ ] **Step 1: 创建 `tests/test_mvp_endpoint.py`**
+- [ ] **Step 1: 编写测试 `tests/test_mvp_endpoint.py`**
 
 ```python
 """Tests for the /backtest/mvp endpoint."""
@@ -1506,57 +1893,74 @@ git commit -m "feat(api): 添加轻量异步任务队列支持长耗时操作"
 import numpy as np
 import pandas as pd
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from src.api.backtest_endpoints import router as backtest_router
-
-
-def _make_ohlc(n: int = 400) -> pd.DataFrame:
-    rng = np.random.default_rng(42)
-    price = 100.0 * np.exp(np.cumsum(rng.normal(0.0, 0.01, n)))
-    return pd.DataFrame({
-        "timestamp": pd.date_range("2024-01-01", periods=n, freq="D", tz="UTC"),
-        "open": price,
-        "high": price * 1.01,
-        "low": price * 0.99,
-        "close": price,
-    })
 
 
 @pytest.fixture
 def client(monkeypatch):
+    """Create a test client with deterministic synthetic OHLC data."""
     monkeypatch.setenv("CSQAQ_API_TOKEN", "")
-    monkeypatch.setenv("CSQAQ_CACHE_PATH", "/tmp/csqaq_test_cache_mvp")
-    import src.api.backtest_endpoints as endpoints
-    monkeypatch.setattr(endpoints, "_load_ohlc", lambda sub_index, period, **kw: _make_ohlc())
-    app = FastAPI()
-    app.include_router(backtest_router)
+
+    dates = pd.date_range("2024-01-01", periods=400, freq="D")
+    rng = np.random.default_rng(42)
+    close = 100.0 * np.exp(np.cumsum(rng.normal(0.001, 0.02, 400)))
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": close * (1 + rng.normal(0, 0.005, 400)),
+        "high": close * (1 + np.abs(rng.normal(0, 0.01, 400))),
+        "low": close * (1 - np.abs(rng.normal(0, 0.01, 400))),
+        "close": close,
+    })
+
+    from src.api import backtest_endpoints
+    monkeypatch.setattr(backtest_endpoints, "_load_ohlc", lambda sub_index, period: df)
+
+    from run_scenario_server import app
     return TestClient(app)
 
 
-def test_mvp_returns_metrics_and_trades(client):
-    resp = client.get("/backtest/mvp", params={"sub_index": "手套", "period": "1day"})
-    assert resp.status_code == 200
-    data = resp.json()
+def test_mvp_returns_metrics_equity_and_trades(client):
+    """MVP backtest should return metrics, equity_curve, and trades."""
+    r = client.get("/backtest/mvp", params={"sub_index": "手套", "period": "1day"})
+    assert r.status_code == 200
+    data = r.json()
+
     assert data["sub_index"] == "手套"
     assert data["period"] == "1day"
-    assert "metrics" in data
+    assert "generated_at" in data
+
+    # metrics 验证
     metrics = data["metrics"]
     assert "total_return" in metrics
-    assert "sharpe_ratio" in metrics
     assert "max_drawdown" in metrics
+    assert "sharpe_ratio" in metrics
     assert "win_rate" in metrics
     assert "total_trades" in metrics
-    assert "equity_curve" in data
-    assert "trades" in data
-    assert isinstance(data["equity_curve"], list)
-    assert isinstance(data["trades"], list)
+    assert isinstance(metrics["total_trades"], int)
+
+    # equity_curve 验证
+    eq = data["equity_curve"]
+    assert isinstance(eq, list)
+    assert len(eq) > 0
+    assert "timestamp" in eq[0]
+    assert "equity" in eq[0]
+
+    # trades 验证
+    trades = data["trades"]
+    assert isinstance(trades, list)
+    if len(trades) > 0:
+        t = trades[0]
+        assert "entry_time" in t
+        assert "entry_price" in t
+        assert "exit_reason" in t
+        assert "pnl" in t
+        assert "return_pct" in t
 
 
 def test_mvp_invalid_period_returns_400(client):
-    resp = client.get("/backtest/mvp", params={"sub_index": "手套", "period": "10year"})
-    assert resp.status_code == 400
+    """Invalid period should return 400."""
+    r = client.get("/backtest/mvp", params={"sub_index": "手套", "period": "10year"})
+    assert r.status_code == 400
 ```
 
 - [ ] **Step 2: 运行测试验证失败**
@@ -1566,16 +1970,11 @@ cd /workspace/csqaq-glove-quant
 python -m pytest tests/test_mvp_endpoint.py -v
 ```
 
-预期：FAIL，404 或端点不存在。
+预期：FAIL with 404 (endpoint not found)
 
-- [ ] **Step 3: 在 `src/api/backtest_endpoints.py` 末尾添加 `/mvp` 端点**
-
-在文件末尾追加：
+- [ ] **Step 3: 在 `src/api/backtest_endpoints.py` 末尾追加 `/backtest/mvp` 端点**
 
 ```python
-from src.analysis.metrics import summarize as _summarize_metrics
-
-
 @router.get("/mvp")
 def mvp_backtest(
     sub_index: str = Query(..., description="Sub-index Chinese name."),
@@ -1605,7 +2004,7 @@ def mvp_backtest(
                 "entry_index": t.entry_index,
                 "entry_time": _to_iso(t.entry_time),
                 "entry_price": round(float(t.entry_price), 6),
-                "exit_time": _to_iso(t.exit_time),
+                "exit_time": _to_iso(t.exit_time) if t.exit_time else None,
                 "exit_price": round(float(t.exit_price), 6) if t.exit_price else None,
                 "exit_reason": t.exit_reason,
                 "pnl": round(float(t.pnl), 4),
@@ -1649,20 +2048,21 @@ python -m pytest tests/test_mvp_endpoint.py -v
 - [ ] **Step 5: 提交**
 
 ```bash
-git add tests/test_mvp_endpoint.py src/api/backtest_endpoints.py
-git commit -m "feat(api): 添加 /backtest/mvp 端点返回回测指标与净值曲线"
+cd /workspace/csqaq-glove-quant
+git add src/api/backtest_endpoints.py tests/test_mvp_endpoint.py
+git commit -m "feat(api): 添加 /backtest/mvp 端点（含 metrics+equity+trades 完整返回）"
 ```
 
 ---
 
-## Task 7: 集成策略 API 端点
+## Task 8: 集成策略 API 端点
 
 **Files:**
-- Create: `tests/test_ensemble_endpoint.py`
 - Create: `src/api/ensemble_endpoints.py`
+- Create: `tests/test_ensemble_endpoints.py`
 - Modify: `run_scenario_server.py`
 
-- [ ] **Step 1: 创建 `tests/test_ensemble_endpoint.py`**
+- [ ] **Step 1: 编写测试 `tests/test_ensemble_endpoints.py`**
 
 ```python
 """Tests for the /ensemble/run endpoint."""
@@ -1670,71 +2070,66 @@ git commit -m "feat(api): 添加 /backtest/mvp 端点返回回测指标与净值
 import numpy as np
 import pandas as pd
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from src.api.ensemble_endpoints import router as ensemble_router
-
-
-def _make_ohlc(n: int = 400) -> pd.DataFrame:
-    rng = np.random.default_rng(99)
-    price = 100.0 * np.exp(np.cumsum(rng.normal(0.0, 0.01, n)))
-    return pd.DataFrame({
-        "timestamp": pd.date_range("2024-01-01", periods=n, freq="D", tz="UTC"),
-        "open": price,
-        "high": price * 1.01,
-        "low": price * 0.99,
-        "close": price,
-    })
 
 
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setenv("CSQAQ_API_TOKEN", "")
-    monkeypatch.setenv("CSQAQ_CACHE_PATH", "/tmp/csqaq_test_cache_ens")
-    import src.api.ensemble_endpoints as endpoints
-    monkeypatch.setattr(endpoints, "_load_ohlc", lambda sub_index, period, **kw: _make_ohlc())
-    app = FastAPI()
-    app.include_router(ensemble_router)
+    dates = pd.date_range("2024-01-01", periods=400, freq="D")
+    rng = np.random.default_rng(42)
+    close = 100.0 * np.exp(np.cumsum(rng.normal(0.001, 0.02, 400)))
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": close * (1 + rng.normal(0, 0.005, 400)),
+        "high": close * (1 + np.abs(rng.normal(0, 0.01, 400))),
+        "low": close * (1 - np.abs(rng.normal(0, 0.01, 400))),
+        "close": close,
+    })
+    from src.api import ensemble_endpoints
+    monkeypatch.setattr(ensemble_endpoints, "_load_ohlc", lambda sub_index, period: df)
+    from run_scenario_server import app
     return TestClient(app)
 
 
 def test_ensemble_returns_three_strategies(client):
-    resp = client.get("/ensemble/run", params={"sub_index": "手套", "period": "1day"})
-    assert resp.status_code == 200
-    data = resp.json()
-    for key in ("ensemble_metrics", "pullback_metrics", "trend_metrics"):
+    """/ensemble/run should return ensemble, pullback, and trend_following results."""
+    r = client.get("/ensemble/run", params={"sub_index": "手套", "period": "1day"})
+    assert r.status_code == 200
+    data = r.json()
+
+    assert data["sub_index"] == "手套"
+    assert data["period"] == "1day"
+
+    for key in ("ensemble", "pullback", "trend_following"):
         assert key in data
-        assert "total_return" in data[key]
-        assert "sharpe_ratio" in data[key]
-    assert "ensemble_equity" in data
-    assert "pullback_equity" in data
-    assert "trend_equity" in data
-    assert "trades" in data
+        strat = data[key]
+        assert "strategy_name" in strat
+        assert "metrics" in strat
+        assert "equity_curve" in strat
+        assert isinstance(strat["equity_curve"], list)
+        assert "trade_count" in strat
+        assert "total_return" in strat["metrics"]
 
 
-def test_ensemble_invalid_period(client):
-    resp = client.get("/ensemble/run", params={"sub_index": "手套", "period": "2month"})
-    assert resp.status_code == 400
+def test_ensemble_invalid_period_returns_400(client):
+    r = client.get("/ensemble/run", params={"sub_index": "手套", "period": "10year"})
+    assert r.status_code == 400
 ```
 
 - [ ] **Step 2: 运行测试验证失败**
 
 ```bash
 cd /workspace/csqaq-glove-quant
-python -m pytest tests/test_ensemble_endpoint.py -v
+python -m pytest tests/test_ensemble_endpoints.py -v
 ```
 
-预期：FAIL，模块不存在。
+预期：FAIL with 404
 
 - [ ] **Step 3: 创建 `src/api/ensemble_endpoints.py`**
 
 ```python
-"""Ensemble strategy API endpoints.
-
-Exposes the dual-strategy ensemble (pullback + trend-following) over HTTP,
-returning metrics for all three strategies and their equity curves.
-"""
+"""Ensemble strategy API endpoints."""
 
 from __future__ import annotations
 
@@ -1742,12 +2137,11 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 
-from src.analysis.metrics import summarize as _summarize
-from src.api.logging import get_logger, log_request
-from src.api.scenario_endpoints import _load_ohlc, _normalize_period
+from src.analysis.metrics import summarize
+from src.api.logging import LOGGER, log_request
+from src.api.scenario_endpoints import _load_ohlc, _normalize_period, _to_iso
 from src.backtest.engine import BacktestParams, run_backtest
 from src.strategy.ensemble import EnsembleParams, generate_ensemble_signals
 from src.strategy.signal import SignalParams, generate_signals
@@ -1756,32 +2150,27 @@ from src.strategy.trend_following_strategy import (
     generate_trend_following_signals,
 )
 
-LOGGER = get_logger("csqaq.ensemble_api")
 router = APIRouter(prefix="/ensemble", tags=["ensemble"])
 
 
-def _equity_records(equity_curve: pd.Series) -> list[dict[str, Any]]:
-    records = []
-    for ts, val in equity_curve.items():
-        ts_iso = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
-        records.append({"timestamp": ts_iso, "equity": round(float(val), 4)})
-    return records
-
-
-def _trade_records(trades: list) -> list[dict[str, Any]]:
-    records = []
-    for t in trades:
-        records.append({
-            "entry_index": t.entry_index,
-            "entry_time": t.entry_time.isoformat() if hasattr(t.entry_time, "isoformat") else str(t.entry_time),
-            "entry_price": round(float(t.entry_price), 6),
-            "exit_time": t.exit_time.isoformat() if hasattr(t.exit_time, "isoformat") else str(t.exit_time),
-            "exit_price": round(float(t.exit_price), 6) if t.exit_price else None,
-            "exit_reason": t.exit_reason,
-            "pnl": round(float(t.pnl), 4),
-            "return_pct": round(float(t.return_pct), 6),
-        })
-    return records
+def _run_single_strategy(
+    df: Any,
+    signal_df: Any,
+    strategy_name: str,
+) -> dict[str, Any]:
+    """Run backtest on a signal df and return structured result."""
+    result = run_backtest(signal_df, BacktestParams())
+    metrics = summarize(result)
+    equity_records = [
+        {"timestamp": _to_iso(ts), "equity": round(float(val), 4)}
+        for ts, val in result.equity_curve.items()
+    ]
+    return {
+        "strategy_name": strategy_name,
+        "metrics": metrics,
+        "equity_curve": equity_records,
+        "trade_count": len(result.trades),
+    }
 
 
 @router.get("/run")
@@ -1789,31 +2178,27 @@ def run_ensemble(
     sub_index: str = Query(..., description="Sub-index Chinese name."),
     period: str = Query("1day", description="K-line period."),
 ) -> dict[str, Any]:
-    """Run the ensemble, pullback, and trend-following backtests side by side."""
+    """Run ensemble, pullback, and trend-following strategies for comparison."""
     period = _normalize_period(period)
     start = time.perf_counter()
     try:
         df = _load_ohlc(sub_index, period)
 
-        # Ensemble
-        ens_df = generate_ensemble_signals(df, EnsembleParams())
-        ens_result = run_backtest(ens_df, BacktestParams())
-        ens_metrics = _summarize(ens_result)
+        pullback_signals = generate_signals(
+            df, SignalParams(use_smart_money=True, use_trend_following=False)
+        )
+        trend_signals = generate_trend_following_signals(df, TrendFollowingParams())
+        ensemble_signals = generate_ensemble_signals(
+            df, EnsembleParams()
+        )
 
-        # Pullback only
-        pb_df = generate_signals(df, SignalParams(use_smart_money=True, use_trend_following=False))
-        pb_result = run_backtest(pb_df, BacktestParams())
-        pb_metrics = _summarize(pb_result)
-
-        # Trend only
-        tf_df = generate_trend_following_signals(df, TrendFollowingParams())
-        tf_result = run_backtest(tf_df, BacktestParams())
-        tf_metrics = _summarize(tf_result)
-
+        pullback_result = _run_single_strategy(df, pullback_signals, "pullback")
+        trend_result = _run_single_strategy(df, trend_signals, "trend_following")
+        ensemble_result = _run_single_strategy(df, ensemble_signals, "ensemble")
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Ensemble backtest failed: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Ensemble run failed: {exc}") from exc
 
     latency_ms = (time.perf_counter() - start) * 1000
     log_request(
@@ -1827,19 +2212,15 @@ def run_ensemble(
         "sub_index": sub_index,
         "period": period,
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "ensemble_metrics": ens_metrics,
-        "pullback_metrics": pb_metrics,
-        "trend_metrics": tf_metrics,
-        "ensemble_equity": _equity_records(ens_result.equity_curve),
-        "pullback_equity": _equity_records(pb_result.equity_curve),
-        "trend_equity": _equity_records(tf_result.equity_curve),
-        "trades": _trade_records(ens_result.trades),
+        "ensemble": ensemble_result,
+        "pullback": pullback_result,
+        "trend_following": trend_result,
     }
 ```
 
-- [ ] **Step 4: 在 `run_scenario_server.py` 注册 ensemble router**
+- [ ] **Step 4: 在 `run_scenario_server.py` 注册路由**
 
-在 `app.include_router(backtest_router)` 后添加：
+在 `app.include_router(backtest_router)` 之后添加：
 
 ```python
 from src.api.ensemble_endpoints import router as ensemble_router
@@ -1850,7 +2231,7 @@ app.include_router(ensemble_router)
 
 ```bash
 cd /workspace/csqaq-glove-quant
-python -m pytest tests/test_ensemble_endpoint.py -v
+python -m pytest tests/test_ensemble_endpoints.py -v
 ```
 
 预期：2 个测试 PASS。
@@ -1858,219 +2239,276 @@ python -m pytest tests/test_ensemble_endpoint.py -v
 - [ ] **Step 6: 提交**
 
 ```bash
-git add tests/test_ensemble_endpoint.py src/api/ensemble_endpoints.py run_scenario_server.py
-git commit -m "feat(api): 添加 /ensemble/run 端点返回三策略对比"
+cd /workspace/csqaq-glove-quant
+git add src/api/ensemble_endpoints.py tests/test_ensemble_endpoints.py run_scenario_server.py
+git commit -m "feat(api): 添加 /ensemble/run 端点（三策略对比回测）"
 ```
 
 ---
 
-## Task 8: 趋势扫描 API 端点（异步任务）
+## Task 9: 趋势扫描 API 端点（异步任务，POST 语义）
 
 **Files:**
-- Create: `tests/test_trend_scan_endpoint.py`
 - Create: `src/api/trend_scan_endpoints.py`
+- Create: `tests/test_trend_scan_endpoints.py`
 - Modify: `run_scenario_server.py`
 
-- [ ] **Step 1: 创建 `tests/test_trend_scan_endpoint.py`**
+- [ ] **Step 1: 编写测试 `tests/test_trend_scan_endpoints.py`**
 
 ```python
 """Tests for the /trend-scan endpoints."""
 
 import time
+
 import numpy as np
 import pandas as pd
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from src.api.trend_scan_endpoints import router as trend_scan_router, TASK_QUEUE
-
-
-def _make_ohlc(n: int = 400) -> pd.DataFrame:
-    rng = np.random.default_rng(77)
-    price = 100.0 * np.exp(np.cumsum(rng.normal(0.0, 0.01, n)))
-    return pd.DataFrame({
-        "timestamp": pd.date_range("2024-01-01", periods=n, freq="D", tz="UTC"),
-        "open": price,
-        "high": price * 1.01,
-        "low": price * 0.99,
-        "close": price,
-    })
 
 
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setenv("CSQAQ_API_TOKEN", "")
-    monkeypatch.setenv("CSQAQ_CACHE_PATH", "/tmp/csqaq_test_cache_scan")
-    import src.api.trend_scan_endpoints as endpoints
-    monkeypatch.setattr(endpoints, "_load_ohlc", lambda sub_index, period, **kw: _make_ohlc())
-    # Reset task queue between tests
-    TASK_QUEUE._tasks.clear()
-    TASK_QUEUE._fns.clear()
-    app = FastAPI()
-    app.include_router(trend_scan_router)
+    dates = pd.date_range("2024-01-01", periods=400, freq="D")
+    rng = np.random.default_rng(42)
+    close = 100.0 * np.exp(np.cumsum(rng.normal(0.001, 0.02, 400)))
+    df = pd.DataFrame({
+        "timestamp": dates,
+        "open": close * (1 + rng.normal(0, 0.005, 400)),
+        "high": close * (1 + np.abs(rng.normal(0, 0.01, 400))),
+        "low": close * (1 - np.abs(rng.normal(0, 0.01, 400))),
+        "close": close,
+    })
+    from src.api import trend_scan_endpoints
+    monkeypatch.setattr(trend_scan_endpoints, "_load_ohlc", lambda sub_index, period: df)
+    from run_scenario_server import app
     return TestClient(app)
 
 
 def test_start_returns_task_id(client):
-    resp = client.get("/trend-scan/start", params={"sub_index": "手套", "period": "1day"})
-    assert resp.status_code == 200
-    data = resp.json()
+    """POST /trend-scan/start should return a task_id."""
+    r = client.post("/trend-scan/start", json={"sub_index": "手套", "period": "1day"})
+    assert r.status_code == 200
+    data = r.json()
     assert "task_id" in data
     assert len(data["task_id"]) > 0
 
 
-def test_status_returns_progress(client):
-    start_resp = client.get("/trend-scan/start", params={"sub_index": "手套", "period": "1day"})
-    task_id = start_resp.json()["task_id"]
-    # Wait for task to complete (scan is fast on synthetic data)
-    for _ in range(30):
-        status_resp = client.get(f"/trend-scan/status/{task_id}")
-        data = status_resp.json()
+def test_status_returns_valid_structure(client):
+    """GET /trend-scan/status/{task_id} should return valid task info."""
+    r1 = client.post("/trend-scan/start", json={"sub_index": "手套", "period": "1day"})
+    task_id = r1.json()["task_id"]
+
+    # Poll until terminal state
+    for _ in range(120):
+        r2 = client.get(f"/trend-scan/status/{task_id}")
+        assert r2.status_code == 200
+        data = r2.json()
+        assert "status" in data
+        assert "progress" in data
+        assert "result" in data
+        assert "error" in data
         if data["status"] in ("completed", "failed"):
             break
         time.sleep(0.5)
-    assert data["status"] in ("completed", "failed", "running", "pending")
+
+    # Final state should be completed (not pending/running)
+    assert data["status"] in ("completed", "failed"), f"Unexpected status: {data['status']}"
 
 
 def test_status_unknown_task_returns_404(client):
-    resp = client.get("/trend-scan/status/nonexistent")
-    assert resp.status_code == 404
+    """GET /trend-scan/status with unknown task_id should return 404."""
+    r = client.get("/trend-scan/status/nonexistent123")
+    assert r.status_code == 404
+
+
+def test_completed_task_has_scan_result(client):
+    """A completed scan task should have a result with top_10 and total_combinations."""
+    r1 = client.post("/trend-scan/start", json={"sub_index": "手套", "period": "1day"})
+    task_id = r1.json()["task_id"]
+
+    for _ in range(120):
+        r2 = client.get(f"/trend-scan/status/{task_id}")
+        data = r2.json()
+        if data["status"] in ("completed", "failed"):
+            break
+        time.sleep(0.5)
+
+    if data["status"] == "completed":
+        result = data["result"]
+        assert result is not None
+        assert "total_combinations" in result
+        assert "top_10" in result
+        assert isinstance(result["top_10"], list)
+        assert "sub_index" in result
 ```
 
 - [ ] **Step 2: 运行测试验证失败**
 
 ```bash
 cd /workspace/csqaq-glove-quant
-python -m pytest tests/test_trend_scan_endpoint.py -v
+python -m pytest tests/test_trend_scan_endpoints.py -v
 ```
 
-预期：FAIL，模块不存在。
+预期：FAIL with 404
 
 - [ ] **Step 3: 创建 `src/api/trend_scan_endpoints.py`**
 
 ```python
-"""Trend-following parameter scan API endpoints.
-
-Exposes the parameter grid scan as an async task. The frontend polls
-/trend-scan/status/{task_id} for progress and results.
-"""
+"""Trend scan API endpoints with async task execution."""
 
 from __future__ import annotations
 
 import itertools
+from datetime import datetime, timezone
 from typing import Any
 
-import pandas as pd
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
-from src.api.logging import get_logger
+from src.analysis.metrics import summarize
+from src.api.logging import LOGGER, log_request
 from src.api.scenario_endpoints import _load_ohlc, _normalize_period
-from src.api.task_queue import TASK_QUEUE, TaskStatus
+from src.api.task_queue import TASK_QUEUE, TaskQueue
 from src.backtest.engine import BacktestParams, run_backtest
 from src.strategy.trend_following_strategy import (
     TrendFollowingParams,
     generate_trend_following_signals,
 )
 
-LOGGER = get_logger("csqaq.trend_scan_api")
 router = APIRouter(prefix="/trend-scan", tags=["trend-scan"])
 
 
+class ScanRequest(BaseModel):
+    sub_index: str
+    period: str = "1day"
+
+
 def _param_grid() -> list[dict[str, Any]]:
-    """Return trend-following parameter combinations to evaluate."""
-    grid: list[dict[str, Any]] = []
-    for (
-        swing_order,
-        confirmations,
-        trend_strength_threshold,
-        use_di_filter,
-        use_volatility_filter,
-    ) in itertools.product(
+    """Generate the full parameter grid for trend scan."""
+    combos = []
+    for swing_order, confirmations, trend_threshold, use_di, use_vol, vol_mult, use_pb, pb_lookback, pb_buffer in itertools.product(
         (1, 2),
         (1, 2),
         (None, 20.0, 25.0, 30.0),
         (False, True),
         (False, True),
+        (0.3, 0.5, 1.0),
+        (False, True),
+        (3, 5, 8),
+        (0.003, 0.005, 0.01),
     ):
-        grid.append({
+        combos.append({
             "swing_order": swing_order,
             "confirmations": confirmations,
-            "trend_strength_threshold": trend_strength_threshold,
-            "use_di_filter": use_di_filter,
-            "use_volatility_filter": use_volatility_filter,
+            "trend_strength_threshold": trend_threshold,
+            "use_di_filter": use_di,
+            "use_volatility_filter": use_vol,
+            "volatility_atr_multiplier": vol_mult,
+            "use_pullback_confirmation": use_pb,
+            "pullback_lookback": pb_lookback,
+            "pullback_buffer": pb_buffer,
         })
-    return grid
+    return combos
 
 
-def _run_scan(sub_index: str, period: str, progress_cb) -> list[dict[str, Any]]:
-    """Execute the full parameter scan. Returns sorted results."""
+def _run_scan(
+    sub_index: str,
+    period: str,
+    progress_cb,
+) -> dict[str, Any]:
+    """Execute the full parameter scan. Runs in a background thread."""
     df = _load_ohlc(sub_index, period)
     grid = _param_grid()
     total = len(grid)
     results: list[dict[str, Any]] = []
 
-    from src.analysis.metrics import summarize as _summarize
-
     for i, params_dict in enumerate(grid):
-        params = TrendFollowingParams(**params_dict)
+        params = TrendFollowingParams(
+            swing_order=params_dict["swing_order"],
+            confirmations=params_dict["confirmations"],
+            trend_strength_threshold=params_dict["trend_strength_threshold"],
+            use_di_filter=params_dict["use_di_filter"],
+            use_volatility_filter=params_dict["use_volatility_filter"],
+            volatility_atr_multiplier=params_dict["volatility_atr_multiplier"],
+            use_pullback_confirmation=params_dict["use_pullback_confirmation"],
+            pullback_lookback=params_dict["pullback_lookback"],
+            pullback_buffer=params_dict["pullback_buffer"],
+        )
         try:
-            signals_df = generate_trend_following_signals(df, params)
-            result = run_backtest(signals_df, BacktestParams())
-            metrics = _summarize(result)
+            signal_df = generate_trend_following_signals(df, params)
+            bt_result = run_backtest(signal_df, BacktestParams())
+            metrics = summarize(bt_result)
             results.append({
                 "params": params_dict,
                 "total_return": metrics["total_return"],
-                "sharpe_ratio": metrics["sharpe_ratio"],
                 "max_drawdown": metrics["max_drawdown"],
+                "sharpe_ratio": metrics["sharpe_ratio"],
                 "win_rate": metrics["win_rate"],
                 "total_trades": metrics["total_trades"],
             })
         except Exception:
-            results.append({
-                "params": params_dict,
-                "total_return": 0.0,
-                "sharpe_ratio": 0.0,
-                "max_drawdown": 0.0,
-                "win_rate": 0.0,
-                "total_trades": 0,
-            })
-        progress_cb((i + 1) / total, f"已扫描 {i + 1}/{total} 组参数")
+            # Skip parameter combinations that error out
+            pass
 
-    results.sort(key=lambda r: r["total_return"], reverse=True)
-    return results
+        progress_cb((i + 1) / total, f"扫描进度 {i + 1}/{total}")
+
+    results.sort(key=lambda x: x["total_return"], reverse=True)
+    non_negative = sum(1 for r in results if r["total_return"] >= 0)
+
+    return {
+        "sub_index": sub_index,
+        "period": period,
+        "total_combinations": total,
+        "top_10": results[:10],
+        "bottom_10": results[-10:],
+        "non_negative_count": non_negative,
+        "all_results": results,
+    }
 
 
-@router.get("/start")
-def start_scan(
-    sub_index: str = Query(..., description="Sub-index Chinese name."),
-    period: str = Query("1day", description="K-line period."),
-) -> dict[str, str]:
-    """Start a trend-following parameter scan as a background task."""
-    _normalize_period(period)
+@router.post("/start")
+def start_scan(request: ScanRequest) -> dict[str, str]:
+    """Start an async trend scan task. Returns task_id for polling."""
+    # Validate period early
+    _normalize_period(request.period)
 
-    def task_fn(progress_cb):
-        return _run_scan(sub_index, period, progress_cb)
-
-    task_id = TASK_QUEUE.create(task_fn)
+    task_id = TASK_QUEUE.create(
+        lambda progress_cb: _run_scan(request.sub_index, request.period, progress_cb)
+    )
     TASK_QUEUE.run(task_id)
-    LOGGER.info("Trend scan started", extra={"task_id": task_id, "sub_index": sub_index})
+
+    log_request(
+        LOGGER,
+        endpoint="/trend-scan/start",
+        sub_index=request.sub_index,
+        period=request.period,
+        extra={"task_id": task_id},
+    )
     return {"task_id": task_id}
 
 
 @router.get("/status/{task_id}")
-def scan_status(task_id: str) -> dict[str, Any]:
-    """Return the current status of a scan task."""
-    try:
-        info = TASK_QUEUE.get_status(task_id)
-    except KeyError:
+def get_status(task_id: str) -> dict[str, Any]:
+    """Get the status of a trend scan task."""
+    info = TASK_QUEUE.get(task_id)
+    if info is None:
         raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
     return info.to_dict()
 ```
 
-- [ ] **Step 4: 在 `run_scenario_server.py` 注册 trend_scan router**
+- [ ] **Step 4: 在 `run_scenario_server.py` 注册路由和全局 TaskQueue**
 
-在 ensemble router 后添加：
+在 `src/api/task_queue.py` 末尾添加全局单例（Task 6 已创建该文件，此处仅追加最后一行）：
+
+```python
+# 全局单例
+TASK_QUEUE = TaskQueue(ttl_seconds=3600.0, max_workers=4)
+```
+
+`trend_scan_endpoints.py` 直接导入：`from src.api.task_queue import TASK_QUEUE`
+
+`run_scenario_server.py` 只需注册路由：
 
 ```python
 from src.api.trend_scan_endpoints import router as trend_scan_router
@@ -2081,101 +2519,121 @@ app.include_router(trend_scan_router)
 
 ```bash
 cd /workspace/csqaq-glove-quant
-python -m pytest tests/test_trend_scan_endpoint.py -v
+python -m pytest tests/test_trend_scan_endpoints.py -v --timeout=120
 ```
 
-预期：3 个测试 PASS。
+预期：4 个测试 PASS（扫描可能需要数十秒）。
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add tests/test_trend_scan_endpoint.py src/api/trend_scan_endpoints.py run_scenario_server.py
-git commit -m "feat(api): 添加趋势扫描异步任务端点 /trend-scan/start + /status"
+cd /workspace/csqaq-glove-quant
+git add src/api/task_queue.py src/api/trend_scan_endpoints.py tests/test_trend_scan_endpoints.py run_scenario_server.py
+git commit -m "feat(api): 添加趋势扫描异步端点（POST启动+GET轮询+线程池执行）"
 ```
 
 ---
 
-## Task 9: 报告查看 API 端点
+## Task 10: 报告查看 API 端点
 
 **Files:**
-- Create: `tests/test_report_endpoint.py`
 - Create: `src/api/report_endpoints.py`
+- Create: `tests/test_report_endpoints.py`
 - Modify: `run_scenario_server.py`
 
-- [ ] **Step 1: 创建 `tests/test_report_endpoint.py`**
+- [ ] **Step 1: 编写测试 `tests/test_report_endpoints.py`**
 
 ```python
 """Tests for the /reports endpoints."""
 
 import json
 from pathlib import Path
-import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
-from src.api.report_endpoints import router as report_router
+import pytest
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    """Create a temp reports dir with sample files."""
-    reports_dir = tmp_path / "reports"
-    reports_dir.mkdir()
-    (reports_dir / "phase18_test.json").write_text(json.dumps({"phase": 18, "status": "ok"}))
-    (reports_dir / "phase17_perf.json").write_text(json.dumps({"phase": 17}))
+    """Create a test client with a temporary reports directory."""
+    monkeypatch.setenv("CSQAQ_API_TOKEN", "")
 
-    monkeypatch.setattr("src.api.report_endpoints.REPORTS_DIR", reports_dir)
-    app = FastAPI()
-    app.include_router(report_router)
+    # Create test report files
+    (tmp_path / "test_report.json").write_text(json.dumps({"key": "value"}))
+    (tmp_path / "empty.json").write_text("{}")
+    (tmp_path / "not_json.txt").write_text("hello")
+
+    from src.api import report_endpoints
+    monkeypatch.setattr(report_endpoints, "REPORTS_DIR", tmp_path)
+
+    from run_scenario_server import app
     return TestClient(app)
 
 
-def test_list_reports(client):
-    resp = client.get("/reports/list")
-    assert resp.status_code == 200
-    data = resp.json()
+def test_list_returns_json_files(client):
+    """/reports/list should return only .json files."""
+    r = client.get("/reports/list")
+    assert r.status_code == 200
+    data = r.json()
     assert "reports" in data
-    assert len(data["reports"]) == 2
-    names = [r["name"] for r in data["reports"]]
-    assert "phase18_test.json" in names
-    assert "phase17_perf.json" in names
+    filenames = [f["filename"] for f in data["reports"]]
+    assert "test_report.json" in filenames
+    assert "empty.json" in filenames
+    assert "not_json.txt" not in filenames
 
 
-def test_get_report_content(client):
-    resp = client.get("/reports/get", params={"name": "phase18_test.json"})
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["name"] == "phase18_test.json"
-    assert data["content"]["phase"] == 18
+def test_list_file_has_metadata(client):
+    """Each report file should have filename, size_bytes, and modified_at."""
+    r = client.get("/reports/list")
+    files = r.json()["reports"]
+    assert len(files) > 0
+    f = files[0]
+    assert "filename" in f
+    assert "size_bytes" in f
+    assert "modified_at" in f
+    assert isinstance(f["size_bytes"], int)
+    assert f["size_bytes"] > 0
 
 
-def test_get_nonexistent_report_returns_404(client):
-    resp = client.get("/reports/get", params={"name": "nonexistent.json"})
-    assert resp.status_code == 404
+def test_get_returns_content(client):
+    """/reports/get should return the parsed JSON content."""
+    r = client.get("/reports/get", params={"filename": "test_report.json"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["filename"] == "test_report.json"
+    assert data["content"] == {"key": "value"}
 
 
-def test_path_traversal_blocked(client):
-    resp = client.get("/reports/get", params={"name": "../../../etc/passwd"})
-    assert resp.status_code == 400
+def test_get_nonexistent_returns_404(client):
+    r = client.get("/reports/get", params={"filename": "nonexistent.json"})
+    assert r.status_code == 404
+
+
+def test_get_path_traversal_blocked(client):
+    """Path traversal attempts should return 404, not expose files."""
+    r = client.get("/reports/get", params={"filename": "../../../etc/passwd"})
+    assert r.status_code == 404
+
+
+def test_get_absolute_path_blocked(client):
+    """Absolute paths should be blocked."""
+    r = client.get("/reports/get", params={"filename": "/etc/passwd"})
+    assert r.status_code == 404
 ```
 
 - [ ] **Step 2: 运行测试验证失败**
 
 ```bash
 cd /workspace/csqaq-glove-quant
-python -m pytest tests/test_report_endpoint.py -v
+python -m pytest tests/test_report_endpoints.py -v
 ```
 
-预期：FAIL，模块不存在。
+预期：FAIL with 404
 
 - [ ] **Step 3: 创建 `src/api/report_endpoints.py`**
 
 ```python
-"""Report viewing API endpoints.
-
-Lists JSON report files in the reports/ directory and returns their contents.
-Path traversal is blocked: only direct filenames in the reports directory are allowed.
-"""
+"""Report viewing API endpoints."""
 
 from __future__ import annotations
 
@@ -2186,52 +2644,58 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from src.api.logging import get_logger
+from src.api.logging import LOGGER, log_request
 
-LOGGER = get_logger("csqaq.report_api")
 router = APIRouter(prefix="/reports", tags=["reports"])
 
-REPORTS_DIR = Path(__file__).resolve().parents[2] / "reports"
+REPORTS_DIR = Path(__file__).parent.parent.parent / "reports"
 
 
 @router.get("/list")
 def list_reports() -> dict[str, Any]:
-    """List all JSON report files with metadata."""
-    reports: list[dict[str, Any]] = []
+    """List all JSON report files in the reports directory."""
     if not REPORTS_DIR.exists():
         return {"reports": []}
 
-    for path in sorted(REPORTS_DIR.glob("*.json")):
+    files = []
+    for path in sorted(REPORTS_DIR.glob("*.json"), key=lambda p: p.name):
         stat = path.stat()
-        reports.append({
-            "name": path.name,
-            "path": str(path.relative_to(REPORTS_DIR)),
-            "size": stat.st_size,
-            "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+        files.append({
+            "filename": path.name,
+            "size_bytes": stat.st_size,
+            "modified_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
         })
-    return {"reports": reports}
+
+    log_request(LOGGER, endpoint="/reports/list", extra={"file_count": len(files)})
+    return {"reports": files}
 
 
 @router.get("/get")
-def get_report(name: str = Query(..., description="Report filename (no path separators).")) -> dict[str, Any]:
-    """Return the JSON content of a specific report file."""
-    # Block path traversal: only allow simple filenames
-    if "/" in name or "\\" in name or ".." in name:
-        raise HTTPException(status_code=400, detail="Invalid filename: path separators not allowed")
+def get_report(filename: str = Query(..., description="Report filename.")) -> dict[str, Any]:
+    """Get the content of a specific report file."""
+    # Use resolve() to canonicalize path and prevent traversal
+    target = (REPORTS_DIR / filename).resolve()
+    reports_resolved = REPORTS_DIR.resolve()
 
-    file_path = REPORTS_DIR / name
-    if not file_path.exists() or not file_path.is_file():
-        raise HTTPException(status_code=404, detail=f"Report not found: {name}")
+    # Verify the resolved path is within reports directory
+    try:
+        target.relative_to(reports_resolved)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Report not found: {filename}")
+
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail=f"Report not found: {filename}")
 
     try:
-        content = json.loads(file_path.read_text(encoding="utf-8"))
+        content = json.loads(target.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=500, detail=f"Invalid JSON in report: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Failed to parse report: {exc}") from exc
 
-    return {"name": name, "content": content}
+    log_request(LOGGER, endpoint="/reports/get", extra={"filename": filename})
+    return {"filename": filename, "content": content}
 ```
 
-- [ ] **Step 4: 在 `run_scenario_server.py` 注册 report router**
+- [ ] **Step 4: 在 `run_scenario_server.py` 注册路由**
 
 ```python
 from src.api.report_endpoints import router as report_router
@@ -2242,96 +2706,128 @@ app.include_router(report_router)
 
 ```bash
 cd /workspace/csqaq-glove-quant
-python -m pytest tests/test_report_endpoint.py -v
+python -m pytest tests/test_report_endpoints.py -v
 ```
 
-预期：4 个测试 PASS。
+预期：6 个测试 PASS。
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add tests/test_report_endpoint.py src/api/report_endpoints.py run_scenario_server.py
-git commit -m "feat(api): 添加报告查看端点 /reports/list + /reports/get"
+cd /workspace/csqaq-glove-quant
+git add src/api/report_endpoints.py tests/test_report_endpoints.py run_scenario_server.py
+git commit -m "feat(api): 添加报告查看端点（列表+读取+路径遍历防护）"
 ```
 
 ---
 
-## Task 10: 数据管理 API 端点
+## Task 11: 数据管理 API 端点
 
 **Files:**
-- Create: `tests/test_data_endpoint.py`
 - Create: `src/api/data_endpoints.py`
+- Create: `tests/test_data_endpoints.py`
 - Modify: `run_scenario_server.py`
 
-- [ ] **Step 1: 创建 `tests/test_data_endpoint.py`**
+- [ ] **Step 1: 编写测试 `tests/test_data_endpoints.py`**
 
 ```python
 """Tests for the /data endpoints."""
 
-import pandas as pd
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from src.api.data_endpoints import router as data_router
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    cache_dir = tmp_path / "cache"
-    cache_dir.mkdir()
-    # Create a sample parquet cache file
-    df = pd.DataFrame({
-        "timestamp": pd.date_range("2024-01-01", periods=100, freq="D", tz="UTC"),
-        "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5,
-    })
-    df.to_parquet(cache_dir / "手套_1day.parquet")
-
     monkeypatch.setenv("CSQAQ_API_TOKEN", "")
-    monkeypatch.setattr("src.api.data_endpoints._cache_dir", lambda: cache_dir)
-    monkeypatch.setattr("src.api.data_endpoints._load_ohlc",
-                        lambda sub_index, period, **kw: df)
 
-    app = FastAPI()
-    app.include_router(data_router)
+    # Create test parquet files
+    import pandas as pd
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=100, freq="D"),
+        "open": [100.0] * 100,
+        "high": [101.0] * 100,
+        "low": [99.0] * 100,
+        "close": [100.5] * 100,
+    })
+    df.to_parquet(tmp_path / "手套_1d.parquet", index=False)
+    df.to_parquet(tmp_path / "匕首_4h.parquet", index=False)
+
+    from src.api import data_endpoints
+    monkeypatch.setattr(data_endpoints, "CACHE_DIR", tmp_path)
+
+    from run_scenario_server import app
     return TestClient(app)
 
 
-def test_cache_status(client):
-    resp = client.get("/data/cache-status")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "entries" in data
-    assert len(data["entries"]) >= 1
-    entry = data["entries"][0]
-    assert entry["sub_index"] == "手套"
-    assert entry["bars"] == 100
+def test_cache_status_returns_files(client):
+    """/data/cache-status should return parquet files with metadata."""
+    r = client.get("/data/cache-status")
+    assert r.status_code == 200
+    data = r.json()
+    assert "cache_dir" in data
+    assert "total_files" in data
+    assert "total_size_bytes" in data
+    assert "files" in data
+    assert data["total_files"] == 2
+
+    filenames = [f["filename"] for f in data["files"]]
+    assert "手套_1d.parquet" in filenames
+    assert "匕首_4h.parquet" in filenames
+
+    f = data["files"][0]
+    assert "size_bytes" in f
+    assert "bar_count" in f
+    assert "modified_at" in f
 
 
-def test_refresh_data(client):
-    resp = client.get("/data/refresh", params={"sub_index": "手套", "period": "1day"})
-    assert resp.status_code == 200
-    data = resp.json()
+def test_cache_status_empty_dir(tmp_path, monkeypatch):
+    """Empty cache directory should return zero files."""
+    monkeypatch.setenv("CSQAQ_API_TOKEN", "")
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+
+    from src.api import data_endpoints
+    monkeypatch.setattr(data_endpoints, "CACHE_DIR", empty_dir)
+
+    from run_scenario_server import app
+    c = TestClient(app)
+
+    r = c.get("/data/cache-status")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_files"] == 0
+    assert data["files"] == []
+
+
+def test_refresh_returns_success(client):
+    """/data/refresh should return success and bar_count."""
+    r = client.post("/data/refresh", json={"sub_index": "手套", "period": "1day"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["sub_index"] == "手套"
     assert data["success"] is True
-    assert data["bars"] > 0
+    assert isinstance(data["bar_count"], int)
+
+
+def test_refresh_invalid_period_returns_400(client):
+    r = client.post("/data/refresh", json={"sub_index": "手套", "period": "10year"})
+    assert r.status_code == 400
 ```
 
 - [ ] **Step 2: 运行测试验证失败**
 
 ```bash
 cd /workspace/csqaq-glove-quant
-python -m pytest tests/test_data_endpoint.py -v
+python -m pytest tests/test_data_endpoints.py -v
 ```
 
-预期：FAIL，模块不存在。
+预期：FAIL with 404
 
 - [ ] **Step 3: 创建 `src/api/data_endpoints.py`**
 
 ```python
-"""Data management API endpoints.
-
-Provides cache status inspection and manual data refresh capabilities.
-"""
+"""Data management API endpoints."""
 
 from __future__ import annotations
 
@@ -2340,73 +2836,93 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
-from src.api.logging import get_logger
+from src.api.logging import LOGGER, log_request
 from src.api.scenario_endpoints import _load_ohlc, _normalize_period
-from src.config import Settings
-from src.data.cache import cache_file_path
 
-LOGGER = get_logger("csqaq.data_api")
 router = APIRouter(prefix="/data", tags=["data"])
 
+CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "cache"
 
-def _cache_dir() -> Path:
-    """Return the cache directory path."""
-    settings = Settings()
-    return Path(settings.cache_path)
+_PERIOD_SUFFIX = {"1hour": "1h", "4hour": "4h", "1day": "1d", "7day": "7d"}
+
+
+class RefreshRequest(BaseModel):
+    sub_index: str
+    period: str = "1day"
 
 
 @router.get("/cache-status")
 def cache_status() -> dict[str, Any]:
-    """List all cached OHLC files with bar counts and sizes."""
-    cdir = _cache_dir()
-    entries: list[dict[str, Any]] = []
+    """List all cached parquet files with metadata."""
+    if not CACHE_DIR.exists():
+        return {
+            "cache_dir": str(CACHE_DIR),
+            "total_files": 0,
+            "total_size_bytes": 0,
+            "files": [],
+        }
 
-    if not cdir.exists():
-        return {"cache_dir": str(cdir), "entries": []}
-
-    for path in sorted(cdir.glob("*.parquet")):
-        try:
-            df = pd.read_parquet(path)
-            bars = len(df)
-        except Exception:
-            bars = 0
-
-        # Parse sub_index and period from filename: <name>_<period>.parquet
-        stem = path.stem
-        parts = stem.rsplit("_", 1)
-        sub_index = parts[0] if len(parts) == 2 else stem
-        period = parts[1] if len(parts) == 2 else "unknown"
-
+    files = []
+    total_size = 0
+    for path in sorted(CACHE_DIR.glob("*.parquet"), key=lambda p: p.name):
         stat = path.stat()
-        entries.append({
-            "sub_index": sub_index,
-            "period": period,
-            "file": path.name,
-            "bars": bars,
-            "size": stat.st_size,
-            "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+        total_size += stat.st_size
+
+        bar_count = None
+        try:
+            df = pd.read_parquet(path, columns=["close"])
+            bar_count = len(df)
+        except Exception:
+            pass
+
+        files.append({
+            "filename": path.name,
+            "size_bytes": stat.st_size,
+            "bar_count": bar_count,
+            "modified_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
         })
 
-    return {"cache_dir": str(cdir), "entries": entries}
+    log_request(LOGGER, endpoint="/data/cache-status", extra={"file_count": len(files)})
+    return {
+        "cache_dir": str(CACHE_DIR),
+        "total_files": len(files),
+        "total_size_bytes": total_size,
+        "files": files,
+    }
 
 
-@router.get("/refresh")
-def refresh_data(
-    sub_index: str = Query(..., description="Sub-index Chinese name."),
-    period: str = Query("1day", description="K-line period."),
-) -> dict[str, Any]:
-    """Force-refresh cached OHLC data for a sub-index."""
-    period = _normalize_period(period)
+@router.post("/refresh")
+def refresh_data(request: RefreshRequest) -> dict[str, Any]:
+    """Force refresh cached data for a sub-index and period."""
+    period = _normalize_period(request.period)
     try:
-        df = _load_ohlc(sub_index, period, force_refresh=True)
-        return {"success": True, "bars": len(df), "sub_index": sub_index, "period": period}
+        df = _load_ohlc(request.sub_index, period, force_refresh=True)
+        bar_count = len(df)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Data refresh failed: {exc}") from exc
+
+    log_request(
+        LOGGER,
+        endpoint="/data/refresh",
+        sub_index=request.sub_index,
+        period=period,
+        extra={"bar_count": bar_count},
+    )
+    return {
+        "sub_index": request.sub_index,
+        "period": period,
+        "success": True,
+        "bar_count": bar_count,
+        "message": f"已刷新 {bar_count} 根K线数据",
+    }
 ```
 
-- [ ] **Step 4: 在 `run_scenario_server.py` 注册 data router**
+- [ ] **Step 4: 在 `run_scenario_server.py` 注册路由**
 
 ```python
 from src.api.data_endpoints import router as data_router
@@ -2417,21 +2933,22 @@ app.include_router(data_router)
 
 ```bash
 cd /workspace/csqaq-glove-quant
-python -m pytest tests/test_data_endpoint.py -v
+python -m pytest tests/test_data_endpoints.py -v
 ```
 
-预期：2 个测试 PASS。
+预期：4 个测试 PASS。
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add tests/test_data_endpoint.py src/api/data_endpoints.py run_scenario_server.py
-git commit -m "feat(api): 添加数据管理端点 /data/cache-status + /data/refresh"
+cd /workspace/csqaq-glove-quant
+git add src/api/data_endpoints.py tests/test_data_endpoints.py run_scenario_server.py
+git commit -m "feat(api): 添加数据管理端点（缓存状态+强制刷新）"
 ```
 
 ---
 
-## Task 11: 情景分析页面（前端）
+## Task 12: 情景分析页面
 
 **Files:**
 - Create: `frontend/src/pages/ScenarioPage.tsx`
@@ -2439,21 +2956,22 @@ git commit -m "feat(api): 添加数据管理端点 /data/cache-status + /data/re
 
 - [ ] **Step 1: 创建 `frontend/src/pages/ScenarioPage.tsx`**
 
-情景分析页面：K 线图（ECharts）、情景概率条、交易建议、相似历史、模板匹配、浪形草图、LLM 解释。使用 ECharts 替代 Lightweight Charts。
-
-```tsx
-import { useEffect, useState, useCallback } from "react";
+```typescript
+import { useCallback, useEffect, useState } from "react";
 import ReactECharts from "echarts-for-react";
-import { api } from "../lib/api";
-import { formatPercent, formatNumber } from "../lib/format";
+import { api, ApiError } from "../lib/api";
 import { Card } from "../components/Card";
-import { MetricCard } from "../components/MetricCard";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
+import { EmptyState } from "../components/EmptyState";
 import { ScenarioBar } from "../components/ScenarioBar";
-import {
-  Scenario, OhlcBar, HistoryMatch, TemplateMatch,
-  ScenarioGenerateResponse, OhlcResponse, HistoryResponse, TemplatesResponse,
+import { formatNumber, formatPercent, directionLabel, directionColor } from "../lib/format";
+import type {
+  OhlcBar,
+  Scenario,
+  HistoryMatch,
+  TemplateMatch,
+  ExplainResponse,
 } from "../types/api";
 
 interface Props {
@@ -2489,131 +3007,191 @@ export function ScenarioPage({ subIndex, period, refreshKey }: Props) {
       setHistory(histRes.matches);
       setTemplates(tmplRes.matches);
       setSelectedIdx(0);
-    } catch (e: any) {
-      setError(e.message || "加载失败");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "加载失败");
     } finally {
       setLoading(false);
     }
   }, [subIndex, period, refreshKey]);
 
-  useEffect(() => { load(); }, [load]);
-
-  // Fetch explanation when scenario selection changes
   useEffect(() => {
-    if (!scenarios.length) return;
+    load();
+  }, [load]);
+
+  // 加载选中情景的 LLM 解释
+  useEffect(() => {
+    if (scenarios.length === 0) return;
     const s = scenarios[selectedIdx];
-    api.explainScenario(s, { sub_index: subIndex, period, current_price: ohlc[ohlc.length - 1]?.close })
-      .then((res) => setExplanation(res.explanation))
+    if (!s) return;
+    api
+      .explain(s as unknown as Record<string, unknown>)
+      .then((res: ExplainResponse) => setExplanation(res.explanation))
       .catch(() => setExplanation("解释生成失败"));
-  }, [selectedIdx, scenarios, subIndex, period, ohlc]);
+  }, [scenarios, selectedIdx]);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card title="价格走势" className="lg:col-span-2"><LoadingState message="加载K线数据..." /></Card>
+        <Card title="情景概率"><LoadingState message="生成情景中..." /></Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={load} />;
+  }
+
+  const selected = scenarios[selectedIdx];
 
   const chartOption = {
     animation: false,
     grid: { left: "8%", right: "4%", top: "8%", bottom: "12%" },
     xAxis: {
-      type: "category",
+      type: "category" as const,
       data: ohlc.map((b) => b.timestamp.slice(0, 10)),
       axisLabel: { color: "#64748b", fontSize: 11 },
     },
     yAxis: {
-      type: "value",
+      type: "value" as const,
       scale: true,
       axisLabel: { color: "#64748b", fontSize: 11 },
       splitLine: { lineStyle: { color: "#e2e8f0" } },
     },
     dataZoom: [
-      { type: "inside", start: 60, end: 100 },
-      { type: "slider", start: 60, end: 100, height: 20, bottom: 8 },
+      { type: "inside" as const, start: 60, end: 100 },
+      { type: "slider" as const, start: 60, end: 100, height: 20, bottom: 8 },
     ],
-    series: [{
-      type: "candlestick",
-      data: ohlc.map((b) => [b.open, b.close, b.low, b.high]),
-      itemStyle: {
-        color: "#16a34a", color0: "#dc2626",
-        borderColor: "#16a34a", borderColor0: "#dc2626",
+    series: [
+      {
+        type: "candlestick",
+        data: ohlc.map((b) => [b.open, b.close, b.low, b.high]),
+        itemStyle: {
+          color: "#16a34a",
+          color0: "#dc2626",
+          borderColor: "#16a34a",
+          borderColor0: "#dc2626",
+        },
       },
-    }],
+    ],
   };
-
-  if (loading) return <div className="grid grid-cols-2 gap-4"><Card title="加载中"><LoadingState rows={4} /></Card><Card title="加载中"><LoadingState rows={4} /></Card></div>;
-  if (error) return <ErrorState message={error} onRetry={load} />;
-
-  const selected = scenarios[selectedIdx];
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-3 text-xs text-ink-secondary">
+      {/* 生成信息 */}
+      <div className="flex items-center gap-3 text-xs text-ink-muted">
         <span>生成耗时: {genTime.toFixed(0)}ms</span>
-        <span>K线数量: {ohlc.length}</span>
+        <span>情景数: {scenarios.length}</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {/* K线图 */}
-        <div className="col-span-2">
-          <Card title="K 线图">
-            <ReactECharts option={chartOption} style={{ height: 400 }} opts={{ renderer: "canvas" }} />
-          </Card>
-        </div>
-
-        {/* 情景概率 + 交易建议 */}
-        <div className="space-y-4">
-          <Card title="情景概率">
-            <ScenarioBar scenarios={scenarios} selectedIndex={selectedIdx} onSelect={setSelectedIdx} />
-          </Card>
-          {selected && (
-            <Card title="交易建议">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-ink-secondary">方向</span>
-                  <span className={selected.direction > 0 ? "text-bull" : selected.direction < 0 ? "text-bear" : "text-neutral"}>
-                    {selected.direction > 0 ? "偏多" : selected.direction < 0 ? "偏空" : "中性"}
-                  </span>
-                </div>
-                <div className="flex justify-between"><span className="text-ink-secondary">概率</span><span className="font-medium">{formatPercent(selected.probability)}</span></div>
-                <div className="flex justify-between"><span className="text-ink-secondary">支撑</span><span>{formatNumber(selected.support)}</span></div>
-                <div className="flex justify-between"><span className="text-ink-secondary">阻力</span><span>{formatNumber(selected.resistance)}</span></div>
-                <div className="flex justify-between"><span className="text-ink-secondary">目标</span><span className="text-bull">{formatNumber(selected.target)}</span></div>
-                <div className="flex justify-between"><span className="text-ink-secondary">止损</span><span className="text-bear">{formatNumber(selected.stop_loss)}</span></div>
-                <div className="flex justify-between"><span className="text-ink-secondary">仓位</span><span className="font-medium">{formatPercent(selected.position_size)}</span></div>
-              </div>
-            </Card>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* 左侧：K线图 */}
+        <Card title="价格走势" className="lg:col-span-2">
+          {ohlc.length === 0 ? (
+            <EmptyState message="暂无K线数据" />
+          ) : (
+            <ReactECharts option={chartOption} style={{ height: "400px" }} />
           )}
-        </div>
+        </Card>
+
+        {/* 右侧：情景概率 */}
+        <Card title="情景概率分布">
+          {scenarios.length === 0 ? (
+            <EmptyState message="暂无情景区间" />
+          ) : (
+            <ScenarioBar scenarios={scenarios} selectedIndex={selectedIdx} onSelect={setSelectedIdx} />
+          )}
+        </Card>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {/* 相似历史 */}
-        <Card title="相似历史片段">
-          <div className="space-y-1 max-h-64 overflow-auto">
-            {history.length === 0 ? <span className="text-sm text-ink-muted">暂无数据</span> : history.map((m, i) => (
-              <div key={i} className="flex justify-between items-center py-1.5 px-2 rounded hover:bg-surface-hover text-sm cursor-pointer">
-                <span className="text-ink-secondary">{m.neighbor_timestamp?.slice(0, 10) || m.candidate_start_timestamp?.slice(0, 10) || "-"}</span>
-                <span className={m.future_return_5 != null ? (m.future_return_5 > 0 ? "text-bull" : "text-bear") : "text-ink-muted"}>
-                  {m.future_return_5 != null ? formatPercent(m.future_return_5) : "-"}
+      {/* 选中情景详情 */}
+      {selected && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card title="交易建议">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-ink-primary">{selected.name}</span>
+                <span className={`text-xs ${directionColor(selected.direction_label)}`}>
+                  {directionLabel(selected.direction_label)}
                 </span>
+                <span className="text-xs text-ink-muted">概率 {formatPercent(selected.probability, 1)}</span>
               </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* 模板匹配 */}
-        <Card title="模板匹配">
-          <div className="space-y-2 max-h-64 overflow-auto">
-            {templates.length === 0 ? <span className="text-sm text-ink-muted">暂无匹配</span> : templates.map((t, i) => (
-              <div key={i} className="p-2 bg-surface-base rounded-lg">
-                <div className="text-sm font-medium text-ink-primary">{t.template_name}</div>
-                <div className="text-xs text-ink-secondary mt-0.5">
-                  置信度 {formatPercent(t.confidence)} | 目标 {t.target || "-"} | 止损 {t.stop_loss || "-"}
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-ink-muted">支撑: </span>
+                  <span className="font-medium text-ink-primary">{formatNumber(selected.support)}</span>
+                </div>
+                <div>
+                  <span className="text-ink-muted">阻力: </span>
+                  <span className="font-medium text-ink-primary">{formatNumber(selected.resistance)}</span>
+                </div>
+                <div>
+                  <span className="text-ink-muted">目标: </span>
+                  <span className="font-medium text-bull">{formatNumber(selected.target)}</span>
+                </div>
+                <div>
+                  <span className="text-ink-muted">止损: </span>
+                  <span className="font-medium text-bear">{formatNumber(selected.stop_loss)}</span>
+                </div>
+                <div>
+                  <span className="text-ink-muted">仓位: </span>
+                  <span className="font-medium text-ink-primary">{formatNumber(selected.position_size, 4)}</span>
                 </div>
               </div>
-            ))}
-          </div>
+              <p className="pt-2 text-xs text-ink-secondary">{selected.description}</p>
+            </div>
+          </Card>
+
+          <Card title="LLM 解释">
+            {explanation ? (
+              <p className="text-sm leading-relaxed text-ink-secondary">{explanation}</p>
+            ) : (
+              <LoadingState message="生成解释中..." rows={2} />
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* 相似历史 + 模板匹配 */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card title="相似历史片段">
+          {history.length === 0 ? (
+            <EmptyState message="暂无相似片段" />
+          ) : (
+            <div className="max-h-64 space-y-1.5 overflow-y-auto">
+              {history.map((h, i) => (
+                <div key={i} className="flex items-center justify-between rounded-lg border border-surface-border px-3 py-2 text-sm">
+                  <span className="text-ink-secondary">{h.candidate_start_timestamp.slice(0, 10)}</span>
+                  <div className="flex gap-3 text-xs">
+                    <span className="text-ink-muted">距离: {formatNumber(h.distance, 4)}</span>
+                    <span className={h.future_return >= 0 ? "text-bull" : "text-bear"}>
+                      {formatPercent(h.future_return)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
 
-        {/* LLM 解释 */}
-        <Card title="情景解释">
-          <div className="text-sm text-ink-primary leading-relaxed min-h-[200px]">
-            {explanation || "加载中..."}
-          </div>
+        <Card title="模板匹配">
+          {templates.length === 0 ? (
+            <EmptyState message="暂无匹配模板" />
+          ) : (
+            <div className="max-h-64 space-y-1.5 overflow-y-auto">
+              {templates.map((t, i) => (
+                <div key={i} className="rounded-lg border border-surface-border px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-ink-primary">{t.template_name}</span>
+                    <span className="text-xs text-ink-muted">
+                      置信度: {formatPercent(t.confidence, 1)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-ink-secondary">{t.suggestion}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </div>
@@ -2621,36 +3199,14 @@ export function ScenarioPage({ subIndex, period, refreshKey }: Props) {
 }
 ```
 
-- [ ] **Step 2: 修改 `frontend/src/App.tsx` 接入 ScenarioPage**
+- [ ] **Step 2: 更新 `frontend/src/App.tsx` 替换情景分析占位路由**
 
-将情景分析路由替换为实际组件：
+将 `<Route path="/" element={<Placeholder name="情景分析" />} />` 替换为：
 
-```tsx
-import { Routes, Route, Navigate } from "react-router-dom";
-import { Layout } from "./components/Layout";
+```typescript
 import { ScenarioPage } from "./pages/ScenarioPage";
-
-function Placeholder({ name }: { name: string }) {
-  return <div className="p-8"><h1 className="text-2xl font-semibold text-ink-primary">{name}</h1><p className="mt-2 text-ink-secondary">页面开发中...</p></div>;
-}
-
-export default function App() {
-  return (
-    <Layout>
-      {({ subIndex, period, refreshKey }) => (
-        <Routes>
-          <Route path="/" element={<Navigate to="/scenario" replace />} />
-          <Route path="/scenario" element={<ScenarioPage subIndex={subIndex} period={period} refreshKey={refreshKey} />} />
-          <Route path="/backtest" element={<Placeholder name="MVP 回测" />} />
-          <Route path="/ensemble" element={<Placeholder name="集成策略" />} />
-          <Route path="/trend-scan" element={<Placeholder name="趋势扫描" />} />
-          <Route path="/reports" element={<Placeholder name="报告中心" />} />
-          <Route path="/data" element={<Placeholder name="数据管理" />} />
-        </Routes>
-      )}
-    </Layout>
-  );
-}
+// ...
+<Route path="/" element={<ScenarioPage subIndex={subIndex} period={period} refreshKey={refreshKey} />} />
 ```
 
 - [ ] **Step 3: 构建验证**
@@ -2660,18 +3216,18 @@ cd /workspace/csqaq-glove-quant/frontend
 npm run build
 ```
 
-预期：构建成功。
-
 - [ ] **Step 4: 提交**
 
 ```bash
+cd /workspace/csqaq-glove-quant
 git add frontend/src/pages/ScenarioPage.tsx frontend/src/App.tsx
-git commit -m "feat(web): 实现情景分析页面（ECharts K线图 + 概率条 + 历史匹配）"
+git commit -m "feat(web): 实现情景分析页面（K线+概率+建议+历史+模板+LLM解释）"
 ```
 
 ---
 
-## Task 12: MVP 回测页面（前端）
+
+## Task 13: MVP 回测页面
 
 **Files:**
 - Create: `frontend/src/pages/BacktestPage.tsx`
@@ -2679,18 +3235,17 @@ git commit -m "feat(web): 实现情景分析页面（ECharts K线图 + 概率条
 
 - [ ] **Step 1: 创建 `frontend/src/pages/BacktestPage.tsx`**
 
-MVP 回测页面：指标卡片网格 + 净值曲线 + 交易记录表。
-
-```tsx
-import { useEffect, useState, useCallback } from "react";
+```typescript
+import { useCallback, useEffect, useState } from "react";
 import ReactECharts from "echarts-for-react";
-import { api } from "../lib/api";
-import { formatPercent, formatNumber, formatDateTime } from "../lib/format";
+import { api, ApiError } from "../lib/api";
 import { Card } from "../components/Card";
 import { MetricCard } from "../components/MetricCard";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
-import { MvpBacktestResponse } from "../types/api";
+import { EmptyState } from "../components/EmptyState";
+import { formatNumber, formatPercent, formatDate } from "../lib/format";
+import type { MvpBacktestResponse } from "../types/api";
 
 interface Props {
   subIndex: string;
@@ -2709,8 +3264,8 @@ export function BacktestPage({ subIndex, period, refreshKey }: Props) {
     try {
       const res = await api.runMvpBacktest(subIndex, period);
       setData(res);
-    } catch (e: any) {
-      setError(e.message || "回测失败");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "回测失败");
     } finally {
       setLoading(false);
     }
@@ -2718,9 +3273,16 @@ export function BacktestPage({ subIndex, period, refreshKey }: Props) {
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  if (loading) return <Card title="回测运行中"><LoadingState rows={5} /></Card>;
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5"><LoadingState rows={2} /></div>
+        <Card title="净值曲线"><LoadingState message="运行回测中..." /></Card>
+      </div>
+    );
+  }
   if (error) return <ErrorState message={error} onRetry={load} />;
-  if (!data) return null;
+  if (!data) return <EmptyState message="无回测数据" />;
 
   const m = data.metrics;
 
@@ -2728,17 +3290,16 @@ export function BacktestPage({ subIndex, period, refreshKey }: Props) {
     animation: false,
     grid: { left: "8%", right: "4%", top: "8%", bottom: "12%" },
     xAxis: {
-      type: "category",
+      type: "category" as const,
       data: data.equity_curve.map((p) => p.timestamp.slice(0, 10)),
       axisLabel: { color: "#64748b", fontSize: 11 },
     },
     yAxis: {
-      type: "value",
-      scale: true,
+      type: "value" as const, scale: true,
       axisLabel: { color: "#64748b", fontSize: 11 },
       splitLine: { lineStyle: { color: "#e2e8f0" } },
     },
-    dataZoom: [{ type: "inside", start: 0, end: 100 }],
+    dataZoom: [{ type: "inside" as const, start: 0, end: 100 }],
     series: [{
       type: "line",
       data: data.equity_curve.map((p) => p.equity),
@@ -2748,89 +3309,87 @@ export function BacktestPage({ subIndex, period, refreshKey }: Props) {
     }],
   };
 
+  const pf = !Number.isFinite(m.profit_factor)
+    ? (m.profit_factor === Infinity ? "∞" : "-")
+    : formatNumber(m.profit_factor);
+
   return (
     <div className="space-y-4">
-      {/* 指标卡片 */}
-      <div className="grid grid-cols-5 gap-3">
-        <MetricCard label="总收益率" value={formatPercent(m.total_return)} color={m.total_return >= 0 ? "bull" : "bear"} />
-        <MetricCard label="最终净值" value={formatNumber(m.final_equity)} />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+        <MetricCard label="总收益" value={formatPercent(m.total_return)} color={m.total_return >= 0 ? "text-bull" : "text-bear"} />
+        <MetricCard label="最大回撤" value={formatPercent(m.max_drawdown)} color="text-bear" />
         <MetricCard label="夏普比率" value={formatNumber(m.sharpe_ratio)} />
-        <MetricCard label="最大回撤" value={formatPercent(m.max_drawdown)} color="bear" />
-        <MetricCard label="交易次数" value={m.total_trades} />
-        <MetricCard label="胜率" value={formatPercent(m.win_rate)} color={m.win_rate >= 0.5 ? "bull" : "neutral"} />
-        <MetricCard label="盈亏比" value={m.profit_factor === Infinity ? "∞" : formatNumber(m.profit_factor)} />
-        <MetricCard label="平均收益" value={formatPercent(m.avg_trade_return)} />
-        <MetricCard label="初始资金" value={formatNumber(m.initial_capital)} />
-        <MetricCard label="标的/周期" value={`${subIndex} / ${period}`} />
+        <MetricCard label="胜率" value={formatPercent(m.win_rate)} />
+        <MetricCard label="总交易数" value={String(m.total_trades)} />
       </div>
 
-      {/* 净值曲线 */}
       <Card title="净值曲线">
-        <ReactECharts option={equityOption} style={{ height: 360 }} opts={{ renderer: "canvas" }} />
+        {data.equity_curve.length === 0 ? (
+          <EmptyState message="暂无净值数据" />
+        ) : (
+          <ReactECharts option={equityOption} style={{ height: "350px" }} />
+        )}
       </Card>
 
-      {/* 交易记录 */}
-      <Card title={`交易记录（共 ${data.trades.length} 笔）`}>
-        <div className="overflow-auto max-h-96">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-ink-secondary border-b border-surface-border">
-                <th className="text-left py-2 px-3">#</th>
-                <th className="text-left py-2 px-3">买入时间</th>
-                <th className="text-right py-2 px-3">买入价</th>
-                <th className="text-left py-2 px-3">卖出时间</th>
-                <th className="text-right py-2 px-3">卖出价</th>
-                <th className="text-left py-2 px-3">退出原因</th>
-                <th className="text-right py-2 px-3">盈亏</th>
-                <th className="text-right py-2 px-3">收益率</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.trades.map((t, i) => (
-                <tr key={i} className="border-b border-surface-border hover:bg-surface-hover">
-                  <td className="py-2 px-3 text-ink-muted">{t.entry_index}</td>
-                  <td className="py-2 px-3 text-ink-secondary">{formatDateTime(t.entry_time)}</td>
-                  <td className="py-2 px-3 text-right">{formatNumber(t.entry_price)}</td>
-                  <td className="py-2 px-3 text-ink-secondary">{formatDateTime(t.exit_time)}</td>
-                  <td className="py-2 px-3 text-right">{t.exit_price ? formatNumber(t.exit_price) : "-"}</td>
-                  <td className="py-2 px-3 text-ink-secondary">{t.exit_reason}</td>
-                  <td className={`py-2 px-3 text-right font-medium ${t.pnl >= 0 ? "text-bull" : "text-bear"}`}>{formatNumber(t.pnl)}</td>
-                  <td className={`py-2 px-3 text-right ${t.return_pct >= 0 ? "text-bull" : "text-bear"}`}>{formatPercent(t.return_pct)}</td>
+      <Card title="交易记录">
+        {data.trades.length === 0 ? (
+          <EmptyState message="无交易记录" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-border text-left text-xs text-ink-muted">
+                  <th className="pb-2 pr-3">入场时间</th>
+                  <th className="pb-2 pr-3">入场价</th>
+                  <th className="pb-2 pr-3">出场时间</th>
+                  <th className="pb-2 pr-3">出场价</th>
+                  <th className="pb-2 pr-3">出场原因</th>
+                  <th className="pb-2 pr-3">盈亏</th>
+                  <th className="pb-2">收益率</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data.trades.map((t, i) => (
+                  <tr key={i} className="border-b border-surface-border/50">
+                    <td className="py-2 pr-3 text-ink-secondary">{formatDate(t.entry_time)}</td>
+                    <td className="py-2 pr-3 text-ink-primary">{formatNumber(t.entry_price)}</td>
+                    <td className="py-2 pr-3 text-ink-secondary">{formatDate(t.exit_time)}</td>
+                    <td className="py-2 pr-3 text-ink-primary">{t.exit_price != null ? formatNumber(t.exit_price) : "-"}</td>
+                    <td className="py-2 pr-3 text-ink-muted">{t.exit_reason || "-"}</td>
+                    <td className={`py-2 pr-3 font-medium ${t.pnl >= 0 ? "text-bull" : "text-bear"}`}>{formatNumber(t.pnl)}</td>
+                    <td className={`py-2 ${t.return_pct >= 0 ? "text-bull" : "text-bear"}`}>{formatPercent(t.return_pct)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
 }
 ```
 
-- [ ] **Step 2: 修改 `frontend/src/App.tsx` 接入 BacktestPage**
+- [ ] **Step 2: 更新 `frontend/src/App.tsx` 替换回测占位路由**
 
-```tsx
+```typescript
 import { BacktestPage } from "./pages/BacktestPage";
-```
-
-将 `<Route path="/backtest" ...>` 替换为：
-
-```tsx
+// ...
 <Route path="/backtest" element={<BacktestPage subIndex={subIndex} period={period} refreshKey={refreshKey} />} />
 ```
 
 - [ ] **Step 3: 构建验证并提交**
 
 ```bash
-cd /workspace/csqaq-glove-quant/frontend
-npm run build && cd ..
+cd /workspace/csqaq-glove-quant/frontend && npm run build
+cd ..
 git add frontend/src/pages/BacktestPage.tsx frontend/src/App.tsx
-git commit -m "feat(web): 实现 MVP 回测页面（指标卡片 + 净值曲线 + 交易表）"
+git commit -m "feat(web): 实现 MVP 回测页面（指标卡片+净值曲线+交易记录表）"
 ```
 
 ---
 
-## Task 13: 集成策略页面（前端）
+## Task 14: 集成策略页面
 
 **Files:**
 - Create: `frontend/src/pages/EnsemblePage.tsx`
@@ -2838,17 +3397,16 @@ git commit -m "feat(web): 实现 MVP 回测页面（指标卡片 + 净值曲线 
 
 - [ ] **Step 1: 创建 `frontend/src/pages/EnsemblePage.tsx`**
 
-三策略对比页面：三列指标对比表 + 三条净值曲线叠加图。
-
-```tsx
-import { useEffect, useState, useCallback } from "react";
+```typescript
+import { useCallback, useEffect, useState } from "react";
 import ReactECharts from "echarts-for-react";
-import { api } from "../lib/api";
-import { formatPercent, formatNumber } from "../lib/format";
+import { api, ApiError } from "../lib/api";
 import { Card } from "../components/Card";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
-import { EnsembleBacktestResponse, BacktestMetrics } from "../types/api";
+import { EmptyState } from "../components/EmptyState";
+import { formatPercent, formatNumber } from "../lib/format";
+import type { EnsembleResponse, StrategyResult } from "../types/api";
 
 interface Props {
   subIndex: string;
@@ -2856,14 +3414,15 @@ interface Props {
   refreshKey: number;
 }
 
-const STRATEGIES: Array<{ key: "ensemble" | "pullback" | "trend"; label: string; color: string }> = [
-  { key: "ensemble", label: "集成策略", color: "#3b82f6" },
-  { key: "pullback", label: "回撤策略", color: "#16a34a" },
-  { key: "trend", label: "趋势跟踪", color: "#f59e0b" },
-];
+const STRATEGY_LABELS: Record<string, string> = {
+  ensemble: "集成策略", pullback: "回撤策略", trend_following: "趋势跟踪",
+};
+const STRATEGY_COLORS: Record<string, string> = {
+  ensemble: "#3b82f6", pullback: "#16a34a", trend_following: "#f59e0b",
+};
 
 export function EnsemblePage({ subIndex, period, refreshKey }: Props) {
-  const [data, setData] = useState<EnsembleBacktestResponse | null>(null);
+  const [data, setData] = useState<EnsembleResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -2873,8 +3432,8 @@ export function EnsemblePage({ subIndex, period, refreshKey }: Props) {
     try {
       const res = await api.runEnsemble(subIndex, period);
       setData(res);
-    } catch (e: any) {
-      setError(e.message || "集成策略运行失败");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "加载失败");
     } finally {
       setLoading(false);
     }
@@ -2882,119 +3441,88 @@ export function EnsemblePage({ subIndex, period, refreshKey }: Props) {
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  if (loading) return <Card title="三策略回测运行中"><LoadingState rows={5} /></Card>;
+  if (loading) return <Card title="集成策略对比"><LoadingState message="运行三策略回测中..." /></Card>;
   if (error) return <ErrorState message={error} onRetry={load} />;
-  if (!data) return null;
+  if (!data) return <EmptyState message="无策略数据" />;
 
-  const metricsMap: Record<string, BacktestMetrics> = {
-    ensemble: data.ensemble_metrics,
-    pullback: data.pullback_metrics,
-    trend: data.trend_metrics,
-  };
-  const equityMap: Record<string, { timestamp: string; equity: number }[]> = {
-    ensemble: data.ensemble_equity,
-    pullback: data.pullback_equity,
-    trend: data.trend_equity,
-  };
+  const strategies: StrategyResult[] = [data.ensemble, data.pullback, data.trend_following];
 
-  const chartOption = {
+  const equityOption = {
     animation: false,
-    legend: { data: STRATEGIES.map((s) => s.label), top: 0, textStyle: { color: "#64748b" } },
-    grid: { left: "8%", right: "4%", top: "10%", bottom: "12%" },
-    xAxis: {
-      type: "category",
-      data: equityMap.ensemble.map((p) => p.timestamp.slice(0, 10)),
-      axisLabel: { color: "#64748b", fontSize: 11 },
-    },
-    yAxis: {
-      type: "value",
-      scale: true,
-      axisLabel: { color: "#64748b", fontSize: 11 },
-      splitLine: { lineStyle: { color: "#e2e8f0" } },
-    },
-    dataZoom: [{ type: "inside", start: 0, end: 100 }],
-    series: STRATEGIES.map((s) => ({
-      name: s.label,
+    grid: { left: "8%", right: "4%", top: "8%", bottom: "12%" },
+    legend: { data: strategies.map((s) => STRATEGY_LABELS[s.strategy_name] || s.strategy_name), top: 0, textStyle: { color: "#64748b", fontSize: 12 } },
+    xAxis: { type: "category" as const, data: data.ensemble.equity_curve.map((p) => p.timestamp.slice(0, 10)), axisLabel: { color: "#64748b", fontSize: 11 } },
+    yAxis: { type: "value" as const, scale: true, axisLabel: { color: "#64748b", fontSize: 11 }, splitLine: { lineStyle: { color: "#e2e8f0" } } },
+    dataZoom: [{ type: "inside" as const, start: 0, end: 100 }],
+    series: strategies.map((s) => ({
+      name: STRATEGY_LABELS[s.strategy_name] || s.strategy_name,
       type: "line",
-      data: equityMap[s.key].map((p) => p.equity),
+      data: s.equity_curve.map((p) => p.equity),
       smooth: false,
-      lineStyle: { color: s.color, width: 2 },
+      lineStyle: { color: STRATEGY_COLORS[s.strategy_name] || "#999", width: 2 },
       symbol: "none",
     })),
   };
 
-  const metricRows: Array<{ label: string; key: keyof BacktestMetrics; isPercent?: boolean }> = [
-    { label: "总收益率", key: "total_return", isPercent: true },
-    { label: "最终净值", key: "final_equity" },
-    { label: "夏普比率", key: "sharpe_ratio" },
-    { label: "最大回撤", key: "max_drawdown", isPercent: true },
-    { label: "交易次数", key: "total_trades" },
-    { label: "胜率", key: "win_rate", isPercent: true },
-    { label: "盈亏比", key: "profit_factor" },
-    { label: "平均收益", key: "avg_trade_return", isPercent: true },
-  ];
-
   return (
     <div className="space-y-4">
       <Card title="三策略净值曲线对比">
-        <ReactECharts option={chartOption} style={{ height: 400 }} opts={{ renderer: "canvas" }} />
+        <ReactECharts option={equityOption} style={{ height: "400px" }} />
       </Card>
-
       <Card title="指标对比">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-surface-border">
-              <th className="text-left py-2 px-3 text-xs text-ink-secondary">指标</th>
-              {STRATEGIES.map((s) => (
-                <th key={s.key} className="text-right py-2 px-3 text-sm font-medium" style={{ color: s.color }}>{s.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {metricRows.map((row) => (
-              <tr key={row.key} className="border-b border-surface-border hover:bg-surface-hover">
-                <td className="py-2 px-3 text-ink-secondary">{row.label}</td>
-                {STRATEGIES.map((s) => {
-                  const val = metricsMap[s.key][row.key];
-                  const display = row.isPercent
-                    ? formatPercent(val as number)
-                    : val === Infinity ? "∞" : formatNumber(val as number);
-                  return <td key={s.key} className="py-2 px-3 text-right font-medium">{display}</td>;
-                })}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-surface-border text-left text-xs text-ink-muted">
+                <th className="pb-2 pr-4">策略</th><th className="pb-2 pr-4">总收益</th><th className="pb-2 pr-4">最大回撤</th>
+                <th className="pb-2 pr-4">夏普</th><th className="pb-2 pr-4">胜率</th><th className="pb-2 pr-4">盈亏比</th><th className="pb-2">交易数</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {strategies.map((s) => {
+                const m = s.metrics;
+                const pf = !Number.isFinite(m.profit_factor) ? (m.profit_factor === Infinity ? "∞" : "-") : formatNumber(m.profit_factor);
+                return (
+                  <tr key={s.strategy_name} className="border-b border-surface-border/50">
+                    <td className="py-2 pr-4 font-medium text-ink-primary">{STRATEGY_LABELS[s.strategy_name] || s.strategy_name}</td>
+                    <td className={`py-2 pr-4 ${m.total_return >= 0 ? "text-bull" : "text-bear"}`}>{formatPercent(m.total_return)}</td>
+                    <td className="py-2 pr-4 text-bear">{formatPercent(m.max_drawdown)}</td>
+                    <td className="py-2 pr-4 text-ink-primary">{formatNumber(m.sharpe_ratio)}</td>
+                    <td className="py-2 pr-4 text-ink-primary">{formatPercent(m.win_rate)}</td>
+                    <td className="py-2 pr-4 text-ink-primary">{pf}</td>
+                    <td className="py-2 text-ink-secondary">{m.total_trades}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </Card>
     </div>
   );
 }
 ```
 
-- [ ] **Step 2: 修改 `frontend/src/App.tsx` 接入 EnsemblePage**
+- [ ] **Step 2: 更新 `frontend/src/App.tsx` 替换集成策略占位路由**
 
-```tsx
+```typescript
 import { EnsemblePage } from "./pages/EnsemblePage";
-```
-
-替换路由：
-
-```tsx
+// ...
 <Route path="/ensemble" element={<EnsemblePage subIndex={subIndex} period={period} refreshKey={refreshKey} />} />
 ```
 
 - [ ] **Step 3: 构建验证并提交**
 
 ```bash
-cd /workspace/csqaq-glove-quant/frontend
-npm run build && cd ..
+cd /workspace/csqaq-glove-quant/frontend && npm run build
+cd ..
 git add frontend/src/pages/EnsemblePage.tsx frontend/src/App.tsx
-git commit -m "feat(web): 实现集成策略页面（三策略净值对比 + 指标对比表）"
+git commit -m "feat(web): 实现集成策略页面（三策略净值叠加+指标对比表）"
 ```
 
 ---
 
-## Task 14: 趋势扫描页面（前端）
+## Task 15: 趋势扫描页面（含轮询清理/指数退避）
 
 **Files:**
 - Create: `frontend/src/pages/TrendScanPage.tsx`
@@ -3002,17 +3530,16 @@ git commit -m "feat(web): 实现集成策略页面（三策略净值对比 + 指
 
 - [ ] **Step 1: 创建 `frontend/src/pages/TrendScanPage.tsx`**
 
-趋势扫描页面：启动扫描按钮、进度条、结果排名表、参数详情展开。
-
-```tsx
-import { useState, useCallback, useRef } from "react";
+```typescript
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactECharts from "echarts-for-react";
-import { api } from "../lib/api";
-import { formatPercent, formatNumber } from "../lib/format";
+import { api, ApiError } from "../lib/api";
 import { Card } from "../components/Card";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
-import { TrendScanResult, TaskStatusResponse } from "../types/api";
+import { EmptyState } from "../components/EmptyState";
+import { formatPercent, formatNumber } from "../lib/format";
+import type { TaskStatusResponse, ScanEntry } from "../types/api";
 
 interface Props {
   subIndex: string;
@@ -3020,178 +3547,151 @@ interface Props {
   refreshKey: number;
 }
 
-export function TrendScanPage({ subIndex, period }: Props) {
-  const [taskId, setTaskId] = useState("");
+const MAX_POLL_MS = 5_000;
+const BASE_POLL_MS = 1_000;
+
+export function TrendScanPage({ subIndex, period, refreshKey }: Props) {
   const [status, setStatus] = useState<TaskStatusResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const pollRef = useRef<number | null>(null);
+  const pollIntervalRef = useRef(BASE_POLL_MS);
 
   const startScan = useCallback(async () => {
     setLoading(true);
     setError("");
     setStatus(null);
+    pollIntervalRef.current = BASE_POLL_MS;
     try {
       const { task_id } = await api.startTrendScan(subIndex, period);
-      setTaskId(task_id);
-      // Poll for status
       const poll = async () => {
         try {
           const s = await api.getTaskStatus(task_id);
           setStatus(s);
           if (s.status === "running" || s.status === "pending") {
-            pollRef.current = window.setTimeout(poll, 1000);
+            pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, MAX_POLL_MS);
+            pollRef.current = window.setTimeout(poll, pollIntervalRef.current);
+          } else if (s.status === "failed" && s.error) {
+            setError(`扫描失败: ${s.error}`);
           }
-        } catch (e: any) {
-          setError(e.message);
+        } catch (e) {
+          setError(e instanceof ApiError ? e.message : "轮询状态失败");
         }
       };
       poll();
-    } catch (e: any) {
-      setError(e.message || "启动扫描失败");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "启动扫描失败");
     } finally {
       setLoading(false);
     }
   }, [subIndex, period]);
 
-  const results = status?.result || [];
-  const isRunning = status?.status === "running" || status?.status === "pending";
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
+    };
+  }, [refreshKey]);
 
-  // Chart: top 10 results bar chart
-  const topResults = results.slice(0, 10);
-  const chartOption = topResults.length > 0 ? {
+  const isRunning = status?.status === "running" || status?.status === "pending";
+  const result = status?.result;
+
+  const top10Option = result && result.top_10.length > 0 ? {
     animation: false,
-    grid: { left: "15%", right: "4%", top: "8%", bottom: "12%" },
-    xAxis: {
-      type: "value",
-      axisLabel: { color: "#64748b", fontSize: 11, formatter: (v: number) => `${(v * 100).toFixed(0)}%` },
-      splitLine: { lineStyle: { color: "#e2e8f0" } },
-    },
-    yAxis: {
-      type: "category",
-      data: topResults.map((_, i) => `#${i + 1}`).reverse(),
-      axisLabel: { color: "#64748b", fontSize: 11 },
-    },
-    series: [{
-      type: "bar",
-      data: topResults.map((r) => r.total_return).reverse(),
-      itemStyle: {
-        color: (params: any) => params.value >= 0 ? "#16a34a" : "#dc2626",
-      },
-    }],
+    grid: { left: "10%", right: "4%", top: "8%", bottom: "15%" },
+    xAxis: { type: "category" as const, data: result.top_10.map((_, i) => `#${i + 1}`), axisLabel: { color: "#64748b", fontSize: 11 } },
+    yAxis: { type: "value" as const, axisLabel: { color: "#64748b", fontSize: 11, formatter: (v: number) => `${(v * 100).toFixed(0)}%` }, splitLine: { lineStyle: { color: "#e2e8f0" } } },
+    series: [{ type: "bar", data: result.top_10.map((e: ScanEntry) => ({ value: e.total_return, itemStyle: { color: e.total_return >= 0 ? "#16a34a" : "#dc2626" } })) }],
   } : null;
 
   return (
     <div className="space-y-4">
-      <Card title="趋势跟踪参数扫描">
+      <Card title="趋势参数扫描">
         <div className="flex items-center gap-4">
-          <button
-            onClick={startScan}
-            disabled={isRunning}
-            className="px-4 py-2 bg-brand-500 text-white text-sm rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
+          <button onClick={startScan} disabled={isRunning || loading}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50">
             {isRunning ? "扫描中..." : "启动扫描"}
           </button>
-          <span className="text-sm text-ink-secondary">标的: {subIndex} | 周期: {period}</span>
+          {status && (
+            <div className="flex items-center gap-3 text-sm">
+              <span className="text-ink-secondary">状态: {status.status}</span>
+              <span className="text-ink-muted">{status.message}</span>
+              {isRunning && (
+                <div className="h-2 w-32 overflow-hidden rounded-full bg-surface-hover">
+                  <div className="h-full rounded-full bg-brand-500 transition-all duration-300" style={{ width: `${status.progress * 100}%` }} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
-
-        {status && (
-          <div className="mt-4">
-            <div className="flex items-center gap-3 mb-2">
-              <span className={`text-sm font-medium ${
-                status.status === "completed" ? "text-bull" :
-                status.status === "failed" ? "text-bear" : "text-brand-500"
-              }`}>
-                {status.status === "completed" ? "已完成" :
-                 status.status === "failed" ? "失败" :
-                 status.status === "running" ? "运行中" : "等待中"}
-              </span>
-              <span className="text-xs text-ink-secondary">{status.message}</span>
-            </div>
-            <div className="w-full h-2 bg-surface-hover rounded-full overflow-hidden">
-              <div
-                className="h-full bg-brand-500 rounded-full transition-all duration-500"
-                style={{ width: `${status.progress * 100}%` }}
-              />
-            </div>
-            <span className="text-xs text-ink-muted mt-1 block">{(status.progress * 100).toFixed(0)}%</span>
-          </div>
-        )}
-
-        {error && <ErrorState message={error} onRetry={startScan} />}
       </Card>
 
-      {chartOption && (
-        <Card title="收益率 Top 10">
-          <ReactECharts option={chartOption} style={{ height: 320 }} opts={{ renderer: "canvas" }} />
-        </Card>
-      )}
+      {error && !isRunning && <ErrorState message={error} onRetry={startScan} />}
 
-      {results.length > 0 && (
-        <Card title={`扫描结果（共 ${results.length} 组参数，按收益率排序）`}>
-          <div className="overflow-auto max-h-96">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-ink-secondary border-b border-surface-border">
-                  <th className="text-left py-2 px-3">排名</th>
-                  <th className="text-left py-2 px-3">参数</th>
-                  <th className="text-right py-2 px-3">总收益</th>
-                  <th className="text-right py-2 px-3">夏普</th>
-                  <th className="text-right py-2 px-3">最大回撤</th>
-                  <th className="text-right py-2 px-3">胜率</th>
-                  <th className="text-right py-2 px-3">交易数</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((r, i) => (
-                  <tr key={i} className="border-b border-surface-border hover:bg-surface-hover">
-                    <td className="py-2 px-3 text-ink-muted">#{i + 1}</td>
-                    <td className="py-2 px-3 text-xs text-ink-secondary">
-                      {Object.entries(r.params).map(([k, v]) => `${k}=${String(v)}`).join(", ")}
-                    </td>
-                    <td className={`py-2 px-3 text-right font-medium ${r.total_return >= 0 ? "text-bull" : "text-bear"}`}>
-                      {formatPercent(r.total_return)}
-                    </td>
-                    <td className="py-2 px-3 text-right">{formatNumber(r.sharpe_ratio)}</td>
-                    <td className="py-2 px-3 text-right text-bear">{formatPercent(r.max_drawdown)}</td>
-                    <td className="py-2 px-3 text-right">{formatPercent(r.win_rate)}</td>
-                    <td className="py-2 px-3 text-right">{r.total_trades}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {result && (
+        <>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card title="Top 10 收益率">
+              {top10Option ? <ReactECharts option={top10Option} style={{ height: "300px" }} /> : <EmptyState />}
+            </Card>
+            <Card title="扫描摘要">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-ink-muted">总组合数</span><span className="font-medium text-ink-primary">{result.total_combinations}</span></div>
+                <div className="flex justify-between"><span className="text-ink-muted">非负收益数</span><span className="font-medium text-bull">{result.non_negative_count}</span></div>
+                <div className="flex justify-between"><span className="text-ink-muted">正收益占比</span><span className="font-medium text-ink-primary">{formatPercent(result.non_negative_count / result.total_combinations)}</span></div>
+              </div>
+            </Card>
           </div>
-        </Card>
+          <Card title="参数排名详情">
+            {result.top_10.length === 0 ? <EmptyState /> : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b border-surface-border text-left text-xs text-ink-muted">
+                    <th className="pb-2 pr-3">排名</th><th className="pb-2 pr-3">总收益</th><th className="pb-2 pr-3">最大回撤</th>
+                    <th className="pb-2 pr-3">夏普</th><th className="pb-2 pr-3">胜率</th><th className="pb-2">关键参数</th>
+                  </tr></thead>
+                  <tbody>
+                    {result.top_10.map((e: ScanEntry, i: number) => (
+                      <tr key={i} className="border-b border-surface-border/50">
+                        <td className="py-2 pr-3 font-medium text-ink-primary">#{i + 1}</td>
+                        <td className={`py-2 pr-3 ${e.total_return >= 0 ? "text-bull" : "text-bear"}`}>{formatPercent(e.total_return)}</td>
+                        <td className="py-2 pr-3 text-bear">{formatPercent(e.max_drawdown)}</td>
+                        <td className="py-2 pr-3 text-ink-primary">{formatNumber(e.sharpe_ratio)}</td>
+                        <td className="py-2 pr-3 text-ink-primary">{formatPercent(e.win_rate)}</td>
+                        <td className="py-2 text-xs text-ink-muted">ADX={String(e.params.trend_strength_threshold)}, DI={String(e.params.use_di_filter)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </>
       )}
     </div>
   );
 }
 ```
 
-- [ ] **Step 2: 修改 `frontend/src/App.tsx` 接入 TrendScanPage**
+- [ ] **Step 2: 更新 `frontend/src/App.tsx` 替换趋势扫描占位路由**
 
-```tsx
+```typescript
 import { TrendScanPage } from "./pages/TrendScanPage";
-```
-
-替换路由：
-
-```tsx
+// ...
 <Route path="/trend-scan" element={<TrendScanPage subIndex={subIndex} period={period} refreshKey={refreshKey} />} />
 ```
 
 - [ ] **Step 3: 构建验证并提交**
 
 ```bash
-cd /workspace/csqaq-glove-quant/frontend
-npm run build && cd ..
+cd /workspace/csqaq-glove-quant/frontend && npm run build
+cd ..
 git add frontend/src/pages/TrendScanPage.tsx frontend/src/App.tsx
-git commit -m "feat(web): 实现趋势扫描页面（异步任务 + 进度条 + 结果排名表）"
+git commit -m "feat(web): 实现趋势扫描页面（异步任务+指数退避轮询+Top10图表）"
 ```
 
 ---
 
-## Task 15: 报告中心页面（前端）
+## Task 16: 报告中心页面
 
 **Files:**
 - Create: `frontend/src/pages/ReportsPage.tsx`
@@ -3199,21 +3699,20 @@ git commit -m "feat(web): 实现趋势扫描页面（异步任务 + 进度条 + 
 
 - [ ] **Step 1: 创建 `frontend/src/pages/ReportsPage.tsx`**
 
-报告中心页面：左侧报告文件列表，右侧选中报告的 JSON 内容可视化展示。
-
-```tsx
-import { useEffect, useState, useCallback } from "react";
-import { api } from "../lib/api";
-import { formatBytes, formatDateTime } from "../lib/format";
+```typescript
+import { useCallback, useEffect, useState } from "react";
+import { api, ApiError } from "../lib/api";
 import { Card } from "../components/Card";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
-import { ReportFile } from "../types/api";
+import { EmptyState } from "../components/EmptyState";
+import { formatFileSize, formatDate } from "../lib/format";
+import type { ReportFile, ReportContentResponse } from "../types/api";
 
 export function ReportsPage() {
-  const [reports, setReports] = useState<ReportFile[]>([]);
+  const [files, setFiles] = useState<ReportFile[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [content, setContent] = useState<Record<string, unknown> | null>(null);
+  const [content, setContent] = useState<ReportContentResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -3222,113 +3721,90 @@ export function ReportsPage() {
     setError("");
     try {
       const res = await api.listReports();
-      setReports(res.reports);
+      setFiles(res.reports);
       if (res.reports.length > 0 && !selected) {
-        setSelected(res.reports[0].name);
+        setSelected(res.reports[0].filename);
       }
-    } catch (e: any) {
-      setError(e.message || "加载报告列表失败");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "加载报告列表失败");
     } finally {
       setLoading(false);
     }
-  }, [selected]);
+  }, []);
 
   useEffect(() => { loadList(); }, [loadList]);
 
   useEffect(() => {
     if (!selected) return;
-    api.getReport(selected)
-      .then((res) => setContent(res.content))
-      .catch((e) => setError(e.message));
+    api.getReport(selected).then(setContent).catch((e: unknown) => {
+      setError(e instanceof ApiError ? e.message : "加载报告内容失败");
+    });
   }, [selected]);
 
-  const renderValue = (value: unknown, depth = 0): string => {
-    if (value === null) return "null";
-    if (typeof value === "string") return value;
-    if (typeof value === "number") return value.toLocaleString("zh-CN");
-    if (typeof value === "boolean") return value ? "是" : "否";
-    return JSON.stringify(value, null, 2);
-  };
-
-  const renderContent = (data: Record<string, unknown>) => {
-    const entries = Object.entries(data);
-    return (
-      <div className="space-y-2">
-        {entries.map(([key, value]) => (
-          <div key={key} className="flex gap-3 py-1.5 border-b border-surface-border">
-            <span className="text-sm text-ink-secondary w-48 shrink-0">{key}</span>
-            <span className="text-sm text-ink-primary flex-1 break-all">
-              {typeof value === "object" && value !== null
-                ? <pre className="text-xs bg-surface-base p-2 rounded overflow-auto">{JSON.stringify(value, null, 2)}</pre>
-                : renderValue(value)
-              }
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  if (loading) return <Card title="加载中"><LoadingState rows={4} /></Card>;
+  if (loading) return <Card title="报告中心"><LoadingState message="加载报告列表..." /></Card>;
   if (error) return <ErrorState message={error} onRetry={loadList} />;
 
   return (
-    <div className="grid grid-cols-4 gap-4">
-      {/* 报告列表 */}
-      <Card title={`报告文件（${reports.length}）`}>
-        <div className="space-y-1 max-h-[600px] overflow-auto">
-          {reports.map((r) => (
-            <div
-              key={r.name}
-              onClick={() => setSelected(r.name)}
-              className={`cursor-pointer p-2.5 rounded-lg transition-colors ${
-                selected === r.name ? "bg-brand-50 ring-1 ring-brand-100" : "hover:bg-surface-hover"
-              }`}
-            >
-              <div className="text-sm text-ink-primary truncate">{r.name}</div>
-              <div className="text-xs text-ink-muted mt-0.5">
-                {formatBytes(r.size)} · {formatDateTime(r.modified)}
-              </div>
-            </div>
-          ))}
-        </div>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <Card title="报告列表" className="md:col-span-1">
+        {files.length === 0 ? (
+          <EmptyState message="暂无报告文件" />
+        ) : (
+          <div className="max-h-[500px] space-y-1 overflow-y-auto">
+            {files.map((f) => (
+              <button
+                key={f.filename}
+                onClick={() => setSelected(f.filename)}
+                className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
+                  selected === f.filename
+                    ? "border-brand-500 bg-brand-50"
+                    : "border-surface-border bg-surface-card hover:bg-surface-hover"
+                }`}
+              >
+                <div className="truncate font-medium text-ink-primary">{f.filename}</div>
+                <div className="mt-0.5 text-xs text-ink-muted">
+                  {formatFileSize(f.size_bytes)} · {formatDate(f.modified_at)}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </Card>
 
-      {/* 报告内容 */}
-      <div className="col-span-3">
-        <Card title={selected || "选择报告"}>
-          {content ? renderContent(content) : <span className="text-sm text-ink-muted">请选择左侧报告查看内容</span>}
-        </Card>
-      </div>
+      <Card title="报告内容" className="md:col-span-2">
+        {content ? (
+          <pre className="max-h-[500px] overflow-auto rounded-lg bg-surface-base p-4 text-xs text-ink-secondary">
+            {JSON.stringify(content.content, null, 2)}
+          </pre>
+        ) : (
+          <EmptyState message="选择左侧报告查看内容" />
+        )}
+      </Card>
     </div>
   );
 }
 ```
 
-- [ ] **Step 2: 修改 `frontend/src/App.tsx` 接入 ReportsPage**
+- [ ] **Step 2: 更新 `frontend/src/App.tsx` 替换报告中心占位路由**
 
-```tsx
+```typescript
 import { ReportsPage } from "./pages/ReportsPage";
-```
-
-替换路由：
-
-```tsx
+// ...
 <Route path="/reports" element={<ReportsPage />} />
 ```
 
 - [ ] **Step 3: 构建验证并提交**
 
 ```bash
-cd /workspace/csqaq-glove-quant/frontend
-npm run build && cd ..
+cd /workspace/csqaq-glove-quant/frontend && npm run build
+cd ..
 git add frontend/src/pages/ReportsPage.tsx frontend/src/App.tsx
-git commit -m "feat(web): 实现报告中心页面（文件列表 + JSON 可视化展示）"
+git commit -m "feat(web): 实现报告中心页面（文件列表+JSON内容查看）"
 ```
 
 ---
 
-## Task 16: 数据管理页面（前端）
+## Task 17: 数据管理页面
 
 **Files:**
 - Create: `frontend/src/pages/DataManagementPage.tsx`
@@ -3336,34 +3812,37 @@ git commit -m "feat(web): 实现报告中心页面（文件列表 + JSON 可视�
 
 - [ ] **Step 1: 创建 `frontend/src/pages/DataManagementPage.tsx`**
 
-数据管理页面：缓存文件表格（子指数、周期、K线数、大小、修改时间）、刷新按钮。
-
-```tsx
-import { useEffect, useState, useCallback } from "react";
-import { api } from "../lib/api";
-import { formatBytes, formatDateTime } from "../lib/format";
+```typescript
+import { useCallback, useEffect, useState } from "react";
+import { api, ApiError } from "../lib/api";
 import { Card } from "../components/Card";
 import { MetricCard } from "../components/MetricCard";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
-import { CacheEntry } from "../types/api";
+import { EmptyState } from "../components/EmptyState";
+import { formatFileSize, formatDate, formatNumber } from "../lib/format";
+import type { CacheStatusResponse } from "../types/api";
 
-export function DataManagementPage() {
-  const [entries, setEntries] = useState<CacheEntry[]>([]);
-  const [cacheDir, setCacheDir] = useState("");
+interface Props {
+  subIndex: string;
+  period: string;
+}
+
+export function DataManagementPage({ subIndex, period }: Props) {
+  const [data, setData] = useState<CacheStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [refreshing, setRefreshing] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const res = await api.getCacheStatus();
-      setEntries(res.entries);
-      setCacheDir(res.cache_dir);
-    } catch (e: any) {
-      setError(e.message || "加载缓存状态失败");
+      setData(res);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "加载缓存状态失败");
     } finally {
       setLoading(false);
     }
@@ -3371,112 +3850,348 @@ export function DataManagementPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleRefresh = async (subIndex: string, period: string) => {
-    setRefreshing(`${subIndex}_${period}`);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setRefreshMsg("");
     try {
-      await api.refreshData(subIndex, period);
+      const res = await api.refreshData(subIndex, period);
+      setRefreshMsg(res.message);
       await load();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setRefreshMsg(e instanceof ApiError ? e.message : "刷新失败");
     } finally {
-      setRefreshing(null);
+      setRefreshing(false);
     }
   };
 
-  const totalBars = entries.reduce((sum, e) => sum + e.bars, 0);
-  const totalSize = entries.reduce((sum, e) => sum + e.size, 0);
-
-  if (loading) return <Card title="加载中"><LoadingState rows={4} /></Card>;
+  if (loading) return <Card title="数据管理"><LoadingState message="加载缓存状态..." /></Card>;
   if (error) return <ErrorState message={error} onRetry={load} />;
+  if (!data) return <EmptyState />;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
-        <MetricCard label="缓存文件数" value={entries.length} />
-        <MetricCard label="总K线数" value={totalBars.toLocaleString("zh-CN")} />
-        <MetricCard label="总大小" value={formatBytes(totalSize)} />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <MetricCard label="缓存文件数" value={String(data.total_files)} />
+        <MetricCard label="总占用空间" value={formatFileSize(data.total_size_bytes)} />
+        <div className="rounded-lg border border-surface-border bg-surface-card p-4">
+          <p className="text-xs font-medium text-ink-secondary">数据刷新</p>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="mt-2 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-50"
+          >
+            {refreshing ? "刷新中..." : `刷新 ${subIndex} ${period}`}
+          </button>
+          {refreshMsg && <p className="mt-1 text-xs text-ink-muted">{refreshMsg}</p>}
+        </div>
       </div>
 
-      <Card title="缓存文件列表">
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-ink-secondary border-b border-surface-border">
-                <th className="text-left py-2 px-3">子指数</th>
-                <th className="text-left py-2 px-3">周期</th>
-                <th className="text-left py-2 px-3">文件名</th>
-                <th className="text-right py-2 px-3">K线数</th>
-                <th className="text-right py-2 px-3">大小</th>
-                <th className="text-left py-2 px-3">修改时间</th>
-                <th className="text-center py-2 px-3">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((e, i) => (
-                <tr key={i} className="border-b border-surface-border hover:bg-surface-hover">
-                  <td className="py-2 px-3 font-medium">{e.sub_index}</td>
-                  <td className="py-2 px-3 text-ink-secondary">{e.period}</td>
-                  <td className="py-2 px-3 text-ink-muted text-xs font-mono">{e.file}</td>
-                  <td className="py-2 px-3 text-right">{e.bars.toLocaleString("zh-CN")}</td>
-                  <td className="py-2 px-3 text-right text-ink-secondary">{formatBytes(e.size)}</td>
-                  <td className="py-2 px-3 text-ink-secondary text-xs">{formatDateTime(e.modified)}</td>
-                  <td className="py-2 px-3 text-center">
-                    <button
-                      onClick={() => handleRefresh(e.sub_index, e.period)}
-                      disabled={refreshing === `${e.sub_index}_${e.period}`}
-                      className="px-2.5 py-1 text-xs bg-brand-50 text-brand-600 rounded hover:bg-brand-100 disabled:opacity-50 transition-colors"
-                    >
-                      {refreshing === `${e.sub_index}_${e.period}` ? "刷新中..." : "刷新"}
-                    </button>
-                  </td>
+      <Card title="缓存文件详情">
+        {data.files.length === 0 ? (
+          <EmptyState message="暂无缓存文件" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-border text-left text-xs text-ink-muted">
+                  <th className="pb-2 pr-3">文件名</th>
+                  <th className="pb-2 pr-3">大小</th>
+                  <th className="pb-2 pr-3">K线数</th>
+                  <th className="pb-2">修改时间</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data.files.map((f) => (
+                  <tr key={f.filename} className="border-b border-surface-border/50">
+                    <td className="py-2 pr-3 font-medium text-ink-primary">{f.filename}</td>
+                    <td className="py-2 pr-3 text-ink-secondary">{formatFileSize(f.size_bytes)}</td>
+                    <td className="py-2 pr-3 text-ink-secondary">{f.bar_count != null ? formatNumber(f.bar_count, 0) : "-"}</td>
+                    <td className="py-2 text-ink-muted">{formatDate(f.modified_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
-
-      <div className="text-xs text-ink-muted">缓存目录: {cacheDir}</div>
     </div>
   );
 }
 ```
 
-- [ ] **Step 2: 修改 `frontend/src/App.tsx` 接入 DataManagementPage**
+- [ ] **Step 2: 更新 `frontend/src/App.tsx` 替换数据管理占位路由**
 
-```tsx
+```typescript
 import { DataManagementPage } from "./pages/DataManagementPage";
-```
-
-替换路由：
-
-```tsx
-<Route path="/data" element={<DataManagementPage />} />
+// ...
+<Route path="/data" element={<DataManagementPage subIndex={subIndex} period={period} />} />
 ```
 
 - [ ] **Step 3: 构建验证并提交**
 
 ```bash
-cd /workspace/csqaq-glove-quant/frontend
-npm run build && cd ..
+cd /workspace/csqaq-glove-quant/frontend && npm run build
+cd ..
 git add frontend/src/pages/DataManagementPage.tsx frontend/src/App.tsx
-git commit -m "feat(web): 实现数据管理页面（缓存列表 + 刷新操作）"
+git commit -m "feat(web): 实现数据管理页面（缓存统计+文件列表+强制刷新）"
 ```
 
 ---
 
-## Task 17: 端到端集成验证与旧前端清理
+## Task 18: 代码分割与懒加载
+
+**Files:**
+- Modify: `frontend/src/App.tsx`
+
+- [ ] **Step 1: 更新 `frontend/src/App.tsx` 使用 React.lazy + Suspense 实现路由级代码分割**
+
+```typescript
+import { lazy, Suspense } from "react";
+import { Routes, Route } from "react-router-dom";
+import { ErrorBoundary } from "./ErrorBoundary";
+import { Layout } from "./components/Layout";
+import { LoadingState } from "./components/LoadingState";
+
+const ScenarioPage = lazy(() => import("./pages/ScenarioPage").then((m) => ({ default: m.ScenarioPage })));
+const BacktestPage = lazy(() => import("./pages/BacktestPage").then((m) => ({ default: m.BacktestPage })));
+const EnsemblePage = lazy(() => import("./pages/EnsemblePage").then((m) => ({ default: m.EnsemblePage })));
+const TrendScanPage = lazy(() => import("./pages/TrendScanPage").then((m) => ({ default: m.TrendScanPage })));
+const ReportsPage = lazy(() => import("./pages/ReportsPage").then((m) => ({ default: m.ReportsPage })));
+const DataManagementPage = lazy(() => import("./pages/DataManagementPage").then((m) => ({ default: m.DataManagementPage })));
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <Layout>
+        {({ subIndex, period, refreshKey }) => (
+          <Suspense fallback={<LoadingState message="加载页面..." />}>
+            <Routes>
+              <Route path="/" element={<ScenarioPage subIndex={subIndex} period={period} refreshKey={refreshKey} />} />
+              <Route path="/backtest" element={<BacktestPage subIndex={subIndex} period={period} refreshKey={refreshKey} />} />
+              <Route path="/ensemble" element={<EnsemblePage subIndex={subIndex} period={period} refreshKey={refreshKey} />} />
+              <Route path="/trend-scan" element={<TrendScanPage subIndex={subIndex} period={period} refreshKey={refreshKey} />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/data" element={<DataManagementPage subIndex={subIndex} period={period} />} />
+              <Route path="*" element={
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-ink-muted">
+                  <p className="text-4xl font-bold">404</p>
+                  <p className="text-sm">页面不存在</p>
+                </div>
+              } />
+            </Routes>
+          </Suspense>
+        )}
+      </Layout>
+    </ErrorBoundary>
+  );
+}
+```
+
+- [ ] **Step 2: 构建验证代码分割生效**
+
+```bash
+cd /workspace/csqaq-glove-quant/frontend
+npm run build
+```
+
+预期：`dist/assets/` 目录下生成多个按路由分割的 JS chunk 文件（如 `ScenarioPage-*.js`、`BacktestPage-*.js` 等），而非单一 bundle。
+
+- [ ] **Step 3: 提交**
+
+```bash
+cd /workspace/csqaq-glove-quant
+git add frontend/src/App.tsx
+git commit -m "perf(web): 实现 React.lazy 路由级代码分割与 Suspense 懒加载"
+```
+
+---
+
+## Task 19: 前端单元测试（Vitest）
+
+**Files:**
+- Create: `frontend/src/__tests__/format.test.ts`
+- Create: `frontend/src/__tests__/api.test.ts`
+
+- [ ] **Step 1: 创建 `frontend/src/__tests__/format.test.ts`**
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { formatPercent, formatNumber, formatDate, formatFileSize, directionLabel, directionColor } from "../lib/format";
+
+describe("formatPercent", () => {
+  it("formats positive numbers as percentage", () => {
+    expect(formatPercent(0.15)).toBe("15.00%");
+  });
+  it("formats negative numbers", () => {
+    expect(formatPercent(-0.05)).toBe("-5.00%");
+  });
+  it("handles zero", () => {
+    expect(formatPercent(0)).toBe("0.00%");
+  });
+  it("returns dash for null", () => {
+    expect(formatPercent(null)).toBe("-");
+  });
+  it("returns dash for NaN", () => {
+    expect(formatPercent(NaN)).toBe("-");
+  });
+  it("returns dash for Infinity", () => {
+    expect(formatPercent(Infinity)).toBe("-");
+  });
+  it("supports custom digits", () => {
+    expect(formatPercent(0.123456, 1)).toBe("12.3%");
+  });
+});
+
+describe("formatNumber", () => {
+  it("formats numbers with default 2 digits", () => {
+    expect(formatNumber(3.14159)).toBe("3.14");
+  });
+  it("returns dash for null", () => {
+    expect(formatNumber(null)).toBe("-");
+  });
+  it("returns dash for NaN", () => {
+    expect(formatNumber(NaN)).toBe("-");
+  });
+  it("handles zero correctly (not falsy)", () => {
+    expect(formatNumber(0)).toBe("0.00");
+  });
+});
+
+describe("formatDate", () => {
+  it("formats ISO string to YYYY-MM-DD", () => {
+    expect(formatDate("2024-03-15T10:30:00Z")).toBe("2024-03-15");
+  });
+  it("returns dash for null", () => {
+    expect(formatDate(null)).toBe("-");
+  });
+  it("returns dash for empty string", () => {
+    expect(formatDate("")).toBe("-");
+  });
+});
+
+describe("formatFileSize", () => {
+  it("formats bytes", () => {
+    expect(formatFileSize(500)).toBe("500 B");
+  });
+  it("formats kilobytes", () => {
+    expect(formatFileSize(2048)).toBe("2.0 KB");
+  });
+  it("formats megabytes", () => {
+    expect(formatFileSize(1048576)).toBe("1.0 MB");
+  });
+});
+
+describe("directionLabel", () => {
+  it("translates bullish", () => {
+    expect(directionLabel("bullish")).toBe("看涨");
+  });
+  it("translates bearish", () => {
+    expect(directionLabel("bearish")).toBe("看跌");
+  });
+  it("translates neutral", () => {
+    expect(directionLabel("neutral")).toBe("震荡");
+  });
+});
+
+describe("directionColor", () => {
+  it("returns bull color for bullish", () => {
+    expect(directionColor("bullish")).toBe("text-bull");
+  });
+  it("returns bear color for bearish", () => {
+    expect(directionColor("bearish")).toBe("text-bear");
+  });
+  it("returns neutral color for unknown", () => {
+    expect(directionColor("unknown")).toBe("text-neutral");
+  });
+});
+```
+
+- [ ] **Step 2: 创建 `frontend/src/__tests__/api.test.ts`**
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { api, ApiError } from "../lib/api";
+
+// Mock fetch
+const mockFetch = vi.fn();
+vi.stubGlobal("fetch", mockFetch);
+
+beforeEach(() => {
+  mockFetch.mockReset();
+});
+
+describe("api client", () => {
+  it("throws ApiError on non-ok response", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ detail: "Bad request" }),
+    });
+
+    await expect(api.getOhlc("test", "1day")).rejects.toThrow(ApiError);
+    await expect(api.getOhlc("test", "1day")).rejects.toThrow();
+  });
+
+  it("parses JSON response on success", async () => {
+    const mockData = { sub_index: "test", period: "1day", count: 1, ohlc: [] };
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockData,
+    });
+
+    const result = await api.getOhlc("test", "1day");
+    expect(result).toEqual(mockData);
+  });
+
+  it("includes query params in URL", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ reports: [] }),
+    });
+
+    await api.listReports();
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/reports/list"),
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+});
+```
+
+- [ ] **Step 3: 运行测试**
+
+```bash
+cd /workspace/csqaq-glove-quant/frontend
+npm run test
+```
+
+预期：所有测试 PASS。
+
+- [ ] **Step 4: 提交**
+
+```bash
+cd /workspace/csqaq-glove-quant
+git add frontend/src/__tests__/
+git commit -m "test(web): 添加前端单元测试（format 工具 + API 客户端）"
+```
+
+---
+
+## Task 20: 端到端集成验证与旧前端清理
 
 **Files:**
 - Delete: `frontend/static/app.js`
 - Delete: `frontend/static/style.css`
+- Delete: `frontend/index.html`（旧入口，已被 `frontend/src/main.tsx` + Vite 替代）
 - Modify: `docs/deployment.md`
 
 - [ ] **Step 1: 删除旧前端文件**
 
 ```bash
 cd /workspace/csqaq-glove-quant
-git rm frontend/static/app.js frontend/static/style.css
+git rm frontend/static/app.js frontend/static/style.css frontend/index.html
 ```
 
 - [ ] **Step 2: 运行全部后端测试**
@@ -3488,7 +4203,16 @@ python -m pytest tests/ -v --tb=short
 
 预期：所有测试 PASS。
 
-- [ ] **Step 3: 构建前端并启动服务验证**
+- [ ] **Step 3: 运行全部前端测试**
+
+```bash
+cd /workspace/csqaq-glove-quant/frontend
+npm run test
+```
+
+预期：所有测试 PASS。
+
+- [ ] **Step 4: 构建前端并启动服务验证**
 
 ```bash
 cd /workspace/csqaq-glove-quant/frontend
@@ -3501,7 +4225,7 @@ client = TestClient(app)
 
 # 前端首页
 r1 = client.get('/')
-assert r1.status_code == 200
+assert r1.status_code == 200, f'Frontend: expected 200, got {r1.status_code}'
 assert 'root' in r1.text, 'Frontend not served'
 
 # API 端点
@@ -3524,28 +4248,28 @@ print('All integration checks passed!')
 
 预期：所有断言通过。
 
-- [ ] **Step 4: 更新 `docs/deployment.md` 增加前端构建步骤**
+- [ ] **Step 5: 更新 `docs/deployment.md` 增加前端构建步骤**
 
-在"第三步：安装依赖"之后增加前端构建步骤：
+在"第三步：安装依赖"之后增加：
 
 ```markdown
 ## 第三步半：构建前端
 
 前端使用 React + Vite 构建，需安装 Node.js（>= 18）：
 
-```bash
-cd frontend
-npm install
-npm run build
-```
+    cd frontend
+    npm install
+    npm run build
 
 构建产物在 `frontend/dist/`，由后端 `run_scenario_server.py` 自动挂载。
 开发时可运行 `npm run dev` 启动热更新开发服务器（端口 5173），API 请求自动代理到 8000 端口。
+运行前端测试：`npm run test`。
 ```
 
-- [ ] **Step 5: 提交**
+- [ ] **Step 6: 提交**
 
 ```bash
+cd /workspace/csqaq-glove-quant
 git add -A
 git commit -m "feat(web): 清理旧前端文件，完成全功能 Web 可视化平台集成"
 ```
@@ -3556,30 +4280,44 @@ git commit -m "feat(web): 清理旧前端文件，完成全功能 Web 可视化�
 
 ### 性能考量
 
-1. **前端构建优化**：Vite 默认进行代码分割和 tree-shaking，首屏只加载当前路由的 chunk。ECharts 按需引入（`echarts-for-react` 支持按需注册组件），避免打包全量图表库。
+1. **路由级代码分割**：通过 `React.lazy` + `Suspense` 实现按需加载，首屏只加载当前路由的 JS chunk。ECharts 作为独立 chunk 分离，避免阻塞首屏。Vite 的 `manualChunks` 进一步将 vendor 库拆分为 `echarts` 和 `react` 两个 chunk。
 
-2. **后端长耗时操作**：趋势扫描通过异步任务队列（`task_queue.py`）在后台线程执行，前端通过轮询获取进度。不阻塞 API 主线程，其他请求正常响应。
+2. **后端长耗时操作**：趋势扫描通过 `ThreadPoolExecutor`（max_workers=4）在后台线程执行，前端通过指数退避轮询获取进度（1s → 1.5s → 2.25s → ... → 5s 上限）。不阻塞 API 主线程，其他请求正常响应。
 
-3. **数据缓存**：现有 `SCENARIO_CACHE`（5 分钟 TTL 内存缓存）继续工作。回测结果可考虑增加类似的内存缓存，但 MVP 阶段回测耗时在秒级，暂不需要。
+3. **数据缓存**：现有 `SCENARIO_CACHE`（5 分钟 TTL 内存缓存）继续工作。前端 API 客户端通过 `AbortController` 支持请求超时（30s 默认，回测类 60s）和取消。
 
-4. **前端渲染**：ECharts 使用 Canvas 渲染，对大量 K 线数据（数百根）性能足够。`animation: false` 禁用动画，减少重绘开销。React 的 `useCallback` 和 `useMemo` 避免不必要的重渲染。
+4. **前端渲染**：ECharts 使用 Canvas 渲染，`animation: false` 禁用动画减少重绘开销。React 的 `useCallback` 避免不必要的重渲染。
 
 ### 可维护性考量
 
-1. **组件化拆分**：每个页面是独立组件，修改一个页面不影响其他页面。通用 UI 组件（Card、MetricCard 等）复用率高，修改一处全局生效。
+1. **组件化拆分**：每个页面是独立组件，修改一个页面不影响其他页面。通用 UI 组件（Card、MetricCard 等）复用率高。
 
-2. **TypeScript 类型安全**：所有 API 响应有类型定义（`types/api.ts`），后端接口变更时前端编译期即可发现不匹配。
+2. **TypeScript 类型安全**：所有 API 响应有类型定义（`types/api.ts`），`noUnusedLocals` 和 `noUnusedParameters` 编译选项确保无死代码。
 
-3. **后端端点模块化**：每个功能域一个端点文件（`ensemble_endpoints.py`、`trend_scan_endpoints.py` 等），新增功能只需新建文件 + 在 `run_scenario_server.py` 注册路由。
+3. **后端端点模块化**：每个功能域一个端点文件，新增功能只需新建文件 + 在 `run_scenario_server.py` 注册路由。
 
-4. **测试覆盖**：每个新端点都有对应的测试文件，遵循 TDD 流程。前端虽无单元测试，但 TypeScript 编译 + 构建验证提供了基本保障。
+4. **测试覆盖**：后端每个新端点都有对应的测试文件（TDD 流程），前端格式化工具和 API 客户端有 Vitest 单元测试覆盖。
 
-### 功能增强便利性
+### 关键修复清单（相比旧版计划）
 
-1. **新增页面**：在 `pages/` 下新建组件 → 在 `App.tsx` 添加路由 → 完成。不影响现有页面。
-
-2. **新增 API 端点**：在 `src/api/` 下新建端点文件 → 在 `run_scenario_server.py` 注册 → 在 `lib/api.ts` 添加调用方法 → 完成。
-
-3. **新增图表**：ECharts 配置是纯 JS 对象，新增图表只需在页面组件中添加一个 `chartOption` + `<ReactECharts>`。
-
-4. **主题调整**：所有颜色定义在 `tailwind.config.js` 中，修改主题色板一处生效全局。
+| 问题 | 修复方案 |
+|------|----------|
+| 测试文件命名不一致 | 统一使用复数形式（`test_ensemble_endpoints.py` 等） |
+| Task 5 故意写错代码 | 直接给出正确的 `ThreadPoolExecutor` 实现 |
+| 缺少 React Error Boundary | Task 5 新增 `ErrorBoundary.tsx`，包裹整个应用 |
+| 缺少响应式设计 | 侧边栏移动端可折叠，所有页面使用 `md:`/`lg:` 断点 |
+| 缺少代码分割 | Task 18 使用 `React.lazy` + `Suspense` + `manualChunks` |
+| TrendScanPage 轮询无清理 | `useEffect` cleanup 清除定时器，指数退避减少请求 |
+| TrendScanPage 未处理 failed 状态 | 失败时将 `error` 写入状态，触发 `ErrorState` |
+| falsy 值显示错误（0 \|\| "-"） | 使用 `!= null` 判断替代 `\|\|` |
+| profit_factor 未处理 NaN | 使用 `Number.isFinite()` 统一判断 |
+| API 客户端无超时/取消 | `AbortController` + 可配置 timeout |
+| 任务队列无并发限制 | `ThreadPoolExecutor(max_workers=4)` |
+| 缺少前端测试 | Task 19 添加 Vitest + Testing Library |
+| 缺少 404 路由 | App.tsx 添加 `<Route path="*">` |
+| 缺少空状态组件 | 新增 `EmptyState.tsx`，所有页面使用 |
+| TopBar 状态永不清除 | 3 秒后自动清除状态文本 |
+| REST 语义错误（GET 启动扫描） | 改为 POST + Pydantic body model |
+| 路径遍历防护不足 | 使用 `resolve()` + `relative_to()` 规范化 |
+| 缺少环境配置 | `VITE_API_BASE_URL` 环境变量 + `.env.example` |
+| 架构说明与实现矛盾 | ECharts 按需引入 + `manualChunks` 真正实现代码分割 |
