@@ -39,17 +39,22 @@ python run_mvp.py --sub-index-name 匕首
 ## 项目结构
 
 ```
-csqaq-glove-quant/
-├── src/
-│   ├── api/          # CSQAQ API 客户端
-│   ├── data/         # 缓存与数据管道
-│   ├── features/     # 价格行为特征
-│   ├── strategy/     # 信号生成与风控
-│   ├── backtest/     # 回测引擎
-│   └── analysis/     # 绩效指标
-├── tests/            # 单元测试
-├── data/cache/       # 本地 K 线缓存
-└── reports/          # 回测报告与图表
+cs/
+├── src/                  # 核心代码
+│   ├── api/              # CSQAQ API 客户端与 FastAPI 端点
+│   ├── data/             # 缓存与数据管道
+│   ├── features/         # 价格行为特征
+│   ├── strategy/         # 信号生成与风控
+│   ├── backtest/         # 回测引擎
+│   ├── analysis/         # 绩效指标
+│   └── scenario_engine/  # 情景生成引擎
+├── frontend/             # 可视化前端
+├── config/               # 情景模板与 Schema
+├── tests/                # 单元测试
+├── 战术文档/              # 战略文档与各阶段战术文档
+├── docs/                 # 部署指南与 API 文档
+├── data/cache/           # 本地 K 线缓存
+└── reports/              # 回测报告与图表
 ```
 
 ## 数据范围
@@ -58,6 +63,8 @@ csqaq-glove-quant/
 
 ## 文档
 
-- [战略文档](/workspace/strategic-document.md)
-- [战术文档（第一阶段）](/workspace/tactical-document.md)
-- [策略方案](/workspace/price-action-quant-strategy-plan.md)
+- [战略文档](战术文档/战略文档.md)
+- [部署指南](docs/deployment.md)
+- [情景 API 文档](docs/scenario_api.md)
+- [第七阶段](战术文档/第七阶段-战略战术对齐报告.md) ~ [第十七阶段](战术文档/第十七阶段-战略战术对齐报告.md) 战术对齐报告
+- [第十八阶段 情景质量重构实施计划](战术文档/第十八阶段-情景质量重构实施计划.md)
