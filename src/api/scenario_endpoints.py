@@ -151,14 +151,23 @@ def _synthetic_ohlc(sub_index: str, period: str, n: int = _MIN_BARS) -> pd.DataF
     """Generate deterministic synthetic OHLC data for tests / demo mode.
 
     The series is seeded from ``sub_index`` and ``period`` so repeated calls
-    for the same inputs return identical data.
+    for the same inputs return identical data. The data ends at the current
+    date so the UI always shows up-to-date timestamps.
     """
     seed = int(hash(f"{sub_index}:{period}")) % (2**31)
     rng = np.random.default_rng(abs(seed))
     price = 100.0 * np.exp(np.cumsum(rng.normal(0.0, 0.01, n)))
+
+    # Determine frequency from period and end at today's date.
+    freq_map = {"1day": "D", "4hour": "4h", "1hour": "1h", "7day": "7D"}
+    freq = freq_map.get(period, "D")
+
+    end_date = pd.Timestamp.now(tz="UTC")
+    date_range = pd.date_range(end=end_date, periods=n, freq=freq, tz="UTC")
+
     df = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2024-01-01", periods=n, freq="D", tz="UTC"),
+            "timestamp": date_range,
             "open": price * (1.0 + rng.normal(0.0, 0.005, n)),
             "high": price * (1.0 + np.abs(rng.normal(0.0, 0.015, n))),
             "low": price * (1.0 - np.abs(rng.normal(0.0, 0.015, n))),
@@ -188,7 +197,15 @@ def _load_ohlc(sub_index: str, period: str, *, force_refresh: bool = False) -> p
     if not force_refresh:
         df = load_cache(cache_path)
         if df is not None:
-            return filter_from_2024(df)
+            # Check if cached data is stale (last bar more than 3 days old).
+            last_ts = pd.to_datetime(df["timestamp"].iloc[-1])
+            if hasattr(last_ts, "tzinfo") and last_ts.tzinfo is None:
+                last_ts = last_ts.tz_localize("UTC")
+            age = pd.Timestamp.now(tz="UTC") - last_ts
+            if age > pd.Timedelta(days=3):
+                LOGGER.info("Cache stale for %s/%s (last bar %s old), refreshing", sub_index, period, age)
+            else:
+                return filter_from_2024(df)
 
     # Attempt a real fetch only when an API token is configured.
     if settings.api_token:
