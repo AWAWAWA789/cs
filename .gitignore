@@ -41,3 +41,7 @@ env/
 reports/*.png
 reports/*.html
 reports/*.csv
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
