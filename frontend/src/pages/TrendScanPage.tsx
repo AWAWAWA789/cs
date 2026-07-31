@@ -7,6 +7,7 @@ import { SubIndexSelector } from "../components/Selector";
 import { api, pollScanTask } from "../lib/api";
 import { formatPercent, formatNumber } from "../lib/format";
 import type { TaskInfo, ScanResult, ScanResultItem } from "../types/api";
+import { useGlobalStore } from "../store/globalStore";
 import ReactECharts from "echarts-for-react";
 
 /** 扫描生命周期阶段。 */
@@ -59,14 +60,20 @@ function buildScatterOption(results: ScanResultItem[]): EChartsOption {
 }
 
 export default function TrendScanPage() {
-  const [subIndex, setSubIndex] = useState("手套");
-  const [period, setPeriod] = useState("1day");
+  const subIndex = useGlobalStore((s) => s.subIndex);
+  const period = useGlobalStore((s) => s.period);
 
   const [phase, setPhase] = useState<ScanPhase>("idle");
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // 修复 B3：扫描开始时捕获参数快照，用于标题显示，避免实时 state 变化导致错位
+  const [snapshot, setSnapshot] = useState<{ subIndex: string; period: string }>({
+    subIndex,
+    period,
+  });
 
   // 用于标识当前扫描实例，避免过期回调更新状态（如组件卸载或发起新扫描后）
   const runIdRef = useRef(0);
@@ -86,6 +93,9 @@ export default function TrendScanPage() {
 
   const handleStartScan = async () => {
     const runId = ++runIdRef.current;
+    // 捕获当前参数快照，用于扫描过程中和结果展示的标题
+    const snap = { subIndex, period };
+    setSnapshot(snap);
     setPhase("scanning");
     setProgress(0);
     setMessage("正在提交扫描任务...");
@@ -93,7 +103,7 @@ export default function TrendScanPage() {
     setError(null);
 
     try {
-      const { task_id } = await api.trendScan.start(subIndex, period);
+      const { task_id } = await api.trendScan.start(snap.subIndex, snap.period);
       if (isCancelled(runId)) return;
 
       const scanResult = await pollScanTask(task_id, (info: TaskInfo) => {
@@ -130,12 +140,7 @@ export default function TrendScanPage() {
 
       {/* 标的与周期选择器 + 开始扫描按钮 */}
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <SubIndexSelector
-          subIndex={subIndex}
-          period={period}
-          onSubIndexChange={setSubIndex}
-          onPeriodChange={setPeriod}
-        />
+        <SubIndexSelector />
         <Button
           variant="primary"
           onClick={handleStartScan}
@@ -148,7 +153,7 @@ export default function TrendScanPage() {
 
       {/* 扫描进度 */}
       {phase === "scanning" && (
-        <Card title="扫描进度" subtitle={`${subIndex} · ${period}`}>
+        <Card title="扫描进度" subtitle={`${snapshot.subIndex} · ${snapshot.period}`}>
           <div className="space-y-3">
             <div className="h-3 rounded-full bg-surface-border">
               <div
@@ -193,7 +198,7 @@ export default function TrendScanPage() {
               <StatCard
                 label="总组合数"
                 value={formatNumber(result.total_combinations, 0)}
-                hint={`${subIndex} · ${period}`}
+                hint={`${snapshot.subIndex} · ${snapshot.period}`}
               />
               <StatCard
                 label="盈利组合数"

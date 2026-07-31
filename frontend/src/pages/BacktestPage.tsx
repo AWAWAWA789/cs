@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Card, StatCard } from "../components/ui/Card";
 import { Badge, Spinner, EmptyState, ErrorState } from "../components/ui/misc";
 import { SubIndexSelector } from "../components/Selector";
@@ -12,6 +11,7 @@ import {
   exitReasonLabel,
 } from "../lib/format";
 import type { EquityPoint, TradeRecord } from "../types/api";
+import { useGlobalStore } from "../store/globalStore";
 import ReactECharts from "echarts-for-react";
 
 /** 品牌主色（与 tailwind brand-600 一致）。 */
@@ -139,10 +139,10 @@ function TradesTable({ trades }: { trades: TradeRecord[] }) {
 }
 
 export default function BacktestPage() {
-  const [subIndex, setSubIndex] = useState("手套");
-  const [period, setPeriod] = useState("1day");
+  const subIndex = useGlobalStore((s) => s.subIndex);
+  const period = useGlobalStore((s) => s.period);
 
-  const backtest = useAsync(() => api.backtest.mvp(subIndex, period), [subIndex, period]);
+  const backtest = useAsync((signal) => api.backtest.mvp(subIndex, period, signal), [subIndex, period]);
 
   const metrics = backtest.data?.metrics;
   const equityCurve = backtest.data?.equity_curve ?? [];
@@ -166,10 +166,6 @@ export default function BacktestPage() {
 
       {/* 标的与周期选择器 + 重新回测 */}
       <SubIndexSelector
-        subIndex={subIndex}
-        period={period}
-        onSubIndexChange={setSubIndex}
-        onPeriodChange={setPeriod}
         onRefresh={backtest.refetch}
         loading={backtest.loading}
         refreshLabel="重新回测"

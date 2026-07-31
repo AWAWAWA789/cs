@@ -36,6 +36,9 @@ export class ApiClientError extends Error {
 
 type QueryParams = Record<string, string | number | boolean | undefined>;
 
+/** 扩展 RequestInit，确保 signal 可传入。 */
+type RequestOptions = RequestInit & { signal?: AbortSignal };
+
 /**
  * Build a full URL string using the URL class, which handles
  * percent-encoding of non-ASCII characters correctly.
@@ -57,10 +60,14 @@ function buildUrl(path: string, params?: QueryParams): string {
   return url.toString();
 }
 
+/**
+ * 底层请求函数，支持 AbortSignal 取消请求。
+ * @param signal 可选的 AbortSignal，用于取消请求
+ */
 async function request<T>(
   path: string,
   params?: QueryParams,
-  options?: RequestInit,
+  options?: RequestOptions,
 ): Promise<T> {
   const url = buildUrl(path, params);
   const headers: Record<string, string> = {};
@@ -71,6 +78,7 @@ async function request<T>(
   const res = await fetch(url, {
     ...options,
     headers,
+    signal: options?.signal,
   });
 
   if (!res.ok) {
@@ -97,17 +105,19 @@ async function request<T>(
 // to avoid URL-encoding issues in uvicorn's HTTP parser.
 
 export const scenarioApi = {
-  generate(subIndex: string, period: string, refresh = false): Promise<ScenarioResponse> {
+  generate(subIndex: string, period: string, refresh = false, signal?: AbortSignal): Promise<ScenarioResponse> {
     return request<ScenarioResponse>("/scenario/generate", undefined, {
       method: "POST",
       body: JSON.stringify({ sub_index: subIndex, period, refresh }),
+      signal,
     });
   },
 
-  ohlc(subIndex: string, period: string): Promise<OhlcResponse> {
+  ohlc(subIndex: string, period: string, signal?: AbortSignal): Promise<OhlcResponse> {
     return request<OhlcResponse>("/scenario/ohlc", undefined, {
       method: "POST",
       body: JSON.stringify({ sub_index: subIndex, period }),
+      signal,
     });
   },
 
@@ -116,46 +126,52 @@ export const scenarioApi = {
     period: string,
     method = "knn",
     nNeighbors = 10,
+    signal?: AbortSignal,
   ): Promise<HistoryResponse> {
     return request<HistoryResponse>("/scenario/history", undefined, {
       method: "POST",
       body: JSON.stringify({ sub_index: subIndex, period, method, n_neighbors: nNeighbors }),
+      signal,
     });
   },
 
-  templates(subIndex: string, period: string, minConfidence = 0.5): Promise<TemplatesResponse> {
+  templates(subIndex: string, period: string, minConfidence = 0.5, signal?: AbortSignal): Promise<TemplatesResponse> {
     return request<TemplatesResponse>("/scenario/templates", undefined, {
       method: "POST",
       body: JSON.stringify({ sub_index: subIndex, period, min_confidence: minConfidence }),
+      signal,
     });
   },
 
-  explain(scenario: Record<string, unknown>, context?: Record<string, unknown>): Promise<ExplainResponse> {
+  explain(scenario: Record<string, unknown>, context?: Record<string, unknown>, signal?: AbortSignal): Promise<ExplainResponse> {
     return request<ExplainResponse>("/scenario/explain", undefined, {
       method: "POST",
       body: JSON.stringify({ scenario, context }),
+      signal,
     });
   },
 
-  meta(): Promise<MetaResponse> {
-    return request<MetaResponse>("/scenario/meta");
+  meta(signal?: AbortSignal): Promise<MetaResponse> {
+    return request<MetaResponse>("/scenario/meta", undefined, { signal });
   },
 };
 
 // ── Backtest API ──────────────────────────────────────────
 
 export const backtestApi = {
-  equity(subIndex: string, period: string): Promise<BacktestEquityResponse> {
+  equity(subIndex: string, period: string, signal?: AbortSignal): Promise<BacktestEquityResponse> {
     return request<BacktestEquityResponse>("/backtest/equity", undefined, {
       method: "POST",
       body: JSON.stringify({ sub_index: subIndex, period }),
+      signal,
     });
   },
 
-  mvp(subIndex: string, period: string): Promise<MvpBacktestResponse> {
+  mvp(subIndex: string, period: string, signal?: AbortSignal): Promise<MvpBacktestResponse> {
     return request<MvpBacktestResponse>("/backtest/mvp", undefined, {
       method: "POST",
       body: JSON.stringify({ sub_index: subIndex, period }),
+      signal,
     });
   },
 };
@@ -163,10 +179,11 @@ export const backtestApi = {
 // ── Ensemble API ──────────────────────────────────────────
 
 export const ensembleApi = {
-  run(subIndex: string, period: string): Promise<EnsembleResponse> {
+  run(subIndex: string, period: string, signal?: AbortSignal): Promise<EnsembleResponse> {
     return request<EnsembleResponse>("/ensemble/run", undefined, {
       method: "POST",
       body: JSON.stringify({ sub_index: subIndex, period }),
+      signal,
     });
   },
 };
@@ -189,20 +206,20 @@ export const trendScanApi = {
 // ── Reports API ───────────────────────────────────────────
 
 export const reportsApi = {
-  list(): Promise<ReportsListResponse> {
-    return request<ReportsListResponse>("/reports/list");
+  list(signal?: AbortSignal): Promise<ReportsListResponse> {
+    return request<ReportsListResponse>("/reports/list", undefined, { signal });
   },
 
-  get(filename: string): Promise<ReportGetResponse> {
-    return request<ReportGetResponse>("/reports/get", { filename });
+  get(filename: string, signal?: AbortSignal): Promise<ReportGetResponse> {
+    return request<ReportGetResponse>("/reports/get", { filename }, { signal });
   },
 };
 
 // ── Data API ──────────────────────────────────────────────
 
 export const dataApi = {
-  cacheStatus(): Promise<CacheStatusResponse> {
-    return request<CacheStatusResponse>("/data/cache-status");
+  cacheStatus(signal?: AbortSignal): Promise<CacheStatusResponse> {
+    return request<CacheStatusResponse>("/data/cache-status", undefined, { signal });
   },
 
   refresh(subIndex: string, period: string): Promise<DataRefreshResponse> {
@@ -216,8 +233,8 @@ export const dataApi = {
 // ── Monitoring API ────────────────────────────────────────
 
 export const monitoringApi = {
-  metrics(): Promise<MonitoringResponse> {
-    return request<MonitoringResponse>("/monitoring/metrics");
+  metrics(signal?: AbortSignal): Promise<MonitoringResponse> {
+    return request<MonitoringResponse>("/monitoring/metrics", undefined, { signal });
   },
 };
 

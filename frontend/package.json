@@ -11,11 +11,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "echarts": "^5.5.0",
+    "echarts-for-react": "^3.0.2",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.26.0",
-    "echarts": "^5.5.0",
-    "echarts-for-react": "^3.0.2"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.0",

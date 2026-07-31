@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { Card, StatCard } from "../components/ui/Card";
 import { Badge, Spinner, EmptyState, ErrorState } from "../components/ui/misc";
 import { SubIndexSelector } from "../components/Selector";
 import { api } from "../lib/api";
 import { useAsync } from "../hooks/useAsync";
 import { formatPercent, formatNumber } from "../lib/format";
+import { useGlobalStore } from "../store/globalStore";
 
 /** 告警指标的中文标签映射。 */
 const METRIC_LABELS: Record<string, string> = {
@@ -32,21 +32,21 @@ function formatAlertValue(metric: string, value: number): string {
 }
 
 export default function Dashboard() {
-  const [subIndex, setSubIndex] = useState("手套");
-  const [period, setPeriod] = useState("1day");
+  const subIndex = useGlobalStore((s) => s.subIndex);
+  const period = useGlobalStore((s) => s.period);
 
   // 情景生成（用于情景数指标）
   const scenario = useAsync(
-    () => api.scenario.generate(subIndex, period),
+    (signal) => api.scenario.generate(subIndex, period, false, signal),
     [subIndex, period],
   );
   // MVP 回测（用于收益 / 夏普 / 胜率指标）
   const backtest = useAsync(
-    () => api.backtest.mvp(subIndex, period),
+    (signal) => api.backtest.mvp(subIndex, period, signal),
     [subIndex, period],
   );
   // 系统监控（用于告警展示）
-  const monitoring = useAsync(() => api.monitoring.metrics(), []);
+  const monitoring = useAsync((signal) => api.monitoring.metrics(signal), []);
 
   const statsLoading = scenario.loading || backtest.loading;
   const statsError = scenario.error ?? backtest.error;
@@ -76,12 +76,7 @@ export default function Dashboard() {
       </div>
 
       {/* 标的与周期选择器 */}
-      <SubIndexSelector
-        subIndex={subIndex}
-        period={period}
-        onSubIndexChange={setSubIndex}
-        onPeriodChange={setPeriod}
-      />
+      <SubIndexSelector />
 
       {/* 核心指标卡片 */}
       <section>

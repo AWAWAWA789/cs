@@ -5,6 +5,7 @@ import { SubIndexSelector } from "../components/Selector";
 import { api } from "../lib/api";
 import { useAsync } from "../hooks/useAsync";
 import { formatBytes, formatDate, formatNumber } from "../lib/format";
+import { useGlobalStore } from "../store/globalStore";
 
 /** 数据刷新后的内联提示消息。 */
 interface RefreshMessage {
@@ -13,11 +14,11 @@ interface RefreshMessage {
 }
 
 export default function DataPage() {
-  const [subIndex, setSubIndex] = useState("手套");
-  const [period, setPeriod] = useState("1day");
+  const subIndex = useGlobalStore((s) => s.subIndex);
+  const period = useGlobalStore((s) => s.period);
 
   // 缓存状态：通过 useAsync 管理，数据刷新成功后调用 refetch 重新加载
-  const cache = useAsync(() => api.data.cacheStatus(), []);
+  const cache = useAsync((signal) => api.data.cacheStatus(signal), []);
   const { refetch } = cache;
 
   // 数据刷新的独立 loading 与提示消息状态
@@ -71,10 +72,6 @@ export default function DataPage() {
 
       {/* 标的与周期选择器 + 刷新按钮 */}
       <SubIndexSelector
-        subIndex={subIndex}
-        period={period}
-        onSubIndexChange={setSubIndex}
-        onPeriodChange={setPeriod}
         onRefresh={handleRefresh}
         loading={refreshLoading}
         refreshLabel="刷新数据"

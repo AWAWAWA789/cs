@@ -14,6 +14,7 @@ import {
   directionLabel,
 } from "../lib/format";
 import type { Scenario, OhlcBar } from "../types/api";
+import { useGlobalStore } from "../store/globalStore";
 import ReactECharts from "echarts-for-react";
 
 /** 方向标签到 Badge 颜色变体的映射。 */
@@ -148,24 +149,24 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
 }
 
 export default function ScenarioPage() {
-  const [subIndex, setSubIndex] = useState("手套");
-  const [period, setPeriod] = useState("1day");
+  const subIndex = useGlobalStore((s) => s.subIndex);
+  const period = useGlobalStore((s) => s.period);
 
   // 通过 ref 携带「是否强制刷新」标记，刷新后自动复位，避免影响后续常规请求
   const refreshRef = useRef(false);
   const [refreshCounter, setRefreshCounter] = useState(0);
 
   const scenario = useAsync(
-    () => {
+    (signal) => {
       const refresh = refreshRef.current;
       refreshRef.current = false;
-      return api.scenario.generate(subIndex, period, refresh);
+      return api.scenario.generate(subIndex, period, refresh, signal);
     },
     [subIndex, period, refreshCounter],
   );
 
   const ohlc = useAsync(
-    () => api.scenario.ohlc(subIndex, period),
+    (signal) => api.scenario.ohlc(subIndex, period, signal),
     [subIndex, period],
   );
 
@@ -188,10 +189,6 @@ export default function ScenarioPage() {
 
       {/* 标的与周期选择器 + 重新生成 */}
       <SubIndexSelector
-        subIndex={subIndex}
-        period={period}
-        onSubIndexChange={setSubIndex}
-        onPeriodChange={setPeriod}
         onRefresh={handleRefresh}
         loading={scenario.loading}
         refreshLabel="重新生成"

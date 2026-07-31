@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Card, StatCard } from "../components/ui/Card";
 import { Spinner, EmptyState, ErrorState } from "../components/ui/misc";
 import { SubIndexSelector } from "../components/Selector";
@@ -6,6 +5,7 @@ import { api } from "../lib/api";
 import { useAsync } from "../hooks/useAsync";
 import { formatPercent, formatNumber, formatDate } from "../lib/format";
 import type { EnsembleResponse, StrategyResult } from "../types/api";
+import { useGlobalStore } from "../store/globalStore";
 import ReactECharts from "echarts-for-react";
 
 /** 策略 key 到中文展示名的映射。 */
@@ -88,10 +88,10 @@ function metricColor(metric: "total_return" | "max_drawdown", value: number): st
 }
 
 export default function EnsemblePage() {
-  const [subIndex, setSubIndex] = useState("手套");
-  const [period, setPeriod] = useState("1day");
+  const subIndex = useGlobalStore((s) => s.subIndex);
+  const period = useGlobalStore((s) => s.period);
 
-  const ensemble = useAsync(() => api.ensemble.run(subIndex, period), [subIndex, period]);
+  const ensemble = useAsync((signal) => api.ensemble.run(subIndex, period, signal), [subIndex, period]);
 
   const data = ensemble.data;
   const rows = data ? buildStrategyRows(data) : [];
@@ -114,10 +114,6 @@ export default function EnsemblePage() {
 
       {/* 标的与周期选择器 + 重新运行 */}
       <SubIndexSelector
-        subIndex={subIndex}
-        period={period}
-        onSubIndexChange={setSubIndex}
-        onPeriodChange={setPeriod}
         onRefresh={ensemble.refetch}
         loading={ensemble.loading}
         refreshLabel="重新运行"

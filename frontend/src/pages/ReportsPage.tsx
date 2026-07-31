@@ -10,13 +10,13 @@ export default function ReportsPage() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
   // 报告文件列表（仅在挂载时加载一次）
-  const list = useAsync(() => api.reports.list(), []);
+  const list = useAsync((signal) => api.reports.list(signal), []);
 
   // 当前选中报告的 JSON 内容，未选中时返回 null
   const content = useAsync<ReportGetResponse | null>(
-    () =>
+    (signal) =>
       selectedFile
-        ? api.reports.get(selectedFile)
+        ? api.reports.get(selectedFile, signal)
         : Promise.resolve<ReportGetResponse | null>(null),
     [selectedFile],
   );

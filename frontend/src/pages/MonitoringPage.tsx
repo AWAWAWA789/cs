@@ -58,7 +58,7 @@ const REFRESH_INTERVAL_MS = 10_000;
 
 export default function MonitoringPage() {
   // 通过 useAsync 管理初始加载与手动 / 定时 refetch
-  const monitoring = useAsync(() => api.monitoring.metrics(), []);
+  const monitoring = useAsync((signal) => api.monitoring.metrics(signal), []);
   const { refetch } = monitoring;
 
   // 保留最近一次成功的数据，避免定时刷新时因 useAsync 重置 data 而产生闪烁
