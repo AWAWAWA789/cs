@@ -238,6 +238,150 @@ export const monitoringApi = {
   },
 };
 
+// ── Item (饰品) API ───────────────────────────────────────
+// 封装 CSQAQ 饰品详情模块的 7 个端点
+
+/** 饰品搜索请求体。 */
+interface ItemSearchRequest {
+  text: string;
+}
+
+/** 单品图表请求体。 */
+interface ItemChartRequest {
+  good_id: string;
+  key: string;
+  platform: number;
+  period: number;
+  style: string;
+}
+
+/** 批量价格请求体。 */
+interface BatchPriceRequest {
+  market_hash_names: string[];
+}
+
+export const itemApi = {
+  /** 饰品名称联想搜索。 */
+  search(text: string, signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>("/item/search", undefined, {
+      method: "POST",
+      body: JSON.stringify({ text } satisfies ItemSearchRequest),
+      signal,
+    });
+  },
+
+  /** 全量饰品 ID 映射表。 */
+  all(signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>("/item/all", undefined, { signal });
+  },
+
+  /** 单件饰品详情（7 平台 50+ 字段）。 */
+  detail(goodId: string, signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>("/item/detail", { good_id: goodId }, { signal });
+  },
+
+  /** 单品多平台多周期图表数据。 */
+  chart(req: ItemChartRequest, signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>("/item/chart", undefined, {
+      method: "POST",
+      body: JSON.stringify(req),
+      signal,
+    });
+  },
+
+  /** 全量图表（仅售价+在售量）。 */
+  chartAll(goodId: string, signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>("/item/chart-all", undefined, {
+      method: "POST",
+      body: JSON.stringify({ good_id: goodId }),
+      signal,
+    });
+  },
+
+  /** 存世量走势（近 180 天）。 */
+  supply(goodId: string, signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>("/item/supply", { good_id: goodId }, { signal });
+  },
+
+  /** 批量价格查询（≤50 个）。 */
+  batchPrice(marketHashNames: string[], signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>("/item/batch-price", undefined, {
+      method: "POST",
+      body: JSON.stringify({ market_hash_names: marketHashNames } satisfies BatchPriceRequest),
+      signal,
+    });
+  },
+};
+
+// ── Rank (排行榜) API ─────────────────────────────────────
+// 封装 CSQAQ 涨跌排行与饰品列表模块
+
+/** 涨跌排行请求体。 */
+interface RankListRequest {
+  sort: string;
+  page_index: number;
+  page_size: number;
+}
+
+/** 饰品列表筛选请求体。 */
+interface ItemsListRequest {
+  type?: string | null;
+  quality?: string | null;
+  category?: string | null;
+  wear?: string | null;
+  search?: string | null;
+  page_index: number;
+  page_size: number;
+}
+
+/** 饰品列表筛选条件。 */
+export interface ItemListFilters {
+  type?: string;
+  quality?: string;
+  category?: string;
+  wear?: string;
+  search?: string;
+}
+
+export const rankApi = {
+  /** 涨跌排行榜。 */
+  list(sort: string, pageIndex: number, pageSize: number, signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>("/rank/list", undefined, {
+      method: "POST",
+      body: JSON.stringify({ sort, page_index: pageIndex, page_size: pageSize } satisfies RankListRequest),
+      signal,
+    });
+  },
+
+  /** 饰品列表（带筛选与分页）。 */
+  items(filters: ItemListFilters, pageIndex: number, pageSize: number, signal?: AbortSignal): Promise<unknown> {
+    const body: ItemsListRequest = {
+      type: filters.type || null,
+      quality: filters.quality || null,
+      category: filters.category || null,
+      wear: filters.wear || null,
+      search: filters.search || null,
+      page_index: pageIndex,
+      page_size: pageSize,
+    };
+    return request<unknown>("/rank/items", undefined, {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal,
+    });
+  },
+
+  /** 热门系列列表。 */
+  series(signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>("/rank/series", undefined, { signal });
+  },
+
+  /** 系列详情。 */
+  seriesDetail(seriesId: string, signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>(`/rank/series/${encodeURIComponent(seriesId)}`, undefined, { signal });
+  },
+};
+
 // ── Aggregate export ──────────────────────────────────────
 
 export const api = {
@@ -248,6 +392,8 @@ export const api = {
   reports: reportsApi,
   data: dataApi,
   monitoring: monitoringApi,
+  item: itemApi,
+  rank: rankApi,
 };
 
 /** Type guard for ApiClientError. */

@@ -12,6 +12,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Load .env file before any Settings are created
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -20,6 +25,8 @@ from fastapi.staticfiles import StaticFiles
 from src.api.backtest_endpoints import router as backtest_router
 from src.api.data_endpoints import router as data_router
 from src.api.ensemble_endpoints import router as ensemble_router
+from src.api.item_endpoints import router as item_router
+from src.api.rank_endpoints import router as rank_router
 from src.api.monitoring import monitoring_router
 from src.api.report_endpoints import router as report_router
 from src.api.scenario_endpoints import router as scenario_router
@@ -47,6 +54,8 @@ app.include_router(trend_scan_router)
 app.include_router(report_router)
 app.include_router(data_router)
 app.include_router(monitoring_router)
+app.include_router(item_router)
+app.include_router(rank_router)
 
 frontend_dir = Path(__file__).parent / "frontend" / "dist"
 if frontend_dir.exists():

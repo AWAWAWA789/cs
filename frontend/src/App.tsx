@@ -14,6 +14,9 @@ const TrendScanPage = lazy(() => import("./pages/TrendScanPage"));
 const ReportsPage = lazy(() => import("./pages/ReportsPage"));
 const DataPage = lazy(() => import("./pages/DataPage"));
 const MonitoringPage = lazy(() => import("./pages/MonitoringPage"));
+const SearchPage = lazy(() => import("./pages/SearchPage"));
+const ItemDetailPage = lazy(() => import("./pages/ItemDetailPage"));
+const RankingPage = lazy(() => import("./pages/RankingPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function PageLoader() {
@@ -83,6 +86,9 @@ export default function App() {
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/data" element={<DataPage />} />
               <Route path="/monitoring" element={<MonitoringPage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/ranking" element={<RankingPage />} />
+              <Route path="/item/:goodId" element={<ItemDetailPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
