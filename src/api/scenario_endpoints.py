@@ -220,6 +220,12 @@ def _load_ohlc(
     settings = Settings()
     cache_path = cache_file_path(sub_index, period, settings.cache_path)
 
+    # 按周期动态计算新鲜度阈值：至少 2 个周期长度，最小 3 天。
+    # 周线/月线最后一根天然就距当前时间较远，固定 3 天阈值会导致它们
+    # 永远被判为过期并反复尝试刷新。
+    period_days = {"1hour": 1 / 24, "4hour": 4 / 24, "1day": 1.0, "7day": 7.0}.get(period, 1.0)
+    freshness_threshold = pd.Timedelta(days=max(3.0, period_days * 2.0))
+
     # Drop any in-memory parquet entry when the caller explicitly asked for
     # a refresh — otherwise the TTL layer would mask the freshly fetched data.
     if force_refresh:
@@ -227,17 +233,20 @@ def _load_ohlc(
 
     # Load existing cache (may be stale but still usable as fallback).
     cached_df: pd.DataFrame | None = None
-    if not force_refresh:
-        cached_df = load_cache(cache_path)
-        if cached_df is not None:
-            # Check if cached data is fresh (last bar within 3 days).
-            last_ts = pd.to_datetime(cached_df["timestamp"].iloc[-1])
-            if hasattr(last_ts, "tzinfo") and last_ts.tzinfo is None:
-                last_ts = last_ts.tz_localize("UTC")
-            age = pd.Timestamp.now(tz="UTC") - last_ts
-            if age <= pd.Timedelta(days=3):
-                return filter_from_2024(cached_df), "real"
-            LOGGER.info("Cache stale for %s/%s (last bar %s old), refreshing", sub_index, period, age)
+    # force_refresh 时仍读一次磁盘缓存，作为刷新失败时的兜底，
+    # 避免「缓存存在 → 刷新失败 → 无 fallback → synthetic」的退化路径。
+    cached_df = load_cache(cache_path)
+    if cached_df is not None and not force_refresh:
+        last_ts = pd.to_datetime(cached_df["timestamp"].iloc[-1])
+        if hasattr(last_ts, "tzinfo") and last_ts.tzinfo is None:
+            last_ts = last_ts.tz_localize("UTC")
+        age = pd.Timestamp.now(tz="UTC") - last_ts
+        if age <= freshness_threshold:
+            return filter_from_2024(cached_df), "real"
+        LOGGER.info(
+            "Cache stale for %s/%s (last bar %s old, threshold %s), refreshing",
+            sub_index, period, age, freshness_threshold,
+        )
 
     # Attempt a real fetch only when an API token is configured.
     if settings.api_token:
