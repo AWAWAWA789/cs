@@ -87,6 +87,8 @@ app.include_router(rank_router)
 app.include_router(monitor_router)
 app.include_router(volume_router)
 app.include_router(accumulation_router)
+from src.api.training_endpoints import router as training_router
+app.include_router(training_router)
 
 frontend_dir = Path(__file__).parent / "frontend" / "dist"
 if frontend_dir.exists():
