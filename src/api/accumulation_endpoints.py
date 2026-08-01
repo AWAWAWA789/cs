@@ -15,12 +15,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import datetime, timezone
 from typing import Any
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.api.cache import TTLCache, ITEM_CACHE
@@ -238,6 +239,94 @@ def _build_ohlc_from_prices(
 
 
 # ── Endpoints ──────────────────────────────────────────────
+
+
+def _monitor_client() -> CSQAQClient:
+    """创建 CSQAQ 客户端用于库存监控接口调用。"""
+    return CSQAQClient(Settings())
+
+
+def _fetch_good_rank(client: CSQAQClient, good_id: str, page_size: int) -> list[dict[str, Any]]:
+    """拉取持有该饰品的主力用户排行（封装 /monitor/get_good_rank）。"""
+    try:
+        result = client.post(
+            "/monitor/get_good_rank",
+            json={"good_id": good_id, "page_index": 1, "page_size": page_size},
+            skip_rate_limit=True,
+        )
+    except CSQAQAPIError as exc:
+        LOGGER.warning("good_rank fetch failed for good_id=%s: %s", good_id, exc)
+        return []
+    data = result.get("data") if isinstance(result, dict) else None
+    return [item for item in (data or []) if isinstance(item, dict)]
+
+
+def _fetch_good_trends(client: CSQAQClient, good_id: str, page_size: int) -> list[dict[str, Any]]:
+    """拉取该饰品的近期库存变动（封装 /monitor/get_task_trends，按 good_id 筛选）。
+
+    返回主力对该饰品的买卖动态（type 标识买入/卖出等行为）。
+    """
+    try:
+        result = client.post(
+            "/monitor/get_task_trends",
+            json={"good_id": good_id, "page_index": 1, "page_size": page_size},
+            skip_rate_limit=True,
+        )
+    except CSQAQAPIError as exc:
+        LOGGER.warning("good_trends fetch failed for good_id=%s: %s", good_id, exc)
+        return []
+    data = result.get("data") if isinstance(result, dict) else None
+    return [item for item in (data or []) if isinstance(item, dict)]
+
+
+@router.get("/item-inventory")
+async def item_inventory(
+    good_id: str = Query(..., description="饰品 good_id"),
+    top_n: int = Query(20, ge=1, le=100, description="返回的主力/变动条数"),
+) -> dict[str, Any]:
+    """单品库存监控数据聚合（先看数据，不加算法）。
+
+    一次返回该饰品的：
+    1. ``holders`` — 持有量排行（主力手里的货量），来自 /monitor/get_good_rank
+    2. ``trends`` — 近期库存变动（主力的买卖情况），来自 /monitor/get_task_trends
+
+    供单品吸货页面直接展示原始库存数据，结合 K 线人工判断主力行为。
+    """
+    start = time.perf_counter()
+    if not good_id:
+        raise HTTPException(status_code=400, detail="good_id 不能为空")
+
+    settings = Settings()
+    if not settings.api_token:
+        latency_ms = (time.perf_counter() - start) * 1000
+        record_request("/accumulation/item-inventory", latency_ms, error=False)
+        return {
+            "good_id": good_id,
+            "holders": [],
+            "trends": [],
+            "data_source": "no_token",
+            "description": "未配置 API token，无法拉取库存监控数据",
+        }
+
+    client = _monitor_client()
+    holders = await asyncio.to_thread(_fetch_good_rank, client, good_id, top_n)
+    trends = await asyncio.to_thread(_fetch_good_trends, client, good_id, top_n)
+
+    latency_ms = (time.perf_counter() - start) * 1000
+    record_request("/accumulation/item-inventory", latency_ms, error=False)
+    LOGGER.info(
+        "item-inventory good_id=%s: %d holders, %d trends (%.0fms)",
+        good_id, len(holders), len(trends), latency_ms,
+    )
+
+    return {
+        "good_id": good_id,
+        "holders": holders,
+        "trends": trends,
+        "data_source": "real",
+        "holder_count": len(holders),
+        "trend_count": len(trends),
+    }
 
 
 @router.post("/analyze")

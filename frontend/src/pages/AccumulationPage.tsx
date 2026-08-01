@@ -4,6 +4,7 @@ import { Badge, Spinner, EmptyState, ErrorState } from "../components/ui/misc";
 import { Button } from "../components/ui/Button";
 import { Select, TextInput } from "../components/ui/Select";
 import { useMeta, PERIOD_LABELS } from "../components/Selector";
+import { ItemSearchBar } from "../components/ItemSearchBar";
 import { api } from "../lib/api";
 import { useAsync } from "../hooks/useAsync";
 import { formatPercent, formatDuration, formatNumber, formatDate } from "../lib/format";
@@ -12,6 +13,9 @@ import type {
   AccumulationFeatures,
   AccumulationSignals,
   AccumulationScanResponse,
+  ItemInventoryResponse,
+  ItemHolder,
+  ItemTrend,
 } from "../types/api";
 import { useGlobalStore, DEFAULT_PERIOD } from "../store/globalStore";
 
@@ -55,6 +59,28 @@ const FEATURE_LABELS: Array<{ key: keyof AccumulationFeatures; label: string }> 
 
 /** 周期下拉兜底选项（meta 未加载时使用）。 */
 const FALLBACK_PERIODS = [DEFAULT_PERIOD, "4hour", "1hour", "7day"];
+
+/**
+ * 库存变动 type → 中文标签（CSQAQ monitor 约定）。
+ * 0-7 分别对应不同的入/出库行为；买卖方向用于着色。
+ */
+const TREND_TYPE_LABEL: Record<number, string> = {
+  0: "未知变动",
+  1: "买入入库",
+  2: "卖出出库",
+  3: "库存增加",
+  4: "库存减少",
+  5: "转移入库",
+  6: "转移出库",
+  7: "其他",
+};
+
+/** 变动方向（买入/入库=多方，卖出/出库=空方），用于着色。 */
+function trendDirection(type: number): "bull" | "bear" | "neutral" {
+  if ([1, 3, 5].includes(type)) return "bull";
+  if ([2, 4, 6].includes(type)) return "bear";
+  return "neutral";
+}
 
 /** 持续时间条满刻度（K线根数），仅用于可视化比例。 */
 const DURATION_FULL_BARS = 120;
@@ -173,6 +199,109 @@ function ScanResultsTable({ data }: { data: AccumulationScanResponse }) {
   );
 }
 
+/** 单品库存监控数据展示（先看数据，不加算法）。 */
+function ItemInventoryPanel({ data }: { data: ItemInventoryResponse }) {
+  const holders = data.holders;
+  const trends = data.trends;
+  const topHolders = holders.slice(0, 10);
+  // 持有量总和与集中度（top3 占比）
+  const totalHold = holders.reduce((s, h) => s + (h.hold_count || 0), 0);
+  const top3Hold = topHolders.slice(0, 3).reduce((s, h) => s + (h.hold_count || 0), 0);
+  const top3Ratio = totalHold > 0 ? (top3Hold / totalHold) * 100 : 0;
+
+  return (
+    <div className="space-y-4">
+      {/* 概览统计 */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="监控到的持有者" value={data.holder_count} hint="主力分布广度" />
+        <StatCard label="近期变动笔数" value={data.trend_count} hint="买卖活跃度" />
+        <StatCard label="总持有量" value={formatNumber(totalHold, 0)} hint="主力手里货量" />
+        <StatCard
+          label="TOP3 集中度"
+          value={formatPercent(top3Ratio / 100, 1)}
+          hint="头部主力占比"
+          color={top3Ratio >= 50 ? "bull" : "neutral"}
+        />
+      </div>
+
+      {/* 主力持有量排行 */}
+      <Card title="主力持有量排行" subtitle="持有该饰品最多的 Steam 用户（货量分布）">
+        {topHolders.length === 0 ? (
+          <EmptyState title="暂无持有者数据" description="可能是该饰品暂未被监控，或未配置 API token。" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-sm">
+              <thead>
+                <tr className="border-b border-surface-border text-left text-xs text-ink-muted">
+                  <th className="px-3 py-2 font-medium">排名</th>
+                  <th className="px-3 py-2 font-medium">用户</th>
+                  <th className="px-3 py-2 text-right font-medium">持有量</th>
+                  <th className="px-3 py-2 text-right font-medium">持仓价值</th>
+                  <th className="px-3 py-2 text-right font-medium">占比</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border">
+                {topHolders.map((h: ItemHolder, idx) => (
+                  <tr key={h.task_id} className="transition-colors hover:bg-surface-hover">
+                    <td className="px-3 py-2 text-ink-muted">#{idx + 1}</td>
+                    <td className="px-3 py-2 font-medium text-ink-primary">{h.steam_name || h.steam_id}</td>
+                    <td className="px-3 py-2 text-right">{formatNumber(h.hold_count, 0)}</td>
+                    <td className="px-3 py-2 text-right text-ink-secondary">¥{formatNumber(h.hold_value, 0)}</td>
+                    <td className="px-3 py-2 text-right text-ink-secondary">
+                      {totalHold > 0 ? formatPercent((h.hold_count || 0) / totalHold, 1) : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* 近期买卖变动 */}
+      <Card title="近期库存变动" subtitle="主力对该饰品的买卖动态（结合 K 线判断吸/出货）">
+        {trends.length === 0 ? (
+          <EmptyState title="暂无变动数据" description="该饰品近期无库存变动记录。" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-surface-border text-left text-xs text-ink-muted">
+                  <th className="px-3 py-2 font-medium">时间</th>
+                  <th className="px-3 py-2 font-medium">用户</th>
+                  <th className="px-3 py-2 font-medium">方向</th>
+                  <th className="px-3 py-2 text-right font-medium">数量</th>
+                  <th className="px-3 py-2 text-right font-medium">价格</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border">
+                {trends.slice(0, 20).map((t: ItemTrend) => {
+                  const dir = trendDirection(t.type);
+                  return (
+                    <tr key={t.trend_id} className="transition-colors hover:bg-surface-hover">
+                      <td className="px-3 py-2 text-xs text-ink-muted">{formatDate(t.time)}</td>
+                      <td className="px-3 py-2 font-medium text-ink-primary">{t.steam_name}</td>
+                      <td className="px-3 py-2">
+                        <Badge variant={dir}>{TREND_TYPE_LABEL[t.type] ?? `类型${t.type}`}</Badge>
+                      </td>
+                      <td className="px-3 py-2 text-right">{formatNumber(t.count, 0)}</td>
+                      <td className="px-3 py-2 text-right text-ink-secondary">¥{formatNumber(t.price, 2)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {data.description && (
+        <p className="text-xs text-ink-muted">{data.description}</p>
+      )}
+    </div>
+  );
+}
+
 /** 单个标的的吸货分析结果展示。 */
 function AnalysisResult({ data }: { data: AccumulationAnalysis }) {
   const score = data.accumulation_score;
@@ -283,11 +412,20 @@ export default function AccumulationPage() {
   const [mode, setMode] = useState<"index" | "item">(itemGoodId ? "item" : "index");
   // 单品输入框值（独立于全局 store，避免输入时全局联动）
   const [goodIdInput, setGoodIdInput] = useState(itemGoodId ?? "");
+  // 通过名称搜索选中的饰品名（用于展示），与 goodIdInput 配合
+  const [selectedItemName, setSelectedItemName] = useState("");
   // 单品价格指标选择
   const [itemKey, setItemKey] = useState<"sell_price" | "buy_price">("sell_price");
 
   // 初始化状态（挂载时自动查询一次）
   const status = useAsync((signal) => api.accumulation.status(signal), []);
+
+  // 单品库存监控数据：goodIdInput 变化且为单品模式时自动拉取（先看数据，不加算法）
+  const inventory = useAsync(
+    (signal) => api.accumulation.itemInventory(goodIdInput, 20, signal),
+    [goodIdInput],
+    mode === "item" && goodIdInput.trim() !== "",
+  );
 
   // 数据预热（按钮触发）
   const [initTrigger, setInitTrigger] = useState(0);
@@ -412,12 +550,27 @@ export default function AccumulationPage() {
               />
             ) : (
               <>
-                <TextInput
-                  label="单品 good_id"
-                  value={goodIdInput}
-                  onChange={(e) => setGoodIdInput(e.target.value)}
-                  placeholder="如：2"
-                />
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-medium text-ink-secondary">
+                    饰品名称搜索 → good_id
+                  </label>
+                  <ItemSearchBar
+                    placeholder="输入饰品名称搜索，如「蝴蝶刀 | 渐变」"
+                    onSelect={(item) => {
+                      setGoodIdInput(item.good_id);
+                      setSelectedItemName(item.name);
+                    }}
+                  />
+                  {goodIdInput && (
+                    <div className="mt-1.5 flex items-center gap-2 text-xs">
+                      <Badge variant="bull">已选</Badge>
+                      <span className="text-ink-primary">
+                        {selectedItemName || "(未命名)"}
+                      </span>
+                      <span className="text-ink-muted">good_id: {goodIdInput}</span>
+                    </div>
+                  )}
+                </div>
                 <Select
                   label="平台"
                   value={String(platform)}
@@ -456,12 +609,47 @@ export default function AccumulationPage() {
           </div>
           {mode === "item" && (
             <p className="text-xs text-ink-muted">
-              提示：单品模式下数据来自 CSQAQ /info/chart 价格序列，按周期聚合为OHLC后分析。
-              good_id 可在「单品详情页」URL 或搜索结果中查看。
+              提示：单品模式下数据来自 CSQAQ /info/chart 价格序列，按周期聚合为 OHLC 后分析。
+              在上方搜索框输入饰品名称即可自动填入 good_id，无需手动查找。
             </p>
           )}
         </div>
       </Card>
+
+      {/* 单品库存监控数据（仅单品模式，先看数据不加算法） */}
+      {mode === "item" && goodIdInput.trim() !== "" && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-secondary">库存监控数据</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => inventory.refetch()}
+              loading={inventory.loading}
+            >
+              刷新库存
+            </Button>
+          </div>
+          {inventory.loading ? (
+            <Card>
+              <Spinner className="py-10" />
+            </Card>
+          ) : inventory.error ? (
+            <Card>
+              <ErrorState message={inventory.error} onRetry={() => inventory.refetch()} />
+            </Card>
+          ) : !inventory.data ? (
+            <Card>
+              <EmptyState
+                title="尚无库存数据"
+                description="搜索并选择饰品后，将自动拉取该饰品的主力持有量与买卖变动。"
+              />
+            </Card>
+          ) : (
+            <ItemInventoryPanel data={inventory.data} />
+          )}
+        </section>
+      )}
 
       {/* 数据预热 */}
       <Card title="数据预热" subtitle="一次性初始化吸货分析所需缓存，加速后续分析">

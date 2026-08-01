@@ -23,6 +23,7 @@ import type {
   AccumulationScanResponse,
   AccumulationInitResponse,
   AccumulationStatusResponse,
+  ItemInventoryResponse,
 } from "../types/api";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -455,6 +456,15 @@ export const accumulationApi = {
   /** 查看初始化状态。 */
   status(signal?: AbortSignal): Promise<AccumulationStatusResponse> {
     return request<AccumulationStatusResponse>("/accumulation/status", undefined, { signal });
+  },
+
+  /** 拉取单品库存监控聚合数据（主力持有量 + 近期买卖变动，先看数据不加算法）。 */
+  itemInventory(goodId: string, topN = 20, signal?: AbortSignal): Promise<ItemInventoryResponse> {
+    return request<ItemInventoryResponse>(
+      "/accumulation/item-inventory",
+      { good_id: goodId, top_n: topN },
+      { signal },
+    );
   },
 };
 

@@ -349,3 +349,43 @@ export interface AccumulationStatusResponse {
   items_cached: number;
   errors: string[];
 }
+
+// ── 单品库存监控（吸货页面用，先看数据） ────────────────
+
+/** 持有该饰品的主力用户项（来自 /monitor/get_good_rank）。 */
+export interface ItemHolder {
+  task_id: string;
+  steam_id: string;
+  steam_name: string;
+  avatar: string;
+  hold_count: number;
+  hold_value: number;
+  [key: string]: unknown;
+}
+
+/** 该饰品近期库存变动项（来自 /monitor/get_task_trends）。 */
+export interface ItemTrend {
+  trend_id: string;
+  task_id: string;
+  steam_name: string;
+  good_id: string;
+  good_name: string;
+  good_img: string;
+  /** 变动类型（0-7，标识买入/卖出等行为）。 */
+  type: number;
+  count: number;
+  price: number;
+  time: string;
+  [key: string]: unknown;
+}
+
+/** 单品库存聚合响应（GET /accumulation/item-inventory）。 */
+export interface ItemInventoryResponse {
+  good_id: string;
+  holders: ItemHolder[];
+  trends: ItemTrend[];
+  data_source: string;
+  holder_count: number;
+  trend_count: number;
+  description?: string;
+}

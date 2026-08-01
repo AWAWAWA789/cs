@@ -24,6 +24,11 @@ interface ItemSearchBarProps {
   className?: string;
   /** 输入框 placeholder。 */
   placeholder?: string;
+  /**
+   * 选中饰品时的回调。若提供，则调用该回调而非导航至 /item/:good_id。
+   * 用于在非详情页（如吸货分析页）复用搜索框来填充 good_id。
+   */
+  onSelect?: (item: SearchSuggestItem) => void;
 }
 
 /**
@@ -37,6 +42,7 @@ interface ItemSearchBarProps {
 export function ItemSearchBar({
   className = "",
   placeholder = "搜索饰品...",
+  onSelect,
 }: ItemSearchBarProps) {
   const [text, setText] = useState("");
   const [results, setResults] = useState<SearchSuggestItem[]>([]);
@@ -140,7 +146,12 @@ export function ItemSearchBar({
   const handleSelect = (item: SearchSuggestItem) => {
     cancelPendingClose();
     setItemGoodId(item.good_id);
-    navigate(`/item/${item.good_id}`);
+    if (onSelect) {
+      // 回调模式：仅通知父组件选中的饰品，不导航
+      onSelect(item);
+    } else {
+      navigate(`/item/${item.good_id}`);
+    }
     setText("");
     closeDropdown();
   };

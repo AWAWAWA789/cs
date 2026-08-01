@@ -88,12 +88,45 @@ class BatchPriceRequest(BaseModel):
 # ── Endpoints ──────────────────────────────────────────────
 
 
+def _normalize_search_result(raw: Any) -> dict[str, Any]:
+    """将 CSQAQ /search/suggest 响应归一化为 ``{data: [{good_id, name}]}``。
+
+    CSQAQ 该端点实际返回 ``{code, msg, data: [{id, value}]}``（``id`` 即
+    good_id，``value`` 即中文名）。但本项目前端类型与其他端点（rank/page
+    list 等）统一使用 ``good_id``/``name``。这里做一层映射，避免前端拿到
+    ``item.good_id === undefined`` 进而导致 ``/info/good?id=undefined`` 的
+    422 错误。同时对两种形状都做兼容，防止 API 字段调整时回归。
+    """
+    if not isinstance(raw, dict):
+        return {"data": []}
+
+    data = raw.get("data")
+    items: list[dict[str, str]] = []
+    if isinstance(data, list):
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            good_id = str(
+                item.get("good_id") or item.get("id") or ""
+            )
+            name = str(item.get("name") or item.get("value") or "")
+            if not good_id and not name:
+                continue
+            items.append({"good_id": good_id, "name": name})
+
+    return {
+        "code": raw.get("code", 0),
+        "msg": raw.get("msg", "Success"),
+        "data": items,
+    }
+
+
 @router.post("/search")
 async def search_suggest(req: SearchRequest) -> Any:
     """饰品名称联想搜索。
 
-    封装 CSQAQ ``/api/v1/search/suggest?text={keyword}``。
-    结果缓存 30 秒。
+    封装 CSQAQ ``/api/v1/search/suggest?text={keyword}``，并将结果归一化为
+    ``{data: [{good_id, name}]}`` 以匹配前端类型。结果缓存 30 秒。
     """
     cache_key = f"search:{req.text}"
     cached = _SEARCH_CACHE.get(cache_key)
@@ -105,8 +138,9 @@ async def search_suggest(req: SearchRequest) -> Any:
     client = _get_client()
     try:
         result = await asyncio.to_thread(client.get, "/search/suggest", params={"text": req.text})
-        _SEARCH_CACHE.set(cache_key, result)
-        return result
+        normalized = _normalize_search_result(result)
+        _SEARCH_CACHE.set(cache_key, normalized)
+        return normalized
     except CSQAQAPIError as exc:
         _handle_api_error(exc)
 
