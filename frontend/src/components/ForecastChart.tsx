@@ -160,10 +160,10 @@ export const ForecastChart = memo(function ForecastChart({
         type: "candlestick",
         data: [...histData, ...Array(maxForecastLen).fill(null)],
         itemStyle: {
-          color: "#16a34a",
-          color0: "#dc2626",
-          borderColor: "#16a34a",
-          borderColor0: "#dc2626",
+          color: "#dc2626",
+          color0: "#16a34a",
+          borderColor: "#dc2626",
+          borderColor0: "#16a34a",
         },
         markPoint: { data: markPoints },
         markLine: {

@@ -193,14 +193,27 @@ def _build_wave_sketch(
     support: float,
     resistance: float,
     target: float,
+    *,
+    scenario_key: str = "",
 ) -> list[dict[str, Any]]:
-    """生成浪形草图关键点位序列。"""
+    """生成浪形草图关键点位序列。
+
+    不同方向的情景会生成不同的预测路径：
+    - 上涨情景：先回踩 support → 反弹至 resistance → 突破到 target
+    - 下跌情景：先反抽 resistance → 回落至 support → 跌破到 target
+    - 震荡情景：在 support/resistance 之间往复
+
+    历史 swings 作为路径起点上下文，但预测部分按情景方向差异化生成，
+    避免不同情景的波形看起来一模一样。
+    """
     close = float(df["close"].iloc[-1])
     swings = _extract_last_swings(df, n=4)
-    sketch = [
+
+    sketch: list[dict[str, Any]] = [
         {"label": "current", "price": round(close, 6), "type": "current"},
     ]
-    for s in swings:
+    # 加入最近 2 个 swing 作为路径起点上下文（从旧到新）
+    for s in swings[-2:]:
         sketch.append({
             "label": s["type"],
             "price": round(s["price"], 6),
@@ -208,26 +221,34 @@ def _build_wave_sketch(
             "idx": s["idx"],
         })
 
+    # 按情景方向生成差异化的预测路径
     if direction > 0:
+        # 上涨路径：回踩 → 反弹 → 突破
         sketch.extend([
-            {"label": "support", "price": round(support, 6), "type": "support"},
+            {"label": "pullback", "price": round(support, 6), "type": "pullback"},
             {"label": "resistance", "price": round(resistance, 6), "type": "resistance"},
+            {"label": "breakout", "price": round((resistance + target) / 2, 6), "type": "breakout"},
             {"label": "target", "price": round(target, 6), "type": "target"},
         ])
     elif direction < 0:
+        # 下跌路径：反抽 → 回落 → 跌破
         sketch.extend([
-            {"label": "resistance", "price": round(resistance, 6), "type": "resistance"},
+            {"label": "rebound", "price": round(resistance, 6), "type": "rebound"},
             {"label": "support", "price": round(support, 6), "type": "support"},
+            {"label": "breakdown", "price": round((support + target) / 2, 6), "type": "breakdown"},
             {"label": "target", "price": round(target, 6), "type": "target"},
         ])
     else:
+        # 震荡路径：上下往复
+        mid = (support + resistance) / 2
         sketch.extend([
             {"label": "support", "price": round(support, 6), "type": "support"},
+            {"label": "mid", "price": round(mid, 6), "type": "mid"},
             {"label": "resistance", "price": round(resistance, 6), "type": "resistance"},
-            {"label": "mid", "price": round((support + resistance) / 2, 6), "type": "mid"},
+            {"label": "mid2", "price": round(mid, 6), "type": "mid"},
         ])
 
-    # 按价格排序去重，便于可视化。
+    # 去重（相同 label+价格只保留首个）
     seen = set()
     unique = []
     for pt in sketch:

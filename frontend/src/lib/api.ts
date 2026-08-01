@@ -410,11 +410,26 @@ export const rankApi = {
 // ── Accumulation (吸货分析) API ───────────────────────────
 
 export const accumulationApi = {
-  /** 对指定标的执行吸货分析。 */
+  /** 对指定标的执行吸货分析（指数模式）。 */
   analyze(subIndex: string, period: string, signal?: AbortSignal): Promise<AccumulationAnalysis> {
     return request<AccumulationAnalysis>("/accumulation/analyze", undefined, {
       method: "POST",
       body: JSON.stringify({ sub_index: subIndex, period }),
+      signal,
+    });
+  },
+
+  /** 对指定单品执行吸货分析（单品模式，优先于指数）。 */
+  analyzeItem(
+    goodId: string,
+    period: string,
+    platform = 1,
+    key = "sell_price",
+    signal?: AbortSignal,
+  ): Promise<AccumulationAnalysis> {
+    return request<AccumulationAnalysis>("/accumulation/analyze", undefined, {
+      method: "POST",
+      body: JSON.stringify({ good_id: goodId, period, platform, key }),
       signal,
     });
   },

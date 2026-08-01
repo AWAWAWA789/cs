@@ -50,7 +50,7 @@ function buildEnhancedOhlcOption(ohlc: OhlcBar[], scenarios: Scenario[]) {
   const volumeData = hasVolume
     ? ohlc.map((d) => ({
         value: d.volume ?? 0,
-        itemStyle: { color: d.close >= d.open ? "#16a34a80" : "#dc262680" },
+        itemStyle: { color: d.close >= d.open ? "#dc262680" : "#16a34a80" },
       }))
     : [];
 
@@ -146,10 +146,10 @@ function buildEnhancedOhlcOption(ohlc: OhlcBar[], scenarios: Scenario[]) {
       type: "candlestick",
       data: candleData,
       itemStyle: {
-        color: "#16a34a",
-        color0: "#dc2626",
-        borderColor: "#16a34a",
-        borderColor0: "#dc2626",
+        color: "#dc2626",
+        color0: "#16a34a",
+        borderColor: "#dc2626",
+        borderColor0: "#16a34a",
       },
       markPoint: { data: markPoints },
       markLine: {

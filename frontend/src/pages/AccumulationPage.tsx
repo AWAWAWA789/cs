@@ -272,9 +272,19 @@ export default function AccumulationPage() {
   const period = useGlobalStore((s) => s.period);
   const setSubIndex = useGlobalStore((s) => s.setSubIndex);
   const setPeriod = useGlobalStore((s) => s.setPeriod);
+  const itemGoodId = useGlobalStore((s) => s.itemGoodId);
+  const platform = useGlobalStore((s) => s.platform);
+  const setPlatform = useGlobalStore((s) => s.setPlatform);
 
   const meta = useMeta();
   const periods = meta?.supported_periods?.length ? meta.supported_periods : FALLBACK_PERIODS;
+
+  // 分析模式：index=指数模式，item=单品模式
+  const [mode, setMode] = useState<"index" | "item">(itemGoodId ? "item" : "index");
+  // 单品输入框值（独立于全局 store，避免输入时全局联动）
+  const [goodIdInput, setGoodIdInput] = useState(itemGoodId ?? "");
+  // 单品价格指标选择
+  const [itemKey, setItemKey] = useState<"sell_price" | "buy_price">("sell_price");
 
   // 初始化状态（挂载时自动查询一次）
   const status = useAsync((signal) => api.accumulation.status(signal), []);
@@ -289,13 +299,26 @@ export default function AccumulationPage() {
 
   // 单标的分析（按钮触发，捕获点击时的参数）
   const [analyzeTrigger, setAnalyzeTrigger] = useState(0);
-  const [analyzeParams, setAnalyzeParams] = useState<{ subIndex: string; period: string }>({
-    subIndex,
-    period,
-  });
+  const [analyzeParams, setAnalyzeParams] = useState<{
+    mode: "index" | "item";
+    subIndex: string;
+    goodId: string;
+    period: string;
+    platform: number;
+    key: string;
+  }>({ mode, subIndex, goodId: goodIdInput, period, platform, key: itemKey });
   const analysis = useAsync(
-    (signal) => api.accumulation.analyze(analyzeParams.subIndex, analyzeParams.period, signal),
-    [analyzeParams.subIndex, analyzeParams.period, analyzeTrigger],
+    (signal) =>
+      analyzeParams.mode === "item"
+        ? api.accumulation.analyzeItem(
+            analyzeParams.goodId,
+            analyzeParams.period,
+            analyzeParams.platform,
+            analyzeParams.key,
+            signal,
+          )
+        : api.accumulation.analyze(analyzeParams.subIndex, analyzeParams.period, signal),
+    [analyzeParams.mode, analyzeParams.subIndex, analyzeParams.goodId, analyzeParams.period, analyzeParams.platform, analyzeParams.key, analyzeTrigger],
     analyzeTrigger > 0,
   );
 
@@ -323,7 +346,7 @@ export default function AccumulationPage() {
   const handleInit = () => setInitTrigger((c) => c + 1);
 
   const handleAnalyze = () => {
-    setAnalyzeParams({ subIndex, period });
+    setAnalyzeParams({ mode, subIndex, goodId: goodIdInput, period, platform, key: itemKey });
     setAnalyzeTrigger((c) => c + 1);
   };
 
@@ -340,39 +363,103 @@ export default function AccumulationPage() {
   const analyzeBusy = analysis.loading || analysis.isStale;
   const initBusy = init.loading || init.isStale;
   const scanBusy = scan.loading || scan.isStale;
+  const canAnalyze = mode === "item" ? goodIdInput.trim() !== "" : subIndex.trim() !== "";
 
   return (
     <div className="space-y-6">
       {/* 页面头部 */}
       <div>
         <h1 className="text-2xl font-bold text-ink-primary">库存吸货分析</h1>
-        <p className="mt-1 text-sm text-ink-muted">识别主力资金隐蔽建仓行为</p>
+        <p className="mt-1 text-sm text-ink-muted">识别主力资金隐蔽建仓行为（支持指数与单品）</p>
       </div>
 
       {/* 分析参数 */}
-      <Card title="分析参数" subtitle="输入标的名称并选择周期">
-        <div className="flex flex-wrap items-end gap-3">
-          <TextInput
-            label="标的 (sub_index)"
-            value={subIndex}
-            onChange={(e) => setSubIndex(e.target.value)}
-            placeholder="如：饰品指数"
-          />
-          <Select label="周期" value={period} onChange={(e) => setPeriod(e.target.value)}>
-            {periods.map((p) => (
-              <option key={p} value={p}>
-                {PERIOD_LABELS[p] ?? p}
-              </option>
-            ))}
-          </Select>
-          <Button
-            variant="primary"
-            onClick={handleAnalyze}
-            loading={analyzeBusy}
-            disabled={!subIndex.trim()}
-          >
-            执行分析
-          </Button>
+      <Card title="分析参数" subtitle="选择分析模式并设置参数">
+        <div className="space-y-4">
+          {/* 模式切换 */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setMode("index")}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                mode === "index"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-surface-hover text-ink-secondary hover:bg-surface-border"
+              }`}
+            >
+              指数模式
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("item")}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                mode === "item"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-surface-hover text-ink-secondary hover:bg-surface-border"
+              }`}
+            >
+              单品模式
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            {mode === "index" ? (
+              <TextInput
+                label="标的 (sub_index)"
+                value={subIndex}
+                onChange={(e) => setSubIndex(e.target.value)}
+                placeholder="如：饰品指数"
+              />
+            ) : (
+              <>
+                <TextInput
+                  label="单品 good_id"
+                  value={goodIdInput}
+                  onChange={(e) => setGoodIdInput(e.target.value)}
+                  placeholder="如：2"
+                />
+                <Select
+                  label="平台"
+                  value={String(platform)}
+                  onChange={(e) => setPlatform(Number(e.target.value) as 1 | 2 | 3 | 4)}
+                >
+                  <option value="1">BUFF</option>
+                  <option value="2">悠悠有品</option>
+                  <option value="3">Steam</option>
+                  <option value="4">C5GAME</option>
+                </Select>
+                <Select
+                  label="价格指标"
+                  value={itemKey}
+                  onChange={(e) => setItemKey(e.target.value as "sell_price" | "buy_price")}
+                >
+                  <option value="sell_price">卖价</option>
+                  <option value="buy_price">买价</option>
+                </Select>
+              </>
+            )}
+            <Select label="周期" value={period} onChange={(e) => setPeriod(e.target.value)}>
+              {periods.map((p) => (
+                <option key={p} value={p}>
+                  {PERIOD_LABELS[p] ?? p}
+                </option>
+              ))}
+            </Select>
+            <Button
+              variant="primary"
+              onClick={handleAnalyze}
+              loading={analyzeBusy}
+              disabled={!canAnalyze}
+            >
+              执行分析
+            </Button>
+          </div>
+          {mode === "item" && (
+            <p className="text-xs text-ink-muted">
+              提示：单品模式下数据来自 CSQAQ /info/chart 价格序列，按周期聚合为OHLC后分析。
+              good_id 可在「单品详情页」URL 或搜索结果中查看。
+            </p>
+          )}
         </div>
       </Card>
 
