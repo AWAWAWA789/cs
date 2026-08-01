@@ -234,6 +234,86 @@ def detect_accumulation(
     }
 
 
+# ── 双轨融合 ──────────────────────────────────────────────
+# K线行为轨 + 库存行为轨的融合阈值与权重
+KLINE_HIGH = 0.55
+KLINE_LOW = 0.35
+INV_HIGH = 0.55
+INV_LOW = 0.35
+
+
+def _classify_fusion_pattern(kline_score: float, inventory_score: float) -> str:
+    """判定双轨融合模式。
+
+    返回四种模式之一：
+    - strong: 双高（K线吸货 + 库存加仓）→ 明牌吸货
+    - weak:   K高库低（可能下跌中继）
+    - hidden: K低库高（隐蔽吸货，最稀缺信号）
+    - none:   双低（无信号）
+    """
+    k_high = kline_score >= KLINE_HIGH
+    k_low = kline_score <= KLINE_LOW
+    i_high = inventory_score >= INV_HIGH
+    i_low = inventory_score <= INV_LOW
+
+    if k_high and i_high:
+        return "strong"
+    if k_high and i_low:
+        return "weak"
+    if k_low and i_high:
+        return "hidden"
+    return "none"
+
+
+def fuse_scores(
+    kline_score: float,
+    inventory_score: float,
+) -> dict[str, Any]:
+    """双轨融合评分。
+
+    融合规则（核心）：
+    - strong (双高): kline×0.6 + inv×0.4 + 0.10（同向加分）
+    - weak   (K高库低): kline×0.6 + inv×0.4 - 0.05（减分，可能误判）
+    - hidden (K低库高): kline×0.4 + inv×0.6 + 0.15（隐蔽吸货加成，最稀缺）
+    - none   (双低): kline×0.5 + inv×0.5
+
+    Args:
+        kline_score: K线行为评分 (0-1)
+        inventory_score: 库存行为评分 (0-1)
+
+    Returns:
+        融合结果字典：fused_score, pattern, kline_score, inventory_score
+    """
+    pattern = _classify_fusion_pattern(kline_score, inventory_score)
+
+    if pattern == "strong":
+        fused = kline_score * 0.6 + inventory_score * 0.4 + 0.10
+    elif pattern == "weak":
+        fused = kline_score * 0.6 + inventory_score * 0.4 - 0.05
+    elif pattern == "hidden":
+        fused = kline_score * 0.4 + inventory_score * 0.6 + 0.15
+    else:  # none
+        fused = kline_score * 0.5 + inventory_score * 0.5
+
+    fused = float(max(0.0, min(1.0, fused)))
+
+    # 阶段判定
+    if fused >= 0.6:
+        phase = "accumulation"
+    elif fused <= 0.3:
+        phase = "distribution"
+    else:
+        phase = "neutral"
+
+    return {
+        "fused_score": round(fused, 4),
+        "pattern": pattern,
+        "phase": phase,
+        "kline_score": round(float(kline_score), 4),
+        "inventory_score": round(float(inventory_score), 4),
+    }
+
+
 def _generate_description(
     scores: dict[str, float],
     features: dict[str, float],

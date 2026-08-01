@@ -390,6 +390,55 @@ export interface ItemInventoryResponse {
   description?: string;
 }
 
+// ── 双轨融合吸货分析 ────────────────────────────────────
+
+/** 双轨融合模式。 */
+export type FusionPattern = "strong" | "weak" | "hidden" | "none";
+
+/** 库存行为 4 项子分。 */
+export interface InventorySignals {
+  concentration: number;
+  net_inflow: number;
+  holder_activity: number;
+  team_synergy: number;
+}
+
+/** 库存原始统计（用于展示）。 */
+export interface InventoryStats {
+  top3_concentration: number;
+  total_hold: number;
+  net_inflow_7d: number;
+  active_holder_count: number;
+  holder_total: number;
+  team_confidence: number | null;
+}
+
+/** 双轨融合分析响应（GET /accumulation/analyze-fused）。 */
+export interface FusedAccumulationResponse {
+  good_id: string;
+  period: string;
+  /** 融合吸货评分 (0-1)。 */
+  fused_score: number;
+  phase: "accumulation" | "distribution" | "neutral";
+  /** 融合模式。 */
+  pattern: FusionPattern;
+  /** K线行为评分 (0-1)。 */
+  kline_score: number;
+  /** 库存行为评分 (0-1)。 */
+  inventory_score: number;
+  /** K线 6 项规则子分。 */
+  kline_signals: Record<string, number>;
+  /** 库存 4 项子分。 */
+  inventory_signals: InventorySignals;
+  kline_features: Record<string, number>;
+  inventory_stats: InventoryStats;
+  duration_bars: number;
+  /** 人话证据链。 */
+  evidence: string[];
+  data_source: string;
+  cached?: boolean;
+}
+
 // ── 跨品主力团队识别（吸货页面用） ──────────────────────
 
 /** 关联品：被多个种子主力共同持有的其他饰品。 */

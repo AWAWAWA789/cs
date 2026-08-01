@@ -24,6 +24,7 @@ import type {
   AccumulationInitResponse,
   AccumulationStatusResponse,
   ItemInventoryResponse,
+  FusedAccumulationResponse,
   TeamAnalysisResponse,
 } from "../types/api";
 
@@ -478,6 +479,22 @@ export const accumulationApi = {
     return request<TeamAnalysisResponse>(
       "/accumulation/team-analysis",
       { good_id: goodId, holder_top_n: holderTopN, min_overlap: minOverlap },
+      { signal },
+    );
+  },
+
+  /** 双轨融合吸货分析（K线行为 + 库存行为）。 */
+  analyzeFused(
+    goodId: string,
+    period = "1day",
+    platform = 1,
+    key = "sell_price",
+    includeTeam = true,
+    signal?: AbortSignal,
+  ): Promise<FusedAccumulationResponse> {
+    return request<FusedAccumulationResponse>(
+      "/accumulation/analyze-fused",
+      { good_id: goodId, period, platform, key, include_team: includeTeam },
       { signal },
     );
   },

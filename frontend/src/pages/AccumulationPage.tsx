@@ -17,6 +17,8 @@ import type {
   ItemInventoryResponse,
   ItemHolder,
   ItemTrend,
+  FusedAccumulationResponse,
+  FusionPattern,
   TeamAnalysisResponse,
   TeamRelatedItem,
   TeamHolderCross,
@@ -199,6 +201,157 @@ function ScanResultsTable({ data }: { data: AccumulationScanResponse }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/** 双轨融合模式 → 中文标签与颜色。 */
+const PATTERN_META: Record<FusionPattern, { label: string; desc: string; color: string; variant: "bull" | "bear" | "neutral" }> = {
+  strong: { label: "明牌吸货", desc: "K线吸货 + 库存加仓，双高信号", color: "#16a34a", variant: "bull" },
+  hidden: { label: "隐蔽吸货", desc: "K线不动但库存加仓，最稀缺信号", color: "#0ea5e9", variant: "bull" },
+  weak: { label: "疑似误判", desc: "K线看似吸货但库存不配合，可能下跌中继", color: "#f59e0b", variant: "neutral" },
+  none: { label: "无信号", desc: "双低，无明显吸货迹象", color: "#9ca3af", variant: "neutral" },
+};
+
+/** 双轨融合吸货分析展示。 */
+function FusedAnalysisPanel({ data }: { data: FusedAccumulationResponse }) {
+  const meta = PATTERN_META[data.pattern];
+  const klinePct = Math.round(data.kline_score * 100);
+  const invPct = Math.round(data.inventory_score * 100);
+  const fusedPct = Math.round(data.fused_score * 100);
+
+  return (
+    <div className="space-y-4">
+      {/* 融合评分总览 */}
+      <Card title="双轨融合评分" subtitle="K线行为 × 库存行为 交叉验证">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard
+            label="融合吸货评分"
+            value={
+              <span style={{ color: scoreColor(data.fused_score) }}>
+                {formatPercent(data.fused_score, 1)}
+              </span>
+            }
+            hint={<Badge variant={PHASE_BADGE[data.phase]}>{PHASE_LABEL[data.phase]}</Badge>}
+          />
+          <StatCard
+            label="融合模式"
+            value={<span style={{ color: meta.color }}>{meta.label}</span>}
+            hint={meta.desc}
+          />
+          <StatCard
+            label="持续K线数"
+            value={data.duration_bars}
+            hint={`数据源：${data.data_source}`}
+          />
+        </div>
+
+        {/* 双轨对比条 */}
+        <div className="mt-4 space-y-3">
+          <div>
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="text-ink-secondary">K线行为评分</span>
+              <span className="font-semibold" style={{ color: scoreColor(data.kline_score) }}>
+                {formatPercent(data.kline_score, 1)}
+              </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-surface-hover">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${klinePct}%`, backgroundColor: scoreColor(data.kline_score) }}
+              />
+            </div>
+          </div>
+          <div>
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="text-ink-secondary">库存行为评分</span>
+              <span className="font-semibold" style={{ color: scoreColor(data.inventory_score) }}>
+                {formatPercent(data.inventory_score, 1)}
+              </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-surface-hover">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${invPct}%`, backgroundColor: scoreColor(data.inventory_score) }}
+              />
+            </div>
+          </div>
+          <div>
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="font-medium text-ink-primary">融合评分</span>
+              <span className="font-bold" style={{ color: scoreColor(data.fused_score) }}>
+                {formatPercent(data.fused_score, 1)}
+              </span>
+            </div>
+            <div className="h-3 w-full overflow-hidden rounded-full bg-surface-hover">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${fusedPct}%`, backgroundColor: scoreColor(data.fused_score) }}
+              />
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* 证据链 */}
+      {data.evidence.length > 0 && (
+        <Card title="证据链" subtitle="双轨信号交叉验证依据">
+          <ul className="space-y-2">
+            {data.evidence.map((e, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-ink-secondary">
+                <span className="mt-1 text-xs text-ink-muted">▸</span>
+                <span>{e}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {/* 库存子分明细 */}
+      <Card title="库存行为子分" subtitle="4 项库存特征明细">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+          <SignalBar label="集中度" value={data.inventory_signals.concentration} />
+          <SignalBar label="净流入" value={data.inventory_signals.net_inflow} />
+          <SignalBar label="活跃度" value={data.inventory_signals.holder_activity} />
+          <SignalBar label="团队协同" value={data.inventory_signals.team_synergy} />
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-surface-border pt-3 text-xs sm:grid-cols-3">
+          <div className="flex justify-between">
+            <span className="text-ink-muted">TOP3 集中度</span>
+            <span className="font-medium text-ink-primary">
+              {formatPercent(data.inventory_stats.top3_concentration, 1)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ink-muted">总持仓量</span>
+            <span className="font-medium text-ink-primary">{formatNumber(data.inventory_stats.total_hold, 0)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ink-muted">近7日净流入</span>
+            <span
+              className="font-medium"
+              style={{ color: data.inventory_stats.net_inflow_7d >= 0 ? "#16a34a" : "#dc2626" }}
+            >
+              {data.inventory_stats.net_inflow_7d > 0 ? "+" : ""}
+              {formatNumber(data.inventory_stats.net_inflow_7d, 0)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-ink-muted">活跃主力</span>
+            <span className="font-medium text-ink-primary">
+              {data.inventory_stats.active_holder_count} / {data.inventory_stats.holder_total}
+            </span>
+          </div>
+          {data.inventory_stats.team_confidence !== null && (
+            <div className="flex justify-between">
+              <span className="text-ink-muted">团队置信度</span>
+              <span className="font-medium text-ink-primary">
+                {formatPercent(data.inventory_stats.team_confidence, 0)}
+              </span>
+            </div>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -824,6 +977,14 @@ export default function AccumulationPage() {
     mode === "item" && goodIdInput.trim() !== "",
   );
 
+  // 双轨融合吸货分析：按钮触发（含团队分析耗时约 10s，避免每次切换都拉取）
+  const [fusedTrigger, setFusedTrigger] = useState(0);
+  const fused = useAsync(
+    (signal) => api.accumulation.analyzeFused(goodIdInput, period, platform, itemKey, true, signal),
+    [goodIdInput, fusedTrigger, period, platform, itemKey],
+    fusedTrigger > 0 && mode === "item" && goodIdInput.trim() !== "",
+  );
+
   // 跨品主力团队识别：goodIdInput 变化且为单品模式时自动拉取（按钮触发，避免每次切换都拉取 N 个用户持仓）
   const [teamTrigger, setTeamTrigger] = useState(0);
   const team = useAsync(
@@ -1092,6 +1253,46 @@ export default function AccumulationPage() {
           )}
         </div>
       </Card>
+
+      {/* 双轨融合吸货分析（仅单品模式，按钮触发） */}
+      {mode === "item" && goodIdInput.trim() !== "" && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-ink-secondary">双轨融合吸货分析</h2>
+              <p className="mt-0.5 text-xs text-ink-muted">
+                K线行为 × 库存行为 交叉验证，识别明牌/隐蔽/误判三种模式（含团队分析约 10s）
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setFusedTrigger((c) => c + 1)}
+              loading={fused.loading}
+            >
+              执行融合分析
+            </Button>
+          </div>
+          {fused.loading ? (
+            <Card>
+              <Spinner className="py-10" />
+            </Card>
+          ) : fused.error ? (
+            <Card>
+              <ErrorState message={fused.error} onRetry={() => setFusedTrigger((c) => c + 1)} />
+            </Card>
+          ) : fused.data ? (
+            <FusedAnalysisPanel data={fused.data} />
+          ) : (
+            <Card>
+              <EmptyState
+                title="点击「执行融合分析」"
+                description="将并发拉取 K线、库存、团队数据，输出双轨融合吸货评分与证据链。"
+              />
+            </Card>
+          )}
+        </section>
+      )}
 
       {/* 单品库存监控数据（仅单品模式，先看数据不加算法） */}
       {mode === "item" && goodIdInput.trim() !== "" && (

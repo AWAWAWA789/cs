@@ -41,6 +41,9 @@ router = APIRouter(prefix="/accumulation", tags=["accumulation"])
 # 分析结果缓存（5 分钟）
 _ANALYSIS_CACHE = TTLCache(ttl_seconds=300.0)
 
+# 双轨融合分析结果缓存（5 分钟）
+_FUSED_CACHE = TTLCache(ttl_seconds=300.0)
+
 # 团队分析结果缓存（5 分钟）
 _TEAM_CACHE = TTLCache(ttl_seconds=300.0)
 
@@ -351,6 +354,173 @@ async def item_inventory(
         "holder_count": len(holders),
         "trend_count": len(trends),
     }
+
+
+@router.get("/analyze-fused")
+async def analyze_fused(
+    good_id: str = Query(..., description="饰品 good_id"),
+    period: str = Query("1day", description="K线周期"),
+    platform: int = Query(1, description="平台：1-BUFF/2-悠悠/3-Steam/4-C5"),
+    key: str = Query("sell_price", description="价格指标"),
+    include_team: bool = Query(True, description="是否拉取团队分析（耗时较长）"),
+) -> dict[str, Any]:
+    """双轨融合吸货分析（K线行为 + 库存行为）。
+
+    一次返回：
+    1. K线行为评分（量价/横盘/底部等 6 项规则）
+    2. 库存行为评分（集中度/净流入/活跃度/团队 4 项）
+    3. 融合评分 + 模式判定（strong/weak/hidden/none）
+    4. 证据链（人话）
+
+    融合规则：
+    - strong (双高): 明牌吸货
+    - weak   (K高库低): 可能下跌中继
+    - hidden (K低库高): 隐蔽吸货（最稀缺）
+    - none   (双低): 无信号
+    """
+    start = time.perf_counter()
+    if period not in _SUPPORTED_PERIODS:
+        raise HTTPException(status_code=400, detail=f"不支持的周期: {period}")
+    if not good_id:
+        raise HTTPException(status_code=400, detail="good_id 不能为空")
+
+    cache_key = f"fused:{good_id}:{platform}:{key}:{period}:{include_team}"
+    cached = _FUSED_CACHE.get(cache_key)
+    if cached is not None:
+        return {**cached, "cached": True}
+
+    settings = Settings()
+    if not settings.api_token:
+        raise HTTPException(status_code=503, detail="未配置 API token，无法执行双轨融合分析")
+
+    client = _monitor_client()
+
+    # 并发拉取：K线价格序列 + 库存数据 + 团队分析（可选）
+    kline_task = asyncio.to_thread(_fetch_item_price_series, good_id, period, platform, key)
+    holders_task = asyncio.to_thread(_fetch_good_rank, client, good_id, 20)
+    trends_task = asyncio.to_thread(_fetch_good_trends, client, good_id, 30)
+
+    tasks = [kline_task, holders_task, trends_task]
+
+    # 团队分析（可选，单独拉取后提取 confidence）
+    team_confidence: float | None = None
+    if include_team:
+        # 复用 team-analysis 逻辑，但只取 confidence
+        async def _fetch_team_confidence() -> float | None:
+            try:
+                seed_holders = await asyncio.to_thread(_fetch_good_rank, client, good_id, 8)
+                if not seed_holders:
+                    return None
+                holders_with_task = [h for h in seed_holders if h.get("task_id")]
+                inv_raw: dict[str, Any] = {}
+                inv_tasks = [
+                    asyncio.to_thread(_fetch_user_inventory, client, h["task_id"])
+                    for h in holders_with_task
+                ]
+                inv_results = await asyncio.gather(*inv_tasks, return_exceptions=True)
+                for h, res in zip(holders_with_task, inv_results):
+                    sid = str(h.get("steam_id") or h.get("task_id") or "")
+                    inv_raw[sid] = None if isinstance(res, Exception) else res
+                analysis = analyze_team(
+                    seed_good_id=good_id,
+                    seed_holders_raw=seed_holders,
+                    holders_inventory_raw=inv_raw,
+                    min_overlap=2,
+                )
+                return analysis.get("team_summary", {}).get("confidence")
+            except Exception as exc:
+                LOGGER.warning("team confidence fetch failed for good_id=%s: %s", good_id, exc)
+                return None
+
+        tasks.append(_fetch_team_confidence())
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # 解析结果
+    kline_df, kline_source = results[0] if not isinstance(results[0], Exception) else (None, "fetch_failed")
+    if isinstance(results[0], Exception):
+        LOGGER.warning("kline fetch failed for good_id=%s: %s", good_id, results[0])
+    holders = results[1] if not isinstance(results[1], Exception) else []
+    trends = results[2] if not isinstance(results[2], Exception) else []
+    if include_team and len(results) > 3 and not isinstance(results[3], Exception):
+        team_confidence = results[3]
+
+    # ── K线行为评分 ──
+    if kline_df is not None and len(kline_df) >= 10:
+        from src.scenario_engine.accumulation_detector import detect_accumulation, fuse_scores
+        kline_result = detect_accumulation(kline_df, sub_index=f"单品#{good_id}", period=period)
+        kline_score = kline_result.get("accumulation_score", 0.0)
+        kline_signals = kline_result.get("signals", {})
+        kline_features = kline_result.get("features", {})
+        kline_description = kline_result.get("description", "")
+        duration_bars = kline_result.get("duration_bars", 0)
+    else:
+        kline_score = 0.0
+        kline_signals = {}
+        kline_features = {}
+        kline_description = "K线数据不足"
+        duration_bars = 0
+
+    # ── 库存行为评分 ──
+    from src.scenario_engine.inventory_signals import (
+        compute_inventory_signals,
+        build_inventory_evidence,
+    )
+    inv_result = compute_inventory_signals(holders, trends, team_confidence)
+    inventory_score = inv_result["inventory_score"]
+    inventory_signals = inv_result["signals"]
+    inventory_evidence = build_inventory_evidence(inv_result)
+
+    # ── 融合 ──
+    fused = fuse_scores(kline_score, inventory_score)
+
+    # ── 证据链 ──
+    evidence: list[str] = []
+    pattern = fused["pattern"]
+    pattern_desc = {
+        "strong": "双高信号：K线吸货 + 库存加仓，明牌吸货",
+        "weak": "K高库低：K线看似吸货但库存不配合，可能为下跌中继",
+        "hidden": "K低库高：K线不动但库存加仓，隐蔽吸货（最稀缺信号）",
+        "none": "双低信号：无明显吸货迹象",
+    }
+    evidence.append(pattern_desc.get(pattern, "无信号"))
+    if kline_description:
+        evidence.append(f"K线：{kline_description}")
+    evidence.extend(inventory_evidence)
+
+    latency_ms = (time.perf_counter() - start) * 1000
+    record_request("/accumulation/analyze-fused", latency_ms, error=False)
+    LOGGER.info(
+        "analyze-fused good_id=%s: kline=%.2f inv=%.2f fused=%.2f pattern=%s (%.0fms)",
+        good_id, kline_score, inventory_score, fused["fused_score"], pattern, latency_ms,
+    )
+
+    result = {
+        "good_id": good_id,
+        "period": period,
+        "fused_score": fused["fused_score"],
+        "phase": fused["phase"],
+        "pattern": pattern,
+        "kline_score": kline_score,
+        "inventory_score": inventory_score,
+        "kline_signals": kline_signals,
+        "inventory_signals": inventory_signals,
+        "kline_features": kline_features,
+        "inventory_stats": {
+            "top3_concentration": inv_result["top3_concentration"],
+            "total_hold": inv_result["total_hold"],
+            "net_inflow_7d": inv_result["net_inflow_7d"],
+            "active_holder_count": inv_result["active_holder_count"],
+            "holder_total": inv_result["holder_total"],
+            "team_confidence": inv_result["team_confidence"],
+        },
+        "duration_bars": duration_bars,
+        "evidence": evidence,
+        "data_source": kline_source,
+    }
+
+    _FUSED_CACHE.set(cache_key, result)
+    return result
 
 
 @router.get("/team-analysis")
