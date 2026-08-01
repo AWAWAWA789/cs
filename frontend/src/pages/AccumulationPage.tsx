@@ -5,6 +5,7 @@ import { Button } from "../components/ui/Button";
 import { Select, TextInput } from "../components/ui/Select";
 import { useMeta, PERIOD_LABELS } from "../components/Selector";
 import { ItemSearchBar } from "../components/ItemSearchBar";
+import { EChart } from "../components/EChart";
 import { api } from "../lib/api";
 import { useAsync } from "../hooks/useAsync";
 import { formatPercent, formatDuration, formatNumber, formatDate } from "../lib/format";
@@ -306,12 +307,23 @@ function ItemInventoryPanel({ data }: { data: ItemInventoryResponse }) {
 }
 
 /** 跨品主力团队识别结果展示。 */
-function TeamAnalysisPanel({ data }: { data: TeamAnalysisResponse }) {
+function TeamAnalysisPanel({
+  data,
+  onSelectSeed,
+  relatedScores,
+}: {
+  data: TeamAnalysisResponse;
+  /** 点击关联品设为新种子品做二次分析。 */
+  onSelectSeed?: (goodId: string, name?: string) => void;
+  /** 关联品的同步吸货评分（good_id → score），用于联动加权。 */
+  relatedScores?: Record<string, number>;
+}) {
   const summary = data.team_summary;
   const related = data.related_items;
   const holders = data.holders_cross;
   const coreHolders = holders.filter((h) => h.is_core);
   const confidencePct = Math.max(0, Math.min(1, summary.confidence)) * 100;
+  const hasScores = relatedScores && Object.keys(relatedScores).length > 0;
 
   return (
     <div className="space-y-4">
@@ -379,7 +391,10 @@ function TeamAnalysisPanel({ data }: { data: TeamAnalysisResponse }) {
       </div>
 
       {/* 关联品表 */}
-      <Card title="关联品（疑似同团队标的）" subtitle="被多个种子主力共同持有的其他饰品，重合度越高越可疑">
+      <Card
+        title="关联品（疑似同团队标的）"
+        subtitle="被多个种子主力共同持有的其他饰品，重合度越高越可疑；点击行可设为新种子做二次分析"
+      >
         {related.length === 0 ? (
           <EmptyState
             title="暂无关联品"
@@ -394,37 +409,68 @@ function TeamAnalysisPanel({ data }: { data: TeamAnalysisResponse }) {
                   <th className="px-3 py-2 font-medium">关联品</th>
                   <th className="px-3 py-2 text-right font-medium">重合主力数</th>
                   <th className="px-3 py-2 text-right font-medium">重合度</th>
+                  {hasScores && <th className="px-3 py-2 text-right font-medium">吸货评分</th>}
                   <th className="px-3 py-2 text-right font-medium">团队合计持仓</th>
                   <th className="px-3 py-2 text-right font-medium">团队合计价值</th>
+                  {onSelectSeed && <th className="px-3 py-2 text-center font-medium">操作</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-border">
-                {related.slice(0, 20).map((r: TeamRelatedItem, idx) => (
-                  <tr key={r.good_id} className="transition-colors hover:bg-surface-hover">
-                    <td className="px-3 py-2 text-ink-muted">#{idx + 1}</td>
-                    <td className="px-3 py-2">
-                      <div className="font-medium text-ink-primary">
-                        {r.good_name || `(未命名 #${r.good_id})`}
-                      </div>
-                      <div className="text-xs text-ink-muted">good_id: {r.good_id}</div>
-                    </td>
-                    <td className="px-3 py-2 text-right text-ink-secondary">
-                      {r.overlap_count} / {data.seed_holder_count}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <span
-                        className="font-semibold"
-                        style={{ color: r.overlap_ratio >= 0.5 ? "#16a34a" : r.overlap_ratio >= 0.3 ? "#f59e0b" : "#9ca3af" }}
-                      >
-                        {formatPercent(r.overlap_ratio, 1)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-right">{formatNumber(r.total_hold_in_team, 0)}</td>
-                    <td className="px-3 py-2 text-right text-ink-secondary">
-                      ¥{formatNumber(r.total_value_in_team, 0)}
-                    </td>
-                  </tr>
-                ))}
+                {related.slice(0, 20).map((r: TeamRelatedItem, idx) => {
+                  const score = relatedScores?.[r.good_id];
+                  const isAccumulating = typeof score === "number" && score >= 0.6;
+                  return (
+                    <tr key={r.good_id} className="transition-colors hover:bg-surface-hover">
+                      <td className="px-3 py-2 text-ink-muted">#{idx + 1}</td>
+                      <td className="px-3 py-2">
+                        <div className="font-medium text-ink-primary">
+                          {r.good_name || `(未命名 #${r.good_id})`}
+                        </div>
+                        <div className="text-xs text-ink-muted">good_id: {r.good_id}</div>
+                      </td>
+                      <td className="px-3 py-2 text-right text-ink-secondary">
+                        {r.overlap_count} / {data.seed_holder_count}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <span
+                          className="font-semibold"
+                          style={{ color: r.overlap_ratio >= 0.5 ? "#16a34a" : r.overlap_ratio >= 0.3 ? "#f59e0b" : "#9ca3af" }}
+                        >
+                          {formatPercent(r.overlap_ratio, 1)}
+                        </span>
+                      </td>
+                      {hasScores && (
+                        <td className="px-3 py-2 text-right">
+                          {typeof score === "number" ? (
+                            <span
+                              className="font-semibold"
+                              style={{ color: isAccumulating ? "#16a34a" : score <= 0.4 ? "#dc2626" : "#9ca3af" }}
+                            >
+                              {formatPercent(score, 1)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-ink-muted">-</span>
+                          )}
+                        </td>
+                      )}
+                      <td className="px-3 py-2 text-right">{formatNumber(r.total_hold_in_team, 0)}</td>
+                      <td className="px-3 py-2 text-right text-ink-secondary">
+                        ¥{formatNumber(r.total_value_in_team, 0)}
+                      </td>
+                      {onSelectSeed && (
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => onSelectSeed(r.good_id, r.good_name)}
+                            className="rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-100"
+                          >
+                            设为种子
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -471,12 +517,185 @@ function TeamAnalysisPanel({ data }: { data: TeamAnalysisResponse }) {
         )}
       </Card>
 
+      {/* 持仓关系网络图 */}
+      <TeamNetworkChart data={data} relatedScores={relatedScores} onSelectSeed={onSelectSeed} />
+
       {coreHolders.length > 0 && (
         <p className="text-xs text-ink-muted">
           核心团队 {coreHolders.length} 人：{coreHolders.map((h) => h.steam_name || h.steam_id).join("、")}
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * 主力-饰品持仓关系网络图（force 布局）。
+ *
+ * 节点：种子品（中心）、主力（人形）、关联品（方块）。边表示持有关系。
+ * 关联品节点颜色随吸货评分变化（绿=吸货、红=出货、灰=中性）。
+ */
+function TeamNetworkChart({
+  data,
+  relatedScores,
+  onSelectSeed,
+}: {
+  data: TeamAnalysisResponse;
+  relatedScores?: Record<string, number>;
+  onSelectSeed?: (goodId: string, name?: string) => void;
+}) {
+  const { seed_good_id, holders_cross, related_items, team_summary } = data;
+  const hasScores = relatedScores && Object.keys(relatedScores).length > 0;
+
+  // ── 构造 echarts graph 数据 ──
+  const nodes: Array<Record<string, unknown>> = [];
+  const links: Array<Record<string, unknown>> = [];
+  const categories = [
+    { name: "种子品" },
+    { name: "主力" },
+    { name: "关联品" },
+  ];
+
+  // 种子品节点（中心，最大）
+  nodes.push({
+    id: `good:${seed_good_id}`,
+    name: "种子品",
+    symbolSize: 48,
+    category: 0,
+    itemStyle: { color: "#6366f1" },
+    label: { show: true, position: "bottom", formatter: "种子品" },
+  });
+
+  // 主力节点
+  for (const h of holders_cross) {
+    const nodeId = `user:${h.steam_id}`;
+    nodes.push({
+      id: nodeId,
+      name: h.steam_name || h.steam_id,
+      symbolSize: h.is_core ? 36 : 24,
+      category: 1,
+      itemStyle: { color: h.is_core ? "#16a34a" : "#9ca3af" },
+      label: { show: h.is_core, position: "bottom", formatter: h.steam_name || h.steam_id },
+    });
+    // 主力 → 种子品
+    links.push({
+      source: nodeId,
+      target: `good:${seed_good_id}`,
+      value: h.hold_in_seed,
+      lineStyle: { width: Math.max(1, Math.min(8, h.hold_in_seed / 20)) },
+    });
+    // 主力 → 关联品
+    for (const gid of h.cross_good_ids) {
+      links.push({
+        source: nodeId,
+        target: `good:${gid}`,
+        value: 1,
+        lineStyle: { width: 1, opacity: 0.4 },
+      });
+    }
+  }
+
+  // 关联品节点（去重，仅展示 top-15 重合度最高的）
+  const relatedToShow = related_items.slice(0, 15);
+  for (const r of relatedToShow) {
+    const score = relatedScores?.[r.good_id];
+    const isAccumulating = typeof score === "number" && score >= 0.6;
+    const isDistributing = typeof score === "number" && score <= 0.4;
+    const color = isAccumulating ? "#16a34a" : isDistributing ? "#dc2626" : "#9ca3af";
+    nodes.push({
+      id: `good:${r.good_id}`,
+      name: r.good_name || r.good_id,
+      symbolSize: 20 + r.overlap_count * 4,
+      category: 2,
+      itemStyle: { color },
+      label: {
+        show: r.overlap_count >= 2,
+        position: "bottom",
+        formatter: r.good_name || r.good_id,
+      },
+    });
+  }
+
+  // 移除指向不存在节点的边（关联品 top-15 之外的）
+  const nodeIds = new Set(nodes.map((n) => n.id as string));
+  const validLinks = links.filter(
+    (l) => nodeIds.has(l.source as string) && nodeIds.has(l.target as string),
+  );
+
+  const option: Record<string, unknown> = {
+    tooltip: {
+      formatter: (p: { dataType?: string; data?: Record<string, unknown> }) => {
+        if (!p) return "";
+        if (p.dataType === "node") {
+          const d = p.data || {};
+          return `<b>${d.name ?? ""}</b><br/>类别: ${categories[(d.category as number) ?? 0].name}`;
+        }
+        if (p.dataType === "edge") {
+          const v = p.data?.value;
+          return v ? `持仓: ${v}` : "持仓关系";
+        }
+        return "";
+      },
+    },
+    legend: [
+      {
+        data: categories.map((c) => c.name),
+        top: 8,
+        textStyle: { fontSize: 11 },
+      },
+    ],
+    series: [
+      {
+        type: "graph",
+        layout: "force",
+        roam: true,
+        draggable: true,
+        categories,
+        data: nodes,
+        links: validLinks,
+        // 关联品节点点击事件通过 onEvents 处理
+        force: {
+          repulsion: 220,
+          edgeLength: [50, 120],
+          gravity: 0.12,
+        },
+        focusNodeAdjacency: true,
+        lineStyle: { color: "source", curveness: 0.1, opacity: 0.5 },
+        emphasis: {
+          focus: "adjacency",
+          lineStyle: { width: 3 },
+          label: { show: true },
+        },
+      },
+    ],
+  };
+
+  return (
+    <Card
+      title="持仓关系网络图"
+      subtitle="主力（圆点）与饰品（方块）的持仓关系；绿色关联品=吸货阶段，红色=出货，灰色=中性。可拖拽缩放，点击关联品节点设为新种子"
+    >
+      <EChart
+        option={option}
+        style={{ width: "100%", height: "420px" }}
+        onEvents={{
+          click: (params: unknown) => {
+            const p = params as { dataType?: string; data?: Record<string, unknown> };
+            if (p?.dataType !== "node" || !onSelectSeed) return;
+            const id = p.data?.id as string | undefined;
+            if (!id || !id.startsWith("good:") || id === `good:${seed_good_id}`) return;
+            const gid = id.slice(5);
+            const name = p.data?.name as string | undefined;
+            onSelectSeed(gid, name);
+          },
+        }}
+      />
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
+        <span>核心团队 {team_summary.core_team_size} 人</span>
+        <span>关联品 {team_summary.related_item_count} 个</span>
+        {hasScores && <span>吸货评分着色：绿≥60% · 红≤40%</span>}
+      </div>
+    </Card>
   );
 }
 
@@ -612,6 +831,78 @@ export default function AccumulationPage() {
     [goodIdInput, teamTrigger],
     teamTrigger > 0 && mode === "item" && goodIdInput.trim() !== "",
   );
+
+  // 种子品历史栈：记录用户切换过的种子品，便于回溯二次分析路径
+  const [seedHistory, setSeedHistory] = useState<Array<{ goodId: string; name: string }>>([]);
+
+  // 关联品吸货评分联动：team 数据返回后，并发拉取每个关联品的吸货评分
+  // 用于在关联品表与网络图中以颜色区分吸/出货阶段，并加权团队置信度
+  const [relatedScores, setRelatedScores] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!team.data || team.data.related_items.length === 0) {
+      setRelatedScores({});
+      return;
+    }
+    let cancelled = false;
+    const controller = new AbortController();
+    const items = team.data.related_items.slice(0, 10); // 限制并发数避免过载
+    Promise.all(
+      items.map(async (r) => {
+        try {
+          const res = await api.accumulation.analyzeItem(
+            r.good_id,
+            period,
+            platform,
+            "sell_price",
+            controller.signal,
+          );
+          return [r.good_id, res.accumulation_score] as const;
+        } catch {
+          return [r.good_id, null] as const;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      const scores: Record<string, number> = {};
+      for (const [gid, score] of results) {
+        if (typeof score === "number") scores[gid] = score;
+      }
+      setRelatedScores(scores);
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [team.data, period, platform]);
+
+  // 设为新种子：将当前种子压入历史栈，切换 goodIdInput 并自动触发团队分析
+  const handleSelectSeed = (newGoodId: string, name?: string) => {
+    setSeedHistory((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1].goodId === goodIdInput) {
+        // 避免重复压栈
+        return prev;
+      }
+      return [...prev, { goodId: goodIdInput, name: selectedItemName }];
+    });
+    setGoodIdInput(newGoodId);
+    setSelectedItemName(name ?? "");
+    // 重置评分，待新 team 数据返回后重新拉取
+    setRelatedScores({});
+    setTeamTrigger((c) => c + 1);
+  };
+
+  // 回退到上一个种子品
+  const handlePopSeed = () => {
+    setSeedHistory((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      setGoodIdInput(last.goodId);
+      setSelectedItemName(last.name);
+      setRelatedScores({});
+      setTeamTrigger((c) => c + 1);
+      return prev.slice(0, -1);
+    });
+  };
 
   // 数据预热（按钮触发）
   const [initTrigger, setInitTrigger] = useState(0);
@@ -847,15 +1138,58 @@ export default function AccumulationPage() {
                 分析种子品 top-10 主力的全量持仓，识别是否同一团队跨品操作（耗时约 10s）
               </p>
             </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setTeamTrigger((c) => c + 1)}
-              loading={team.loading}
-            >
-              {team.data ? "重新分析" : "开始团队分析"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {seedHistory.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={handlePopSeed}>
+                  ← 回到上一种子
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setTeamTrigger((c) => c + 1)}
+                loading={team.loading}
+              >
+                {team.data ? "重新分析" : "开始团队分析"}
+              </Button>
+            </div>
           </div>
+
+          {/* 种子品历史栈 */}
+          {seedHistory.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-surface-border bg-surface-hover px-3 py-2 text-xs">
+              <span className="text-ink-muted">分析路径：</span>
+              {seedHistory.map((s, i) => (
+                <span key={`${s.goodId}-${i}`} className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGoodIdInput(s.goodId);
+                      setSelectedItemName(s.name);
+                      setRelatedScores({});
+                      setTeamTrigger((c) => c + 1);
+                      // 截断到点击位置
+                      setSeedHistory((prev) => prev.slice(0, i));
+                    }}
+                    className="text-brand-700 hover:underline"
+                  >
+                    {s.name || s.goodId}
+                  </button>
+                  <span className="text-ink-muted">→</span>
+                </span>
+              ))}
+              <span className="font-medium text-ink-primary">{selectedItemName || goodIdInput}</span>
+            </div>
+          )}
+
+          {/* 关联品吸货评分加载提示 */}
+          {team.data && Object.keys(relatedScores).length === 0 && team.data.related_items.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-ink-muted">
+              <Spinner size="sm" />
+              <span>正在并发拉取关联品吸货评分用于联动着色...</span>
+            </div>
+          )}
+
           {team.loading ? (
             <Card>
               <Spinner className="py-10" />
@@ -872,7 +1206,11 @@ export default function AccumulationPage() {
               />
             </Card>
           ) : (
-            <TeamAnalysisPanel data={team.data} />
+            <TeamAnalysisPanel
+              data={team.data}
+              onSelectSeed={handleSelectSeed}
+              relatedScores={relatedScores}
+            />
           )}
         </section>
       )}

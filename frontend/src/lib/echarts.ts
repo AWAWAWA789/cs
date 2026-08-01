@@ -20,6 +20,7 @@ import { CandlestickChart } from "echarts/charts"; // ForecastChart, ScenarioPag
 import { LineChart } from "echarts/charts"; // most pages + WaveSketchChart
 import { ScatterChart } from "echarts/charts"; // TrendScanPage
 import { BarChart } from "echarts/charts"; // ScenarioPage (volume sub-chart)
+import { GraphChart } from "echarts/charts"; // AccumulationPage 团队持仓关系图
 
 // ── Components ────────────────────────────────────────────────
 import { TitleComponent } from "echarts/components";
@@ -40,6 +41,7 @@ use([
   BarChart,
   CandlestickChart,
   ScatterChart,
+  GraphChart,
   // Components
   TitleComponent,
   TooltipComponent,
