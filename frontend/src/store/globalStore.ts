@@ -11,7 +11,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 /** 默认标的与周期，meta 加载后会校验是否可用。 */
-export const DEFAULT_SUB_INDEX = "手套";
+export const DEFAULT_SUB_INDEX = "饰品指数";
 export const DEFAULT_PERIOD = "1day";
 
 /** 单品图表可选指标 key（对应 CSQAQ /info/chart 的 11 种指标）。 */

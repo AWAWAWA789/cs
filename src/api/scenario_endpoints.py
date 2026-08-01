@@ -194,18 +194,19 @@ def _load_ohlc(sub_index: str, period: str, *, force_refresh: bool = False) -> p
     settings = Settings()
     cache_path = cache_file_path(sub_index, period, settings.cache_path)
 
+    # Load existing cache (may be stale but still usable as fallback).
+    cached_df: pd.DataFrame | None = None
     if not force_refresh:
-        df = load_cache(cache_path)
-        if df is not None:
-            # Check if cached data is stale (last bar more than 3 days old).
-            last_ts = pd.to_datetime(df["timestamp"].iloc[-1])
+        cached_df = load_cache(cache_path)
+        if cached_df is not None:
+            # Check if cached data is fresh (last bar within 3 days).
+            last_ts = pd.to_datetime(cached_df["timestamp"].iloc[-1])
             if hasattr(last_ts, "tzinfo") and last_ts.tzinfo is None:
                 last_ts = last_ts.tz_localize("UTC")
             age = pd.Timestamp.now(tz="UTC") - last_ts
-            if age > pd.Timedelta(days=3):
-                LOGGER.info("Cache stale for %s/%s (last bar %s old), refreshing", sub_index, period, age)
-            else:
-                return filter_from_2024(df)
+            if age <= pd.Timedelta(days=3):
+                return filter_from_2024(cached_df)
+            LOGGER.info("Cache stale for %s/%s (last bar %s old), refreshing", sub_index, period, age)
 
     # Attempt a real fetch only when an API token is configured.
     if settings.api_token:
@@ -216,10 +217,14 @@ def _load_ohlc(sub_index: str, period: str, *, force_refresh: bool = False) -> p
             df = normalize_kline(raw)
             save_cache(df, cache_path)
             return filter_from_2024(df)
-        except Exception as exc:  # pragma: no cover - demo fallback path
-            # Fall back to synthetic data so the UI and tests always work.
-            pass
+        except Exception as exc:
+            LOGGER.warning("API fetch failed for %s/%s: %s", sub_index, period, exc)
+            # If we have stale cached data, return it instead of synthetic data.
+            if cached_df is not None:
+                LOGGER.info("Falling back to stale cache for %s/%s", sub_index, period)
+                return filter_from_2024(cached_df)
 
+    # Only use synthetic data when no cached data exists at all.
     df = _synthetic_ohlc(sub_index, period)
     save_cache(df, cache_path)
     return df

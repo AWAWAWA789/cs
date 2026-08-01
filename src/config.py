@@ -22,7 +22,7 @@ class Settings:
         )
         object.__setattr__(self, "cache_path", os.getenv("CSQAQ_CACHE_PATH", "./data/cache"))
         object.__setattr__(self, "sub_index_id", os.getenv("SUB_INDEX_ID", ""))
-        object.__setattr__(self, "sub_index_name", os.getenv("SUB_INDEX_NAME", "手套"))
+        object.__setattr__(self, "sub_index_name", os.getenv("SUB_INDEX_NAME", "饰品指数"))
         object.__setattr__(self, "default_period", os.getenv("DEFAULT_PERIOD", "4hour"))
 
     def validate(self) -> None:
