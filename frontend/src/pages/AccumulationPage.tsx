@@ -16,6 +16,9 @@ import type {
   ItemInventoryResponse,
   ItemHolder,
   ItemTrend,
+  TeamAnalysisResponse,
+  TeamRelatedItem,
+  TeamHolderCross,
 } from "../types/api";
 import { useGlobalStore, DEFAULT_PERIOD } from "../store/globalStore";
 
@@ -302,6 +305,181 @@ function ItemInventoryPanel({ data }: { data: ItemInventoryResponse }) {
   );
 }
 
+/** 跨品主力团队识别结果展示。 */
+function TeamAnalysisPanel({ data }: { data: TeamAnalysisResponse }) {
+  const summary = data.team_summary;
+  const related = data.related_items;
+  const holders = data.holders_cross;
+  const coreHolders = holders.filter((h) => h.is_core);
+  const confidencePct = Math.max(0, Math.min(1, summary.confidence)) * 100;
+
+  return (
+    <div className="space-y-4">
+      {/* 团队判定信号 */}
+      <div
+        className={`rounded-lg border p-4 ${
+          summary.is_likely_team_operated
+            ? "border-bull/40 bg-bull/5"
+            : "border-surface-border bg-surface-hover"
+        }`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Badge variant={summary.is_likely_team_operated ? "bull" : "neutral"}>
+              {summary.is_likely_team_operated ? "疑似团队操作" : "未发现明显团队信号"}
+            </Badge>
+            <span className="text-sm font-medium text-ink-primary">
+              置信度 {formatPercent(summary.confidence, 1)}
+            </span>
+          </div>
+          <span className="text-xs text-ink-muted">
+            种子主力 {data.analyzed_holder_count} 人 · 关联品 {summary.related_item_count} 个
+          </span>
+        </div>
+        {/* 置信度进度条 */}
+        <div className="mt-3">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-surface-hover">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${confidencePct}%`,
+                backgroundColor: summary.is_likely_team_operated ? "#16a34a" : "#9ca3af",
+              }}
+            />
+          </div>
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-ink-secondary">{summary.reason}</p>
+      </div>
+
+      {/* 团队指标概览 */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard
+          label="核心团队规模"
+          value={summary.core_team_size}
+          hint="跨≥3品的主力人数"
+          color={summary.core_team_size >= 2 ? "bull" : "neutral"}
+        />
+        <StatCard
+          label="核心团队集中度"
+          value={formatPercent(summary.core_team_ratio_in_seed, 1)}
+          hint="核心团队占种子品持仓"
+          color={summary.core_team_ratio_in_seed >= 0.4 ? "bull" : "neutral"}
+        />
+        <StatCard
+          label="最高重合度"
+          value={formatPercent(summary.max_overlap_ratio, 1)}
+          hint={`关联品最多被 ${summary.max_overlap_count} 人共同持有`}
+          color={summary.max_overlap_ratio >= 0.3 ? "bull" : "neutral"}
+        />
+        <StatCard
+          label="主力平均跨品数"
+          value={formatNumber(summary.avg_cross_items_per_holder, 1)}
+          hint="每个主力平均持有的其他品数"
+        />
+      </div>
+
+      {/* 关联品表 */}
+      <Card title="关联品（疑似同团队标的）" subtitle="被多个种子主力共同持有的其他饰品，重合度越高越可疑">
+        {related.length === 0 ? (
+          <EmptyState
+            title="暂无关联品"
+            description="未发现被多个种子主力共同持有的其他饰品，主力可能独立操作。"
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="border-b border-surface-border text-left text-xs text-ink-muted">
+                  <th className="px-3 py-2 font-medium">排名</th>
+                  <th className="px-3 py-2 font-medium">关联品</th>
+                  <th className="px-3 py-2 text-right font-medium">重合主力数</th>
+                  <th className="px-3 py-2 text-right font-medium">重合度</th>
+                  <th className="px-3 py-2 text-right font-medium">团队合计持仓</th>
+                  <th className="px-3 py-2 text-right font-medium">团队合计价值</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border">
+                {related.slice(0, 20).map((r: TeamRelatedItem, idx) => (
+                  <tr key={r.good_id} className="transition-colors hover:bg-surface-hover">
+                    <td className="px-3 py-2 text-ink-muted">#{idx + 1}</td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium text-ink-primary">
+                        {r.good_name || `(未命名 #${r.good_id})`}
+                      </div>
+                      <div className="text-xs text-ink-muted">good_id: {r.good_id}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right text-ink-secondary">
+                      {r.overlap_count} / {data.seed_holder_count}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <span
+                        className="font-semibold"
+                        style={{ color: r.overlap_ratio >= 0.5 ? "#16a34a" : r.overlap_ratio >= 0.3 ? "#f59e0b" : "#9ca3af" }}
+                      >
+                        {formatPercent(r.overlap_ratio, 1)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right">{formatNumber(r.total_hold_in_team, 0)}</td>
+                    <td className="px-3 py-2 text-right text-ink-secondary">
+                      ¥{formatNumber(r.total_value_in_team, 0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* 主力跨品分布 */}
+      <Card title="主力跨品分布" subtitle="每个种子主力还持有哪些其他品（跨品多者疑为核心团队）">
+        {holders.length === 0 ? (
+          <EmptyState title="暂无主力数据" description="该饰品暂无持仓主力。" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-surface-border text-left text-xs text-ink-muted">
+                  <th className="px-3 py-2 font-medium">主力</th>
+                  <th className="px-3 py-2 text-right font-medium">种子品持仓</th>
+                  <th className="px-3 py-2 text-right font-medium">跨品数</th>
+                  <th className="px-3 py-2 text-center font-medium">核心团队</th>
+                  <th className="px-3 py-2 font-medium">持有的其他品</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border">
+                {holders.map((h: TeamHolderCross) => (
+                  <tr key={h.steam_id} className="transition-colors hover:bg-surface-hover">
+                    <td className="px-3 py-2 font-medium text-ink-primary">
+                      {h.steam_name || h.steam_id}
+                    </td>
+                    <td className="px-3 py-2 text-right">{formatNumber(h.hold_in_seed, 0)}</td>
+                    <td className="px-3 py-2 text-right text-ink-secondary">{h.cross_item_count}</td>
+                    <td className="px-3 py-2 text-center">
+                      {h.is_core ? <Badge variant="bull">核心</Badge> : <span className="text-xs text-ink-muted">-</span>}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-ink-muted">
+                      {h.cross_good_ids.length > 0
+                        ? h.cross_good_ids.slice(0, 8).join(", ") + (h.cross_good_ids.length > 8 ? " ..." : "")
+                        : "（无）"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {coreHolders.length > 0 && (
+        <p className="text-xs text-ink-muted">
+          核心团队 {coreHolders.length} 人：{coreHolders.map((h) => h.steam_name || h.steam_id).join("、")}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** 单个标的的吸货分析结果展示。 */
 function AnalysisResult({ data }: { data: AccumulationAnalysis }) {
   const score = data.accumulation_score;
@@ -425,6 +603,14 @@ export default function AccumulationPage() {
     (signal) => api.accumulation.itemInventory(goodIdInput, 20, signal),
     [goodIdInput],
     mode === "item" && goodIdInput.trim() !== "",
+  );
+
+  // 跨品主力团队识别：goodIdInput 变化且为单品模式时自动拉取（按钮触发，避免每次切换都拉取 N 个用户持仓）
+  const [teamTrigger, setTeamTrigger] = useState(0);
+  const team = useAsync(
+    (signal) => api.accumulation.teamAnalysis(goodIdInput, 10, 2, signal),
+    [goodIdInput, teamTrigger],
+    teamTrigger > 0 && mode === "item" && goodIdInput.trim() !== "",
   );
 
   // 数据预热（按钮触发）
@@ -647,6 +833,46 @@ export default function AccumulationPage() {
             </Card>
           ) : (
             <ItemInventoryPanel data={inventory.data} />
+          )}
+        </section>
+      )}
+
+      {/* 跨品主力团队识别（仅单品模式，按钮触发） */}
+      {mode === "item" && goodIdInput.trim() !== "" && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-ink-secondary">跨品主力团队识别</h2>
+              <p className="mt-0.5 text-xs text-ink-muted">
+                分析种子品 top-10 主力的全量持仓，识别是否同一团队跨品操作（耗时约 10s）
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setTeamTrigger((c) => c + 1)}
+              loading={team.loading}
+            >
+              {team.data ? "重新分析" : "开始团队分析"}
+            </Button>
+          </div>
+          {team.loading ? (
+            <Card>
+              <Spinner className="py-10" />
+            </Card>
+          ) : team.error ? (
+            <Card>
+              <ErrorState message={team.error} onRetry={() => setTeamTrigger((c) => c + 1)} />
+            </Card>
+          ) : !team.data ? (
+            <Card>
+              <EmptyState
+                title="尚未执行团队分析"
+                description="点击「开始团队分析」按钮，将拉取种子品主力各自的全量持仓，识别跨品协同信号。"
+              />
+            </Card>
+          ) : (
+            <TeamAnalysisPanel data={team.data} />
           )}
         </section>
       )}

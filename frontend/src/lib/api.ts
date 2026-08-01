@@ -24,6 +24,7 @@ import type {
   AccumulationInitResponse,
   AccumulationStatusResponse,
   ItemInventoryResponse,
+  TeamAnalysisResponse,
 } from "../types/api";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -463,6 +464,20 @@ export const accumulationApi = {
     return request<ItemInventoryResponse>(
       "/accumulation/item-inventory",
       { good_id: goodId, top_n: topN },
+      { signal },
+    );
+  },
+
+  /** 跨品主力团队识别（并发拉取 top-N 主力持仓，构建关联矩阵）。 */
+  teamAnalysis(
+    goodId: string,
+    holderTopN = 10,
+    minOverlap = 2,
+    signal?: AbortSignal,
+  ): Promise<TeamAnalysisResponse> {
+    return request<TeamAnalysisResponse>(
+      "/accumulation/team-analysis",
+      { good_id: goodId, holder_top_n: holderTopN, min_overlap: minOverlap },
       { signal },
     );
   },

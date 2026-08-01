@@ -32,6 +32,7 @@ from src.config import Settings
 from src.data.cache import cache_file_path, load_cached
 from src.data.pipeline import filter_from_2024
 from src.scenario_engine.accumulation_detector import detect_accumulation
+from src.scenario_engine.team_analyzer import analyze_team
 
 LOGGER = get_logger("csqaq.accumulation_api")
 
@@ -39,6 +40,9 @@ router = APIRouter(prefix="/accumulation", tags=["accumulation"])
 
 # 分析结果缓存（5 分钟）
 _ANALYSIS_CACHE = TTLCache(ttl_seconds=300.0)
+
+# 团队分析结果缓存（5 分钟）
+_TEAM_CACHE = TTLCache(ttl_seconds=300.0)
 
 # 初始化状态（进程级）
 _INIT_STATE: dict[str, Any] = {
@@ -279,6 +283,26 @@ def _fetch_good_trends(client: CSQAQClient, good_id: str, page_size: int) -> lis
     return [item for item in (data or []) if isinstance(item, dict)]
 
 
+def _fetch_user_inventory(client: CSQAQClient, task_id: str) -> Any:
+    """拉取单个用户的全部持仓（封装 /task/get_task_all）。
+
+    用于跨品团队识别：获取该主力还持有哪些饰品。
+    单个调用失败返回 None，不影响其他主力的拉取。
+    """
+    try:
+        return client.post(
+            "/task/get_task_all",
+            json={"task_id": task_id},
+            skip_rate_limit=True,
+        )
+    except CSQAQAPIError as exc:
+        LOGGER.warning("user_inventory fetch failed for task_id=%s: %s", task_id, exc)
+        return None
+    except Exception as exc:
+        LOGGER.warning("user_inventory fetch failed for task_id=%s: %s", task_id, exc)
+        return None
+
+
 @router.get("/item-inventory")
 async def item_inventory(
     good_id: str = Query(..., description="饰品 good_id"),
@@ -327,6 +351,137 @@ async def item_inventory(
         "holder_count": len(holders),
         "trend_count": len(trends),
     }
+
+
+@router.get("/team-analysis")
+async def team_analysis(
+    good_id: str = Query(..., description="种子饰品 good_id"),
+    holder_top_n: int = Query(10, ge=1, le=30, description="取种子品 top-N 主力作为团队锚点"),
+    min_overlap: int = Query(2, ge=1, le=20, description="关联品最少需要的种子主力重合数"),
+) -> dict[str, Any]:
+    """跨品主力团队识别分析。
+
+    以选中饰品（种子品）的 top-N 持仓主力为锚点，拉取每个主力的全量持仓，
+    构建 ``steam_id × good_id`` 持仓矩阵，识别：
+
+    1. **关联品**：被多个种子主力共同持有的其他饰品（重合度高的疑似同团队操作标的）
+    2. **核心团队**：跨多个品的主力（跨品数 ≥ 3 视为核心团队成员）
+    3. **团队判定**：综合重合度与集中度的启发式判定 + 置信度
+
+    结果缓存 5 分钟。由于需并发拉取 N 个用户的持仓（N=holder_top_n），
+    耗时约 N × 1s（受 CSQAQ 限流）。
+    """
+    start = time.perf_counter()
+    if not good_id:
+        raise HTTPException(status_code=400, detail="good_id 不能为空")
+
+    cache_key = f"team:{good_id}:{holder_top_n}:{min_overlap}"
+    cached = _TEAM_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    settings = Settings()
+    if not settings.api_token:
+        latency_ms = (time.perf_counter() - start) * 1000
+        record_request("/accumulation/team-analysis", latency_ms, error=False)
+        return {
+            "seed_good_id": good_id,
+            "seed_holder_count": 0,
+            "analyzed_holder_count": 0,
+            "related_items": [],
+            "team_summary": {
+                "core_team_size": 0,
+                "core_team_hold_in_seed": 0,
+                "core_team_ratio_in_seed": 0.0,
+                "max_overlap_ratio": 0.0,
+                "max_overlap_count": 0,
+                "avg_cross_items_per_holder": 0.0,
+                "related_item_count": 0,
+                "is_likely_team_operated": False,
+                "confidence": 0.0,
+                "reason": "未配置 API token，无法拉取库存监控数据",
+            },
+            "holders_cross": [],
+            "data_source": "no_token",
+        }
+
+    client = _monitor_client()
+
+    # 1. 拉取种子品 top-N holders
+    seed_holders = await asyncio.to_thread(_fetch_good_rank, client, good_id, holder_top_n)
+    seed_holders = seed_holders[:holder_top_n]
+
+    if not seed_holders:
+        latency_ms = (time.perf_counter() - start) * 1000
+        record_request("/accumulation/team-analysis", latency_ms, error=False)
+        result = {
+            "seed_good_id": good_id,
+            "seed_holder_count": 0,
+            "analyzed_holder_count": 0,
+            "related_items": [],
+            "team_summary": {
+                "core_team_size": 0,
+                "core_team_hold_in_seed": 0,
+                "core_team_ratio_in_seed": 0.0,
+                "max_overlap_ratio": 0.0,
+                "max_overlap_count": 0,
+                "avg_cross_items_per_holder": 0.0,
+                "related_item_count": 0,
+                "is_likely_team_operated": False,
+                "confidence": 0.0,
+                "reason": "该饰品暂无持仓主力数据，可能未被监控",
+            },
+            "holders_cross": [],
+            "data_source": "real",
+        }
+        _TEAM_CACHE.set(cache_key, result)
+        return result
+
+    # 2. 并发拉取每个 holder 的全量持仓
+    # key 用 task_id（/task/get_task_all 需要 task_id），但 analyze_team 期望按 steam_id 索引
+    # 这里建立 task_id → steam_id 映射，拉取后转成 {steam_id: inventory}
+    holders_with_task = [
+        h for h in seed_holders if h.get("task_id")
+    ]
+    inventories_raw: dict[str, Any] = {}
+    if holders_with_task:
+        # 并发拉取（client 内部 rate_limit 会自动串行化，避免 429）
+        tasks = [
+            asyncio.to_thread(_fetch_user_inventory, client, h["task_id"])
+            for h in holders_with_task
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for h, res in zip(holders_with_task, results):
+            steam_id = str(h.get("steam_id") or h.get("task_id") or "")
+            if isinstance(res, Exception):
+                LOGGER.warning("user_inventory failed for task_id=%s: %s", h.get("task_id"), res)
+                inventories_raw[steam_id] = None
+            else:
+                inventories_raw[steam_id] = res
+
+    # 3. 调用纯函数分析
+    analysis = analyze_team(
+        seed_good_id=good_id,
+        seed_holders_raw=seed_holders,
+        holders_inventory_raw=inventories_raw,
+        min_overlap=min_overlap,
+    )
+    analysis["data_source"] = "real"
+
+    latency_ms = (time.perf_counter() - start) * 1000
+    record_request("/accumulation/team-analysis", latency_ms, error=False)
+    summary = analysis.get("team_summary", {})
+    LOGGER.info(
+        "team-analysis good_id=%s: %d holders, %d related items, core_team=%d (%.0fms)",
+        good_id,
+        analysis.get("seed_holder_count", 0),
+        summary.get("related_item_count", 0),
+        summary.get("core_team_size", 0),
+        latency_ms,
+    )
+
+    _TEAM_CACHE.set(cache_key, analysis)
+    return analysis
 
 
 @router.post("/analyze")

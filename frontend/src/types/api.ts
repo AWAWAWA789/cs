@@ -389,3 +389,74 @@ export interface ItemInventoryResponse {
   trend_count: number;
   description?: string;
 }
+
+// ── 跨品主力团队识别（吸货页面用） ──────────────────────
+
+/** 关联品：被多个种子主力共同持有的其他饰品。 */
+export interface TeamRelatedItem {
+  good_id: string;
+  good_name: string;
+  good_img: string;
+  /** 持有该关联品的种子主力数。 */
+  overlap_count: number;
+  /** 重合度 = overlap_count / 种子主力总数。 */
+  overlap_ratio: number;
+  /** 这些主力持有该关联品的合计持仓量。 */
+  total_hold_in_team: number;
+  /** 这些主力持有该关联品的合计持仓价值。 */
+  total_value_in_team: number;
+  /** 共同持有该关联品的主力 steam_id 列表。 */
+  shared_steam_ids: string[];
+  /** 共同持有该关联品的主力名称列表。 */
+  shared_steam_names: string[];
+}
+
+/** 团队识别汇总指标。 */
+export interface TeamSummary {
+  /** 核心团队规模（跨品数 ≥ 阈值的主力数）。 */
+  core_team_size: number;
+  /** 核心团队在种子品的合计持仓量。 */
+  core_team_hold_in_seed: number;
+  /** 核心团队在种子品的持仓占比。 */
+  core_team_ratio_in_seed: number;
+  /** 关联品最高重合度。 */
+  max_overlap_ratio: number;
+  /** 关联品最高重合数。 */
+  max_overlap_count: number;
+  /** 主力平均跨品数。 */
+  avg_cross_items_per_holder: number;
+  /** 关联品总数。 */
+  related_item_count: number;
+  /** 是否疑似团队操作。 */
+  is_likely_team_operated: boolean;
+  /** 判定置信度（0-1）。 */
+  confidence: number;
+  /** 判定理由（中文）。 */
+  reason: string;
+}
+
+/** 主力跨品分布项。 */
+export interface TeamHolderCross {
+  steam_id: string;
+  steam_name: string;
+  avatar: string;
+  /** 该主力在种子品的持仓量。 */
+  hold_in_seed: number;
+  /** 该主力跨品数。 */
+  cross_item_count: number;
+  /** 该主力持有的其他品 good_id 列表。 */
+  cross_good_ids: string[];
+  /** 是否为核心团队成员（跨品数 ≥ 阈值）。 */
+  is_core: boolean;
+}
+
+/** 跨品团队识别响应（GET /accumulation/team-analysis）。 */
+export interface TeamAnalysisResponse {
+  seed_good_id: string;
+  seed_holder_count: number;
+  analyzed_holder_count: number;
+  related_items: TeamRelatedItem[];
+  team_summary: TeamSummary;
+  holders_cross: TeamHolderCross[];
+  data_source?: string;
+}
