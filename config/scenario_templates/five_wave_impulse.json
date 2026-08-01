@@ -1,0 +1,186 @@
+[
+  {
+    "name": "five_wave_impulse_bullish",
+    "category": "trend_continuation",
+    "direction": "bullish",
+    "description": "五浪推动（多头）：完整的艾略特上升五浪，1、3、5 为推动浪，2、4 为调整浪。",
+    "rules": [
+      "浪 2 回调不跌破浪 1 起点（L2 >= L0）。",
+      "浪 3 通常不是最短推动浪。",
+      "浪 4 回调不进入浪 1 价格区间（L4 > H1）。",
+      "浪 2、浪 4 常在 0.382 至 0.618 回调位。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 30,
+    "structure": {
+      "sequence": [
+        {"label": "L0", "type": "low"},
+        {"label": "H1", "type": "high"},
+        {"label": "L2", "type": "low"},
+        {"label": "H3", "type": "high"},
+        {"label": "L4", "type": "low"},
+        {"label": "H5", "type": "high"}
+      ],
+      "structural_conditions": [
+        {"type": "higher_low", "left": "L0", "right": "L2"},
+        {"type": "higher_high", "left": "H1", "right": "H3"},
+        {"type": "higher_high", "left": "H3", "right": "H5"},
+        {"type": "higher_low", "left": "L2", "right": "L4"},
+        {"type": "higher_low", "left": "H1", "right": "L4"}
+      ],
+      "price_conditions": [
+        {
+          "type": "fib_retracement",
+          "swing_start": "L0",
+          "swing_end": "H1",
+          "point": "L2",
+          "levels": ["0.382", "0.5", "0.618"],
+          "tolerance": 0.15
+        },
+        {
+          "type": "fib_retracement",
+          "swing_start": "L2",
+          "swing_end": "H3",
+          "point": "L4",
+          "levels": ["0.382", "0.5", "0.618"],
+          "tolerance": 0.15
+        },
+        {
+          "type": "price_ratio",
+          "left": "H3 - L2",
+          "right": "H1 - L0",
+          "base": "H1 - L0",
+          "min_ratio": 0.0,
+          "max_ratio": 2.5
+        },
+        {
+          "type": "price_ratio",
+          "left": "H3 - L2",
+          "right": "H5 - L4",
+          "base": "H5 - L4",
+          "min_ratio": 0.0,
+          "max_ratio": 2.5
+        },
+        {
+          "type": "atr_multiple",
+          "a": "H1",
+          "b": "L0",
+          "min_multiple": 0.5,
+          "max_multiple": 12.0
+        },
+        {
+          "type": "breakout",
+          "level": "H5",
+          "direction": "bullish",
+          "require_cross": false,
+          "comment": "当前 K 线收盘价突破第 5 浪高点，确认 5 浪推动完成。"
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "L0", "end": "H5", "value": 12},
+        {"type": "max_bars", "start": "L0", "end": "H5", "value": 120},
+        {"type": "max_gap", "value": 20}
+      ]
+    },
+    "projection": {
+      "support": "L4",
+      "resistance": "H5",
+      "target": "H5 + 1.0 * (H1 - L0)",
+      "stop_loss": "L4 - 0.5 * atr",
+      "suggestion": "long",
+      "probability_prior": 0.52
+    }
+  },
+  {
+    "name": "five_wave_impulse_bearish",
+    "category": "trend_continuation",
+    "direction": "bearish",
+    "description": "五浪推动（空头）：完整的艾略特下跌五浪，1、3、5 为推动浪，2、4 为调整浪。",
+    "rules": [
+      "浪 2 反弹不超过浪 1 起点（H2 <= H0）。",
+      "浪 3 通常不是最短推动浪。",
+      "浪 4 反弹不进入浪 1 价格区间（H4 < L1）。",
+      "浪 2、浪 4 常在 0.382 至 0.618 反弹位。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 30,
+    "structure": {
+      "sequence": [
+        {"label": "H0", "type": "high"},
+        {"label": "L1", "type": "low"},
+        {"label": "H2", "type": "high"},
+        {"label": "L3", "type": "low"},
+        {"label": "H4", "type": "high"},
+        {"label": "L5", "type": "low"}
+      ],
+      "structural_conditions": [
+        {"type": "lower_high", "left": "H0", "right": "H2"},
+        {"type": "lower_low", "left": "L1", "right": "L3"},
+        {"type": "lower_low", "left": "L3", "right": "L5"},
+        {"type": "lower_high", "left": "H2", "right": "H4"},
+        {"type": "lower_high", "left": "L1", "right": "H4"}
+      ],
+      "price_conditions": [
+        {
+          "type": "fib_retracement",
+          "swing_start": "H0",
+          "swing_end": "L1",
+          "point": "H2",
+          "levels": ["0.382", "0.5", "0.618"],
+          "tolerance": 0.15
+        },
+        {
+          "type": "fib_retracement",
+          "swing_start": "H2",
+          "swing_end": "L3",
+          "point": "H4",
+          "levels": ["0.382", "0.5", "0.618"],
+          "tolerance": 0.15
+        },
+        {
+          "type": "price_ratio",
+          "left": "H0 - L1",
+          "right": "H2 - L3",
+          "base": "H0 - L1",
+          "min_ratio": 0.0,
+          "max_ratio": 2.5
+        },
+        {
+          "type": "price_ratio",
+          "left": "H2 - L3",
+          "right": "H4 - L5",
+          "base": "H4 - L5",
+          "min_ratio": 0.0,
+          "max_ratio": 2.5
+        },
+        {
+          "type": "atr_multiple",
+          "a": "H0",
+          "b": "L1",
+          "min_multiple": 0.5,
+          "max_multiple": 12.0
+        },
+        {
+          "type": "breakout",
+          "level": "L3",
+          "direction": "bearish",
+          "require_cross": false,
+          "comment": "当前 K 线收盘价跌破第 3 浪低点，确认 5 浪推动完成。"
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "H0", "end": "L5", "value": 12},
+        {"type": "max_bars", "start": "H0", "end": "L5", "value": 120},
+        {"type": "max_gap", "value": 20}
+      ]
+    },
+    "projection": {
+      "support": "L5",
+      "resistance": "H4",
+      "target": "L5 - 1.0 * (H0 - L1)",
+      "stop_loss": "H4 + 0.5 * atr",
+      "suggestion": "short",
+      "probability_prior": 0.52
+    }
+  }
+]

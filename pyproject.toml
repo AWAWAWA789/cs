@@ -1,0 +1,32 @@
+[project]
+name = "csqaq-glove-quant"
+version = "0.1.0"
+description = "A generic price-action quant strategy framework for CSQAQ CS:GO/CS2 skin indices."
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "pyarrow>=14.0.0",
+    "pytest>=7.4.0",
+    "responses>=0.24.0",
+    "matplotlib>=3.7.0",
+    "scikit-learn>=1.5.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.25.0",
+    "httpx>=0.25.0",
+    "python-multipart>=0.0.9",
+    "jinja2>=3.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"

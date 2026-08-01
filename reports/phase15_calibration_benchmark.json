@@ -1,0 +1,45 @@
+{
+  "generated_at": "2026-07-28T01:36:49.182452+00:00",
+  "per_sub_index": {
+    "匕首": {
+      "buy_and_hold": {
+        "total_return": -0.454885,
+        "max_drawdown": -0.723657,
+        "sharpe": -0.262093,
+        "start_price": 999.22,
+        "end_price": 544.69
+      },
+      "bar_count": 1153
+    },
+    "手套": {
+      "buy_and_hold": {
+        "total_return": -0.305121,
+        "max_drawdown": -0.737976,
+        "sharpe": 0.278349,
+        "start_price": 999.8,
+        "end_price": 694.74
+      },
+      "bar_count": 1153
+    },
+    "百元主战": {
+      "buy_and_hold": {
+        "total_return": 1.982216,
+        "max_drawdown": -0.550896,
+        "sharpe": 1.623297,
+        "start_price": 997.53,
+        "end_price": 2974.85
+      },
+      "bar_count": 1153
+    },
+    "贴纸": {
+      "buy_and_hold": {
+        "total_return": -0.50899,
+        "max_drawdown": -0.683604,
+        "sharpe": -0.591904,
+        "start_price": 997.19,
+        "end_price": 489.63
+      },
+      "bar_count": 1153
+    }
+  }
+}

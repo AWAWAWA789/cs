@@ -1,0 +1,107 @@
+{
+  "generated_at": "2026-07-28T02:27:34.397545+00:00",
+  "per_sub_index": {
+    "匕首": {
+      "sub_index": "匕首",
+      "bar_count": 1153,
+      "strategy": {
+        "initial_capital": 10000.0,
+        "final_equity": 7661.952917897445,
+        "total_return": -0.23380470821025545,
+        "max_drawdown": -0.26237984503025746,
+        "sharpe_ratio": -4.461990468855274,
+        "total_trades": 55,
+        "win_rate": 0.2545454545454545,
+        "profit_factor": 0.3275370301512766,
+        "avg_trade_return": -0.008573119488901692
+      },
+      "benchmark": {
+        "total_return": -0.454885,
+        "max_drawdown": -0.723657,
+        "sharpe": -0.262093,
+        "start_price": 999.22,
+        "end_price": 544.69
+      },
+      "excess_return": 0.22108,
+      "beat_buy_and_hold": true
+    },
+    "手套": {
+      "sub_index": "手套",
+      "bar_count": 1153,
+      "strategy": {
+        "initial_capital": 10000.0,
+        "final_equity": 8508.680563578055,
+        "total_return": -0.1491319436421945,
+        "max_drawdown": -0.17372452577097255,
+        "sharpe_ratio": -2.2916580171875167,
+        "total_trades": 50,
+        "win_rate": 0.36,
+        "profit_factor": 0.5668390302069913,
+        "avg_trade_return": -0.011651447892020307
+      },
+      "benchmark": {
+        "total_return": -0.305121,
+        "max_drawdown": -0.737976,
+        "sharpe": 0.278349,
+        "start_price": 999.8,
+        "end_price": 694.74
+      },
+      "excess_return": 0.155989,
+      "beat_buy_and_hold": true
+    },
+    "百元主战": {
+      "sub_index": "百元主战",
+      "bar_count": 1153,
+      "strategy": {
+        "initial_capital": 10000.0,
+        "final_equity": 12270.74648335141,
+        "total_return": 0.2270746483351409,
+        "max_drawdown": -0.12105256632862185,
+        "sharpe_ratio": 1.517921310707311,
+        "total_trades": 57,
+        "win_rate": 0.40350877192982454,
+        "profit_factor": 1.5196314027952045,
+        "avg_trade_return": 0.0035354420125317705
+      },
+      "benchmark": {
+        "total_return": 1.982216,
+        "max_drawdown": -0.550896,
+        "sharpe": 1.623297,
+        "start_price": 997.53,
+        "end_price": 2974.85
+      },
+      "excess_return": -1.755141,
+      "beat_buy_and_hold": false
+    },
+    "贴纸": {
+      "sub_index": "贴纸",
+      "bar_count": 1153,
+      "strategy": {
+        "initial_capital": 10000.0,
+        "final_equity": 10820.681883192517,
+        "total_return": 0.08206818831925178,
+        "max_drawdown": -0.07697364952165571,
+        "sharpe_ratio": 0.8121038879561643,
+        "total_trades": 41,
+        "win_rate": 0.3902439024390244,
+        "profit_factor": 1.2575013316995094,
+        "avg_trade_return": -0.011490140064744865
+      },
+      "benchmark": {
+        "total_return": -0.50899,
+        "max_drawdown": -0.683604,
+        "sharpe": -0.591904,
+        "start_price": 997.19,
+        "end_price": 489.63
+      },
+      "excess_return": 0.591058,
+      "beat_buy_and_hold": true
+    }
+  },
+  "summary": {
+    "sub_index_count": 4,
+    "beat_buy_and_hold_count": 3,
+    "beat_buy_and_hold_ratio": 0.75,
+    "average_excess_return": -0.196753
+  }
+}

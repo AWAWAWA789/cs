@@ -1,0 +1,142 @@
+[
+  {
+    "name": "wave_extension_bullish",
+    "category": "trend_continuation",
+    "direction": "bullish",
+    "description": "三浪延伸（多头）：1 浪上攻后，2 浪回调不破 1 浪起点，3 浪加速延伸。",
+    "rules": [
+      "浪 2 低点不低于浪 1 起点（L2 >= L0）。",
+      "浪 3 不是最短浪，且相对浪 1 出现延伸（通常 >= 1.272 倍）。",
+      "浪 2 回调幅度常在 0.382 至 0.786 之间。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 20,
+    "structure": {
+      "sequence": [
+        {"label": "L0", "type": "low"},
+        {"label": "H1", "type": "high"},
+        {"label": "L2", "type": "low"},
+        {"label": "H3", "type": "high"}
+      ],
+      "structural_conditions": [
+        {"type": "higher_low", "left": "L0", "right": "L2"},
+        {"type": "higher_high", "left": "H1", "right": "H3"}
+      ],
+      "price_conditions": [
+        {
+          "type": "fib_retracement",
+          "swing_start": "L0",
+          "swing_end": "H1",
+          "point": "L2",
+          "levels": ["0.382", "0.5", "0.618", "0.786"],
+          "tolerance": 0.08
+        },
+        {
+          "type": "atr_multiple",
+          "a": "H1",
+          "b": "L0",
+          "min_multiple": 1.0,
+          "max_multiple": 8.0
+        },
+        {
+          "type": "price_ratio",
+          "left": "H3 - L2",
+          "right": "H1 - L0",
+          "base": "H1 - L0",
+          "min_ratio": 0.25,
+          "max_ratio": 2.5
+        },
+        {
+          "type": "breakout",
+          "level": "H1",
+          "direction": "bullish",
+          "require_cross": false,
+          "comment": "当前 K 线收盘价突破第 1 浪高点，确认 3 浪延伸。"
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "L0", "end": "H3", "value": 8},
+        {"type": "max_bars", "start": "L0", "end": "H3", "value": 80},
+        {"type": "max_gap", "value": 15}
+      ]
+    },
+    "projection": {
+      "support": "L2",
+      "resistance": "H3",
+      "target": "H3 + 1.618 * (H1 - L0)",
+      "stop_loss": "L2 - 0.5 * atr",
+      "suggestion": "long",
+      "probability_prior": 0.55
+    }
+  },
+  {
+    "name": "wave_extension_bearish",
+    "category": "trend_continuation",
+    "direction": "bearish",
+    "description": "三浪延伸（空头）：1 浪下跌后，2 浪反弹不过 1 浪起点，3 浪加速延伸。",
+    "rules": [
+      "浪 2 高点不高于浪 1 起点（H2 <= H0）。",
+      "浪 3 不是最短浪，且相对浪 1 出现延伸。",
+      "浪 2 反弹幅度常在 0.382 至 0.786 之间。"
+    ],
+    "swing_order": 2,
+    "min_required_bars": 20,
+    "structure": {
+      "sequence": [
+        {"label": "H0", "type": "high"},
+        {"label": "L1", "type": "low"},
+        {"label": "H2", "type": "high"},
+        {"label": "L3", "type": "low"}
+      ],
+      "structural_conditions": [
+        {"type": "lower_high", "left": "H0", "right": "H2"},
+        {"type": "lower_low", "left": "L1", "right": "L3"}
+      ],
+      "price_conditions": [
+        {
+          "type": "fib_retracement",
+          "swing_start": "H0",
+          "swing_end": "L1",
+          "point": "H2",
+          "levels": ["0.382", "0.5", "0.618", "0.786"],
+          "tolerance": 0.08
+        },
+        {
+          "type": "atr_multiple",
+          "a": "H0",
+          "b": "L1",
+          "min_multiple": 1.0,
+          "max_multiple": 8.0
+        },
+        {
+          "type": "price_ratio",
+          "left": "H0 - L1",
+          "right": "H2 - L3",
+          "base": "H0 - L1",
+          "min_ratio": 0.25,
+          "max_ratio": 2.5
+        },
+        {
+          "type": "breakout",
+          "level": "L1",
+          "direction": "bearish",
+          "require_cross": false,
+          "comment": "当前 K 线收盘价跌破第 1 浪低点，确认 3 浪延伸。"
+        }
+      ],
+      "time_conditions": [
+        {"type": "min_bars", "start": "H0", "end": "L3", "value": 8},
+        {"type": "max_bars", "start": "H0", "end": "L3", "value": 80},
+        {"type": "max_gap", "value": 15}
+      ]
+    },
+    "projection": {
+      "support": "L3",
+      "resistance": "H2",
+      "target": "L3 - 1.618 * (H0 - L1)",
+      "stop_loss": "H2 + 0.5 * atr",
+      "suggestion": "short",
+      "probability_prior": 0.55
+    }
+  }
+]

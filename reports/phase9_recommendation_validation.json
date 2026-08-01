@@ -1,0 +1,433 @@
+{
+  "generated_at": "2026-07-27T18:35:00+00:00",
+  "results": {
+    "手套": {
+      "sub_index_name": "手套",
+      "period": "1day",
+      "fixed_params": {
+        "swing_order": 2,
+        "fib_tolerance": 0.03,
+        "confirmations": 1,
+        "target_levels": [
+          "0.5",
+          "0.618"
+        ],
+        "tp_target": "1.618",
+        "stop_loss_buffer": 0.002,
+        "use_smart_money": true,
+        "liquidity_grab_buffer": 0.005,
+        "use_trend_following": false,
+        "require_structure_resonance": false,
+        "structure_resonance_buffer": 0.03,
+        "use_market_regime_filter": false,
+        "market_regime_confirmations": 4,
+        "ensemble_mode": "union",
+        "ensemble_adx_threshold": 25.0,
+        "ensemble_regime_confirmations": 4,
+        "ensemble_trend_strength_threshold": 25.0,
+        "ensemble_dynamic_weight_min": 0.2,
+        "ensemble_dynamic_weight_max": 0.8,
+        "ensemble_dynamic_weight_adx_scale": 25.0,
+        "ensemble_use_signal_quality": false,
+        "ensemble_min_signal_quality": 0.0,
+        "ensemble_quality_trend_weight": 0.4,
+        "ensemble_quality_structure_weight": 0.4,
+        "ensemble_quality_confluence_weight": 0.2,
+        "trend_use_di_filter": false,
+        "trend_use_volatility_filter": false,
+        "trend_volatility_atr_multiplier": 0.5,
+        "trend_use_pullback_confirmation": false,
+        "trend_pullback_lookback": 5,
+        "trend_pullback_buffer": 0.005,
+        "risk_fraction": 0.02,
+        "max_position_fraction": 1.0
+      },
+      "windows": 6,
+      "avg_test_return": 0.008415091138647654,
+      "positive_windows": 3,
+      "window_details": [
+        {
+          "train_start": 0,
+          "train_end": 300,
+          "test_start": 300,
+          "test_end": 400,
+          "test_return": 0.007509220931957161,
+          "test_trades": 3,
+          "test_max_drawdown": -0.00858872790793248,
+          "test_sharpe": 2.4845654537202853
+        },
+        {
+          "train_start": 100,
+          "train_end": 400,
+          "test_start": 400,
+          "test_end": 500,
+          "test_return": 0.08953239651613543,
+          "test_trades": 3,
+          "test_max_drawdown": 0.0,
+          "test_sharpe": 7.050784422185256
+        },
+        {
+          "train_start": 200,
+          "train_end": 500,
+          "test_start": 500,
+          "test_end": 600,
+          "test_return": 0.022903952502547842,
+          "test_trades": 3,
+          "test_max_drawdown": -0.019798924184528617,
+          "test_sharpe": 2.0369160479387474
+        },
+        {
+          "train_start": 300,
+          "train_end": 600,
+          "test_start": 600,
+          "test_end": 700,
+          "test_return": -0.013898583382286556,
+          "test_trades": 3,
+          "test_max_drawdown": -0.018518270841292907,
+          "test_sharpe": -4.61342402254147
+        },
+        {
+          "train_start": 400,
+          "train_end": 700,
+          "test_start": 700,
+          "test_end": 800,
+          "test_return": -0.015956439736467987,
+          "test_trades": 3,
+          "test_max_drawdown": -0.0396,
+          "test_sharpe": -1.9211717068744618
+        },
+        {
+          "train_start": 500,
+          "train_end": 800,
+          "test_start": 800,
+          "test_end": 900,
+          "test_return": -0.03959999999999997,
+          "test_trades": 2,
+          "test_max_drawdown": -0.0396,
+          "test_sharpe": -6.685696052681499
+        }
+      ]
+    },
+    "匕首": {
+      "sub_index_name": "匕首",
+      "period": "1day",
+      "fixed_params": {
+        "swing_order": 1,
+        "fib_tolerance": 0.03,
+        "confirmations": 1,
+        "target_levels": [
+          "0.5",
+          "0.618"
+        ],
+        "tp_target": "1.618",
+        "stop_loss_buffer": 0.002,
+        "use_smart_money": true,
+        "liquidity_grab_buffer": 0.005,
+        "use_trend_following": false,
+        "require_structure_resonance": false,
+        "structure_resonance_buffer": 0.03,
+        "use_market_regime_filter": false,
+        "market_regime_confirmations": 4,
+        "ensemble_mode": null,
+        "ensemble_adx_threshold": 25.0,
+        "ensemble_regime_confirmations": 4,
+        "ensemble_trend_strength_threshold": 25.0,
+        "ensemble_dynamic_weight_min": 0.2,
+        "ensemble_dynamic_weight_max": 0.8,
+        "ensemble_dynamic_weight_adx_scale": 25.0,
+        "ensemble_use_signal_quality": false,
+        "ensemble_min_signal_quality": 0.0,
+        "ensemble_quality_trend_weight": 0.4,
+        "ensemble_quality_structure_weight": 0.4,
+        "ensemble_quality_confluence_weight": 0.2,
+        "trend_use_di_filter": false,
+        "trend_use_volatility_filter": false,
+        "trend_volatility_atr_multiplier": 0.5,
+        "trend_use_pullback_confirmation": false,
+        "trend_pullback_lookback": 5,
+        "trend_pullback_buffer": 0.005,
+        "risk_fraction": 0.02,
+        "max_position_fraction": 1.0
+      },
+      "windows": 6,
+      "avg_test_return": 0.006127269497123056,
+      "positive_windows": 4,
+      "window_details": [
+        {
+          "train_start": 0,
+          "train_end": 300,
+          "test_start": 300,
+          "test_end": 400,
+          "test_return": 0.0024848790272737897,
+          "test_trades": 2,
+          "test_max_drawdown": -0.0032827763496143234,
+          "test_sharpe": 1.7624150408203114
+        },
+        {
+          "train_start": 100,
+          "train_end": 400,
+          "test_start": 400,
+          "test_end": 500,
+          "test_return": 0.04696998977819655,
+          "test_trades": 3,
+          "test_max_drawdown": -0.0058752014289320835,
+          "test_sharpe": 5.4493802333303405
+        },
+        {
+          "train_start": 200,
+          "train_end": 500,
+          "test_start": 500,
+          "test_end": 600,
+          "test_return": -0.01296259254007237,
+          "test_trades": 4,
+          "test_max_drawdown": -0.012962592540072364,
+          "test_sharpe": -8.19254831143029
+        },
+        {
+          "train_start": 300,
+          "train_end": 600,
+          "test_start": 600,
+          "test_end": 700,
+          "test_return": -0.006511886344494067,
+          "test_trades": 3,
+          "test_max_drawdown": -0.0065118863444940875,
+          "test_sharpe": -8.036730213813966
+        },
+        {
+          "train_start": 400,
+          "train_end": 700,
+          "test_start": 700,
+          "test_end": 800,
+          "test_return": 0.00214550419348547,
+          "test_trades": 1,
+          "test_max_drawdown": 0.0,
+          "test_sharpe": 4.703319266349258
+        },
+        {
+          "train_start": 500,
+          "train_end": 800,
+          "test_start": 800,
+          "test_end": 900,
+          "test_return": 0.004637722868348959,
+          "test_trades": 1,
+          "test_max_drawdown": 0.0,
+          "test_sharpe": 4.703319266349257
+        }
+      ]
+    },
+    "百元主战": {
+      "sub_index_name": "百元主战",
+      "period": "1day",
+      "fixed_params": {
+        "swing_order": 1,
+        "fib_tolerance": 0.03,
+        "confirmations": 1,
+        "target_levels": [
+          "0.5",
+          "0.618"
+        ],
+        "tp_target": "1.618",
+        "stop_loss_buffer": 0.002,
+        "use_smart_money": true,
+        "liquidity_grab_buffer": 0.005,
+        "use_trend_following": false,
+        "require_structure_resonance": false,
+        "structure_resonance_buffer": 0.03,
+        "use_market_regime_filter": false,
+        "market_regime_confirmations": 4,
+        "ensemble_mode": "dynamic_weight",
+        "ensemble_adx_threshold": 25.0,
+        "ensemble_regime_confirmations": 4,
+        "ensemble_trend_strength_threshold": 25.0,
+        "ensemble_dynamic_weight_min": 0.2,
+        "ensemble_dynamic_weight_max": 0.8,
+        "ensemble_dynamic_weight_adx_scale": 25.0,
+        "ensemble_use_signal_quality": true,
+        "ensemble_min_signal_quality": 0.3,
+        "ensemble_quality_trend_weight": 0.4,
+        "ensemble_quality_structure_weight": 0.4,
+        "ensemble_quality_confluence_weight": 0.2,
+        "trend_use_di_filter": false,
+        "trend_use_volatility_filter": false,
+        "trend_volatility_atr_multiplier": 0.5,
+        "trend_use_pullback_confirmation": false,
+        "trend_pullback_lookback": 5,
+        "trend_pullback_buffer": 0.005,
+        "risk_fraction": 0.02,
+        "max_position_fraction": 0.5
+      },
+      "windows": 6,
+      "avg_test_return": 0.018727145776912462,
+      "positive_windows": 3,
+      "window_details": [
+        {
+          "train_start": 0,
+          "train_end": 300,
+          "test_start": 300,
+          "test_end": 400,
+          "test_return": -0.015103859352117222,
+          "test_trades": 8,
+          "test_max_drawdown": -0.01819888395248566,
+          "test_sharpe": -6.60138417265682
+        },
+        {
+          "train_start": 100,
+          "train_end": 400,
+          "test_start": 400,
+          "test_end": 500,
+          "test_return": -0.033050041355682125,
+          "test_trades": 4,
+          "test_max_drawdown": -0.03305004135568215,
+          "test_sharpe": -8.991941367408185
+        },
+        {
+          "train_start": 200,
+          "train_end": 500,
+          "test_start": 500,
+          "test_end": 600,
+          "test_return": 0.09107263553206635,
+          "test_trades": 5,
+          "test_max_drawdown": -0.024586302087051714,
+          "test_sharpe": 3.9919064601489467
+        },
+        {
+          "train_start": 300,
+          "train_end": 600,
+          "test_start": 600,
+          "test_end": 700,
+          "test_return": 0.11751271761223281,
+          "test_trades": 9,
+          "test_max_drawdown": -0.039599999999999955,
+          "test_sharpe": 6.833979403710678
+        },
+        {
+          "train_start": 400,
+          "train_end": 700,
+          "test_start": 700,
+          "test_end": 800,
+          "test_return": -0.055891223047511596,
+          "test_trades": 6,
+          "test_max_drawdown": -0.05589122304751163,
+          "test_sharpe": -10.373626667997106
+        },
+        {
+          "train_start": 500,
+          "train_end": 800,
+          "test_start": 800,
+          "test_end": 900,
+          "test_return": 0.00782264527248655,
+          "test_trades": 3,
+          "test_max_drawdown": -0.015171059405497362,
+          "test_sharpe": 1.086380481741484
+        }
+      ]
+    },
+    "贴纸": {
+      "sub_index_name": "贴纸",
+      "period": "1day",
+      "fixed_params": {
+        "swing_order": 1,
+        "fib_tolerance": 0.03,
+        "confirmations": 1,
+        "target_levels": [
+          "0.5",
+          "0.618"
+        ],
+        "tp_target": "1.618",
+        "stop_loss_buffer": 0.002,
+        "use_smart_money": true,
+        "liquidity_grab_buffer": 0.005,
+        "use_trend_following": false,
+        "require_structure_resonance": false,
+        "structure_resonance_buffer": 0.03,
+        "use_market_regime_filter": false,
+        "market_regime_confirmations": 4,
+        "ensemble_mode": null,
+        "ensemble_adx_threshold": 25.0,
+        "ensemble_regime_confirmations": 4,
+        "ensemble_trend_strength_threshold": 25.0,
+        "ensemble_dynamic_weight_min": 0.2,
+        "ensemble_dynamic_weight_max": 0.8,
+        "ensemble_dynamic_weight_adx_scale": 25.0,
+        "ensemble_use_signal_quality": true,
+        "ensemble_min_signal_quality": 0.3,
+        "ensemble_quality_trend_weight": 0.4,
+        "ensemble_quality_structure_weight": 0.4,
+        "ensemble_quality_confluence_weight": 0.2,
+        "trend_use_di_filter": false,
+        "trend_use_volatility_filter": false,
+        "trend_volatility_atr_multiplier": 0.5,
+        "trend_use_pullback_confirmation": false,
+        "trend_pullback_lookback": 5,
+        "trend_pullback_buffer": 0.005,
+        "risk_fraction": 0.02,
+        "max_position_fraction": 0.3
+      },
+      "windows": 6,
+      "avg_test_return": 0.040596667165127054,
+      "positive_windows": 5,
+      "window_details": [
+        {
+          "train_start": 0,
+          "train_end": 300,
+          "test_start": 300,
+          "test_end": 400,
+          "test_return": 0.0005187404106086202,
+          "test_trades": 1,
+          "test_max_drawdown": 0.0,
+          "test_sharpe": 4.703319266349258
+        },
+        {
+          "train_start": 100,
+          "train_end": 400,
+          "test_start": 400,
+          "test_end": 500,
+          "test_return": 0.014751509798044182,
+          "test_trades": 5,
+          "test_max_drawdown": -0.004730184287514077,
+          "test_sharpe": 4.597379218379234
+        },
+        {
+          "train_start": 200,
+          "train_end": 500,
+          "test_start": 500,
+          "test_end": 600,
+          "test_return": 0.11795948682807822,
+          "test_trades": 5,
+          "test_max_drawdown": -0.004019213518909711,
+          "test_sharpe": 6.372179565472205
+        },
+        {
+          "train_start": 300,
+          "train_end": 600,
+          "test_start": 600,
+          "test_end": 700,
+          "test_return": 0.11192673889541194,
+          "test_trades": 4,
+          "test_max_drawdown": -0.013256937381216806,
+          "test_sharpe": 7.114952649215681
+        },
+        {
+          "train_start": 400,
+          "train_end": 700,
+          "test_start": 700,
+          "test_end": 800,
+          "test_return": 0.0017396591698646269,
+          "test_trades": 5,
+          "test_max_drawdown": -0.0035143192915666486,
+          "test_sharpe": 1.3566947751525664
+        },
+        {
+          "train_start": 500,
+          "train_end": 800,
+          "test_start": 800,
+          "test_end": 900,
+          "test_return": -0.0033161321112452624,
+          "test_trades": 2,
+          "test_max_drawdown": -0.0033161321112453153,
+          "test_sharpe": -6.403287534378496
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "generated_at": "2026-07-28T00:28:51.724732+00:00",
+  "sub_indices": [
+    "匕首",
+    "手套",
+    "百元主战",
+    "贴纸"
+  ],
+  "benchmark_params": {
+    "timed_runs": 3,
+    "min_bars": 200,
+    "note": "Each measurement runs in a fresh Python process to capture cold-generation latency."
+  },
+  "aggregate": {
+    "baseline_mean_seconds": 1.056742,
+    "optimized_mean_seconds": 0.608014,
+    "improvement_percent": 42.46
+  },
+  "per_sub_index": {
+    "匕首": {
+      "sub_index": "匕首",
+      "total_bars": 450,
+      "baseline": {
+        "mean_seconds": 1.000064,
+        "std_seconds": 0.007775,
+        "min_seconds": 0.992402,
+        "max_seconds": 1.010724,
+        "runs": 3,
+        "enable_parallel": false,
+        "precompute_state": false
+      },
+      "optimized": {
+        "mean_seconds": 0.570172,
+        "std_seconds": 0.001643,
+        "min_seconds": 0.567862,
+        "max_seconds": 0.571538,
+        "runs": 3,
+        "enable_parallel": true,
+        "precompute_state": true
+      },
+      "improvement_percent": 42.99
+    },
+    "手套": {
+      "sub_index": "手套",
+      "total_bars": 450,
+      "baseline": {
+        "mean_seconds": 1.081035,
+        "std_seconds": 0.006523,
+        "min_seconds": 1.073053,
+        "max_seconds": 1.089031,
+        "runs": 3,
+        "enable_parallel": false,
+        "precompute_state": false
+      },
+      "optimized": {
+        "mean_seconds": 0.629116,
+        "std_seconds": 0.016584,
+        "min_seconds": 0.607248,
+        "max_seconds": 0.647391,
+        "runs": 3,
+        "enable_parallel": true,
+        "precompute_state": true
+      },
+      "improvement_percent": 41.8
+    },
+    "百元主战": {
+      "sub_index": "百元主战",
+      "total_bars": 450,
+      "baseline": {
+        "mean_seconds": 1.115229,
+        "std_seconds": 0.044869,
+        "min_seconds": 1.077479,
+        "max_seconds": 1.178275,
+        "runs": 3,
+        "enable_parallel": false,
+        "precompute_state": false
+      },
+      "optimized": {
+        "mean_seconds": 0.637961,
+        "std_seconds": 0.020096,
+        "min_seconds": 0.609757,
+        "max_seconds": 0.655093,
+        "runs": 3,
+        "enable_parallel": true,
+        "precompute_state": true
+      },
+      "improvement_percent": 42.8
+    },
+    "贴纸": {
+      "sub_index": "贴纸",
+      "total_bars": 450,
+      "baseline": {
+        "mean_seconds": 1.030641,
+        "std_seconds": 0.010885,
+        "min_seconds": 1.015717,
+        "max_seconds": 1.041369,
+        "runs": 3,
+        "enable_parallel": false,
+        "precompute_state": false
+      },
+      "optimized": {
+        "mean_seconds": 0.594807,
+        "std_seconds": 0.011333,
+        "min_seconds": 0.578814,
+        "max_seconds": 0.603714,
+        "runs": 3,
+        "enable_parallel": true,
+        "precompute_state": true
+      },
+      "improvement_percent": 42.29
+    }
+  }
+}
