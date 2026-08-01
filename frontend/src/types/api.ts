@@ -281,3 +281,71 @@ export interface ApiError {
 export interface TaskIdResponse {
   task_id: string;
 }
+
+// ── Accumulation (吸货分析) ──────────────────────────────
+
+export interface AccumulationSignals {
+  price_position: number;
+  volume_price_divergence: number;
+  consolidation: number;
+  bottom_rising: number;
+  volatility_contracting: number;
+  volume_trend: number;
+}
+
+export interface AccumulationFeatures {
+  price_position: number;
+  distance_to_low: number;
+  atr_percent: number;
+  volatility_regime: number;
+  volume_ratio: number;
+  volume_trend: number;
+  volume_price_divergence: number;
+  bottom_rising: number;
+  consolidation_score: number;
+  consolidation_bars: number;
+}
+
+export interface AccumulationAnalysis {
+  sub_index: string;
+  period: string;
+  accumulation_score: number;
+  phase: "accumulation" | "distribution" | "neutral";
+  signals: AccumulationSignals;
+  total_rule_score: number;
+  features: AccumulationFeatures;
+  duration_bars: number;
+  data_source: string;
+  description: string;
+  cached?: boolean;
+}
+
+export interface AccumulationScanItem {
+  sub_index: string;
+  accumulation_score: number;
+  phase: "accumulation" | "distribution" | "neutral";
+  duration_bars: number;
+  data_source: string;
+}
+
+export interface AccumulationScanResponse {
+  period: string;
+  total_scanned: number;
+  top_results: AccumulationScanItem[];
+  latency_ms: number;
+}
+
+export interface AccumulationInitResponse {
+  initialized: boolean;
+  items_cached: number;
+  errors: string[];
+  latency_ms: number;
+  message: string;
+}
+
+export interface AccumulationStatusResponse {
+  initialized: boolean;
+  last_run: string | null;
+  items_cached: number;
+  errors: string[];
+}

@@ -24,15 +24,18 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.types import Scope
 
+from src.api.accumulation_endpoints import router as accumulation_router
 from src.api.backtest_endpoints import router as backtest_router
 from src.api.data_endpoints import router as data_router
 from src.api.ensemble_endpoints import router as ensemble_router
 from src.api.item_endpoints import router as item_router
+from src.api.monitor_endpoints import router as monitor_router
 from src.api.rank_endpoints import router as rank_router
 from src.api.monitoring import monitoring_router
 from src.api.report_endpoints import router as report_router
 from src.api.scenario_endpoints import router as scenario_router
 from src.api.trend_scan_endpoints import router as trend_scan_router
+from src.api.volume_endpoints import router as volume_router
 
 
 class CacheControlStaticFiles(StaticFiles):
@@ -81,6 +84,9 @@ app.include_router(data_router)
 app.include_router(monitoring_router)
 app.include_router(item_router)
 app.include_router(rank_router)
+app.include_router(monitor_router)
+app.include_router(volume_router)
+app.include_router(accumulation_router)
 
 frontend_dir = Path(__file__).parent / "frontend" / "dist"
 if frontend_dir.exists():

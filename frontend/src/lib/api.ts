@@ -19,6 +19,10 @@ import type {
   MonitoringResponse,
   TaskIdResponse,
   ApiError,
+  AccumulationAnalysis,
+  AccumulationScanResponse,
+  AccumulationInitResponse,
+  AccumulationStatusResponse,
 } from "../types/api";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -403,6 +407,42 @@ export const rankApi = {
   },
 };
 
+// ── Accumulation (吸货分析) API ───────────────────────────
+
+export const accumulationApi = {
+  /** 对指定标的执行吸货分析。 */
+  analyze(subIndex: string, period: string, signal?: AbortSignal): Promise<AccumulationAnalysis> {
+    return request<AccumulationAnalysis>("/accumulation/analyze", undefined, {
+      method: "POST",
+      body: JSON.stringify({ sub_index: subIndex, period }),
+      signal,
+    });
+  },
+
+  /** 扫描多个标的的吸货评分排行。 */
+  scan(subIndices: string[], period: string, topN = 10, signal?: AbortSignal): Promise<AccumulationScanResponse> {
+    return request<AccumulationScanResponse>("/accumulation/scan", undefined, {
+      method: "POST",
+      body: JSON.stringify({ sub_indices: subIndices, period, top_n: topN }),
+      signal,
+    });
+  },
+
+  /** 一次性数据预热初始化。 */
+  init(subIndices?: string[], periods?: string[], signal?: AbortSignal): Promise<AccumulationInitResponse> {
+    return request<AccumulationInitResponse>("/accumulation/init", undefined, {
+      method: "POST",
+      body: JSON.stringify({ sub_indices: subIndices, periods }),
+      signal,
+    });
+  },
+
+  /** 查看初始化状态。 */
+  status(signal?: AbortSignal): Promise<AccumulationStatusResponse> {
+    return request<AccumulationStatusResponse>("/accumulation/status", undefined, { signal });
+  },
+};
+
 // ── Aggregate export ──────────────────────────────────────
 
 export const api = {
@@ -415,6 +455,7 @@ export const api = {
   monitoring: monitoringApi,
   item: itemApi,
   rank: rankApi,
+  accumulation: accumulationApi,
 };
 
 /** Type guard for ApiClientError. */

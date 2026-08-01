@@ -17,6 +17,7 @@ const MonitoringPage = lazy(() => import("./pages/MonitoringPage"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const ItemDetailPage = lazy(() => import("./pages/ItemDetailPage"));
 const RankingPage = lazy(() => import("./pages/RankingPage"));
+const AccumulationPage = lazy(() => import("./pages/AccumulationPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function PageLoader() {
@@ -50,6 +51,7 @@ function AnimatedRoutes() {
           <Route path="/monitoring" element={<MonitoringPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/ranking" element={<RankingPage />} />
+          <Route path="/accumulation" element={<AccumulationPage />} />
           <Route path="/item/:goodId" element={<ItemDetailPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

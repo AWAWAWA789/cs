@@ -412,17 +412,21 @@ def ohlc(
     highs = np.round(df["high"].to_numpy(dtype=float), 6)
     lows = np.round(df["low"].to_numpy(dtype=float), 6)
     closes = np.round(df["close"].to_numpy(dtype=float), 6)
+    # 成交量列可能不存在（synthetic 数据无 v 字段）
+    volumes = df["volume"].to_numpy(dtype=float) if "volume" in df.columns else None
 
-    records = [
-        {
+    records = []
+    for i, ts in enumerate(timestamps):
+        rec = {
             "timestamp": ts,
-            "open": float(o),
-            "high": float(h),
-            "low": float(l),
-            "close": float(c),
+            "open": float(opens[i]),
+            "high": float(highs[i]),
+            "low": float(lows[i]),
+            "close": float(closes[i]),
         }
-        for ts, o, h, l, c in zip(timestamps, opens, highs, lows, closes)
-    ]
+        if volumes is not None:
+            rec["volume"] = float(volumes[i])
+        records.append(rec)
 
     return {
         "sub_index": sub_index,

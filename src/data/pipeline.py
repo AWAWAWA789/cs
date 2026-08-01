@@ -64,10 +64,15 @@ def normalize_kline(data: dict | list) -> pd.DataFrame:
         df = pd.DataFrame(data)
 
     df = df.rename(
-        columns={"t": "timestamp", "o": "open", "h": "high", "l": "low", "c": "close"}
+        columns={"t": "timestamp", "o": "open", "h": "high", "l": "low", "c": "close", "v": "volume"}
     )
     df["timestamp"] = pd.to_datetime(df["timestamp"].astype("int64"), unit="ms", utc=True)
-    return df[["timestamp", "open", "high", "low", "close"]]
+    # 保留成交量列（如果存在），供吸货分析等功能使用
+    cols = ["timestamp", "open", "high", "low", "close"]
+    if "volume" in df.columns:
+        df["volume"] = df["volume"].fillna(0).astype(float)
+        cols.append("volume")
+    return df[cols]
 
 
 def filter_from_2024(df: pd.DataFrame) -> pd.DataFrame:

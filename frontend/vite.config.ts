@@ -25,6 +25,11 @@ export default defineConfig({
       "/reports": "http://localhost:8000",
       "/data": "http://localhost:8000",
       "/monitoring": "http://localhost:8000",
+      "/item": "http://localhost:8000",
+      "/rank": "http://localhost:8000",
+      "/monitor": "http://localhost:8000",
+      "/volume": "http://localhost:8000",
+      "/accumulation": "http://localhost:8000",
     },
   },
 });
