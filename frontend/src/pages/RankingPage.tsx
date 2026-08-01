@@ -300,21 +300,27 @@ export default function RankingPage() {
   const navigate = useNavigate();
   const setItemGoodId = useGlobalStore((s) => s.setItemGoodId);
 
-  // 涨跌排行数据
+  // 涨跌排行数据 — 仅在 rank 选项卡激活时请求，避免并发触发 429
   const rankAsync = useAsync(
     (signal) => api.rank.list(sort, rankPage, PAGE_SIZE, signal),
     [sort, rankPage],
+    activeTab === "rank",
   );
 
-  // 饰品列表数据
+  // 饰品列表数据 — 仅在 items 选项卡激活时请求
   const itemAsync = useAsync(
     (signal) =>
       api.rank.items({ type: filterType, quality: filterQuality }, itemPage, PAGE_SIZE, signal),
     [filterType, filterQuality, itemPage],
+    activeTab === "items",
   );
 
-  // 热门系列数据
-  const seriesAsync = useAsync((signal) => api.rank.series(signal), []);
+  // 热门系列数据 — 仅在 series 选项卡激活时请求
+  const seriesAsync = useAsync(
+    (signal) => api.rank.series(signal),
+    [],
+    activeTab === "series",
+  );
 
   // 派生数据：从 unknown 响应中安全提取
   const rankData = useMemo(() => extractPaged<RankListItem>(rankAsync.data), [rankAsync.data]);

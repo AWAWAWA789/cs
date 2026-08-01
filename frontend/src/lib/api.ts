@@ -62,6 +62,7 @@ function buildUrl(path: string, params?: QueryParams): string {
 
 /**
  * 底层请求函数，支持 AbortSignal 取消请求。
+ * 遇到 429 (Too Many Requests) 时自动重试，最多重试 2 次。
  * @param signal 可选的 AbortSignal，用于取消请求
  */
 async function request<T>(
@@ -75,29 +76,49 @@ async function request<T>(
     headers["Content-Type"] = "application/json";
   }
   Object.assign(headers, options?.headers as Record<string, string> | undefined);
-  const res = await fetch(url, {
-    ...options,
-    headers,
-    signal: options?.signal,
-  });
 
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}`;
-    try {
-      const body = (await res.json()) as ApiError;
-      detail = body.detail ?? detail;
-    } catch {
-      // ignore parse error
+  const MAX_RETRIES = 2;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    // 如果 signal 已取消，直接抛出
+    if (options?.signal?.aborted) {
+      throw new ApiClientError(0, "请求已取消");
     }
-    throw new ApiClientError(res.status, detail);
+
+    const res = await fetch(url, {
+      ...options,
+      headers,
+      signal: options?.signal,
+    });
+
+    // 429 重试逻辑
+    if (res.status === 429 && attempt < MAX_RETRIES) {
+      const delay = 5000 * (attempt + 1); // 5s, 10s — match backend backoff
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      continue;
+    }
+
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const body = (await res.json()) as ApiError;
+        detail = body.detail ?? detail;
+      } catch {
+        // ignore parse error
+      }
+      throw new ApiClientError(res.status, detail);
+    }
+
+    // Handle 204 No Content
+    if (res.status === 204) {
+      return undefined as T;
+    }
+
+    return (await res.json()) as T;
   }
 
-  // Handle 204 No Content
-  if (res.status === 204) {
-    return undefined as T;
-  }
-
-  return (await res.json()) as T;
+  // 所有重试用尽
+  throw new ApiClientError(429, "请求过于频繁，请稍后重试");
 }
 
 // ── Scenario API ──────────────────────────────────────────
