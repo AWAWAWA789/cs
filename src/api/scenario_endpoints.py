@@ -220,11 +220,15 @@ def _load_ohlc(
     settings = Settings()
     cache_path = cache_file_path(sub_index, period, settings.cache_path)
 
-    # 按周期动态计算新鲜度阈值：至少 2 个周期长度，最小 3 天。
-    # 周线/月线最后一根天然就距当前时间较远，固定 3 天阈值会导致它们
-    # 永远被判为过期并反复尝试刷新。
-    period_days = {"1hour": 1 / 24, "4hour": 4 / 24, "1day": 1.0, "7day": 7.0}.get(period, 1.0)
-    freshness_threshold = pd.Timedelta(days=max(3.0, period_days * 2.0))
+    # 各周期长度，用于判断最后一根是否是"当前未收盘K线"以及已收盘周期
+    # 的新鲜度阈值（见下方 is_unclosed 逻辑）。
+    period_durations = {
+        "1hour": pd.Timedelta(hours=1),
+        "4hour": pd.Timedelta(hours=4),
+        "1day": pd.Timedelta(days=1),
+        "7day": pd.Timedelta(days=7),
+    }
+    period_dur = period_durations.get(period, pd.Timedelta(days=1))
 
     # Drop any in-memory parquet entry when the caller explicitly asked for
     # a refresh — otherwise the TTL layer would mask the freshly fetched data.
@@ -240,12 +244,22 @@ def _load_ohlc(
         last_ts = pd.to_datetime(cached_df["timestamp"].iloc[-1])
         if hasattr(last_ts, "tzinfo") and last_ts.tzinfo is None:
             last_ts = last_ts.tz_localize("UTC")
-        age = pd.Timestamp.now(tz="UTC") - last_ts
-        if age <= freshness_threshold:
+        now_utc = pd.Timestamp.now(tz="UTC")
+        age = now_utc - last_ts
+        # CSQAQ 各周期(1h/4h/1d/7d)均会返回"当前未收盘K线"，其时间戳=周期
+        # 开始时刻。
+        # - 若最后一根的周期尚未结束（结束时刻在未来）：它是实时变动的未
+        #   收盘K线，用 1 小时短阈值刷新，使其随盘中行情更新；
+        # - 若已收盘：用该周期长度作阈值，一旦进入新周期（age > 周期长度）
+        #   立即拉取最新的未收盘K线，避免短周期(1h/4h)在当前K线收盘后长期
+        #   滞后于 1hour。历史已收盘K线本身不变，所以不会反复刷新。
+        is_unclosed = (last_ts + period_dur) > now_utc
+        effective_threshold = pd.Timedelta(hours=1) if is_unclosed else period_dur
+        if age <= effective_threshold:
             return filter_from_2024(cached_df), "real"
         LOGGER.info(
-            "Cache stale for %s/%s (last bar %s old, threshold %s), refreshing",
-            sub_index, period, age, freshness_threshold,
+            "Cache stale for %s/%s (last bar %s old, threshold %s, unclosed=%s), refreshing",
+            sub_index, period, age, effective_threshold, is_unclosed,
         )
 
     # Attempt a real fetch only when an API token is configured.
@@ -264,9 +278,13 @@ def _load_ohlc(
                 LOGGER.info("Falling back to stale cache for %s/%s", sub_index, period)
                 return filter_from_2024(cached_df), "stale_cache"
 
-    # Only use synthetic data when no cached data exists at all. Synthetic
-    # data is NOT persisted to the real cache path — otherwise the freshness
-    # check above would treat it as fresh real data on the next call.
+    # No API token (or token path skipped): prefer any cached data — even if
+    # stale — over synthetic data, so environments without a token still see
+    # real history instead of a deterministic demo series. Synthetic data is
+    # only used when no cached data exists at all, and is NOT persisted to the
+    # real cache path (otherwise the freshness check would treat it as fresh).
+    if cached_df is not None:
+        return filter_from_2024(cached_df), "stale_cache"
     df = _synthetic_ohlc(sub_index, period)
     return df, "synthetic"
 
@@ -277,6 +295,10 @@ def _run_generate(sub_index: str, period: str) -> dict[str, Any]:
     if len(df) < _MIN_BARS:
         df = _synthetic_ohlc(sub_index, period)
         data_source = "synthetic"
+
+    # NOTE: CSQAQ 的 1day/7day 已返回当前未收盘K线（时间戳=周期开始时刻，
+    # 即北京0点=UTC前日16:00），无需再合成"今日K线"。早期版本曾用 1hour
+    # 数据合成额外一根，结果与 CSQAQ 已有的未收盘K线重复，导致日线错乱。
 
     start = time.perf_counter()
     result = generate_scenarios({period: df})
@@ -390,6 +412,8 @@ def ohlc(
         latency_ms = (time.perf_counter() - start) * 1000
         record_request("/scenario/ohlc", latency_ms, error=True)
         raise HTTPException(status_code=500, detail=f"OHLC load failed: {exc}") from exc
+
+    # CSQAQ 各周期(1h/4h/1d/7d)均已返回当前未收盘K线，无需额外合成。
 
     latency_ms = (time.perf_counter() - start) * 1000
     log_request(
