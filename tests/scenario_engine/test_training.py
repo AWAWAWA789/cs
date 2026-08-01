@@ -313,7 +313,43 @@ class TestLlmExplainer:
         assert "证据链" in prompt
 
     def test_build_prompt_with_similar_cases(self):
-        """prompt 包含历史相似案例。"""
+        """prompt 包含历史相似案例（F3: ≥3 才展示）。"""
+        data = _make_fused_data()
+        # F3 要求 ≥3 才喂 LLM
+        cases = [
+            {
+                "good_name": "AK-47 | 红线",
+                "timestamp": "2024-03-15",
+                "kline_score": 0.68,
+                "future_return_30d": 0.18,
+                "max_drawdown_30d": -0.05,
+                "label": "positive",
+            },
+            {
+                "good_name": "M4A4 | 咆哮",
+                "timestamp": "2024-04-20",
+                "kline_score": 0.55,
+                "future_return_30d": -0.12,
+                "max_drawdown_30d": -0.18,
+                "label": "negative",
+            },
+            {
+                "good_name": "AWP | 巨龙传说",
+                "timestamp": "2024-05-10",
+                "kline_score": 0.62,
+                "future_return_30d": 0.05,
+                "max_drawdown_30d": -0.03,
+                "label": "neutral",
+            },
+        ]
+        prompt = _build_prompt(data, cases)
+        assert "AK-47" in prompt
+        assert "历史相似案例" in prompt
+        # F3: 应包含回撤信息
+        assert "回撤" in prompt
+
+    def test_build_prompt_with_few_similar_cases_skipped(self):
+        """F3: 相似案例 <3 不展示（避免噪声）。"""
         data = _make_fused_data()
         cases = [
             {
@@ -325,8 +361,8 @@ class TestLlmExplainer:
             }
         ]
         prompt = _build_prompt(data, cases)
-        assert "AK-47" in prompt
-        assert "历史相似案例" in prompt
+        # 单案例不应展示
+        assert "历史相似案例" not in prompt
 
     def test_fallback_high_score(self):
         """高评分降级模板。"""

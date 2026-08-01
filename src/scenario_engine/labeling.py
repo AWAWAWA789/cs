@@ -66,8 +66,18 @@ def label_case(
     horizon: int = DEFAULT_HORIZON,
     positive_threshold: float = DEFAULT_POSITIVE,
     negative_threshold: float = DEFAULT_NEGATIVE,
+    use_drawdown_constraint: bool = True,
+    positive_max_drawdown: float = -0.08,
+    negative_max_drawdown: float = -0.15,
 ) -> dict[str, Any]:
     """为单个案例生成标签。
+
+    F1 升级：默认启用回撤约束（use_drawdown_constraint=True）
+    - 正样本：future_return ≥ positive_threshold **且** max_drawdown ≥ positive_max_drawdown
+      （即回撤不超过 8%，可持有体验好）
+    - 负样本：future_return ≤ negative_threshold **或** max_drawdown ≤ negative_max_drawdown
+      （即跌幅超 10% 或回撤超 15%，止损触发）
+    - 否则：neutral
 
     Args:
         case: 案例字典，需含 timestamp 与 good_id
@@ -75,6 +85,9 @@ def label_case(
         horizon: 回看窗口（天）
         positive_threshold: 正样本涨幅阈值
         negative_threshold: 负样本跌幅阈值（负数）
+        use_drawdown_constraint: 启用回撤约束
+        positive_max_drawdown: 正样本允许的最大回撤（负数，如 -0.08 = -8%）
+        negative_max_drawdown: 负样本的回撤阈值（负数，如 -0.15 = -15%）
 
     Returns:
         更新后的案例字典，增加 label / future_return_{horizon}d / max_drawdown 字段
@@ -115,17 +128,29 @@ def label_case(
     drawdown = (future_window["close"] - cummax) / cummax
     max_drawdown = float(drawdown.min()) if len(drawdown) > 0 else 0.0
 
-    # 标注
-    if future_return >= positive_threshold:
-        label = "positive"
-    elif future_return <= negative_threshold:
-        label = "negative"
+    # F1 标注（含回撤约束）
+    if use_drawdown_constraint:
+        # 正样本：涨幅达标 + 回撤可控
+        if future_return >= positive_threshold and max_drawdown >= positive_max_drawdown:
+            label = "positive"
+        # 负样本：跌幅超阈 或 回撤超阈（止损触发）
+        elif future_return <= negative_threshold or max_drawdown <= negative_max_drawdown:
+            label = "negative"
+        else:
+            label = "neutral"
     else:
-        label = "neutral"
+        # 旧规则：仅看终点涨幅
+        if future_return >= positive_threshold:
+            label = "positive"
+        elif future_return <= negative_threshold:
+            label = "negative"
+        else:
+            label = "neutral"
 
     case["label"] = label
     case[f"future_return_{horizon}d"] = round(future_return, 4)
     case[f"max_drawdown_{horizon}d"] = round(max_drawdown, 4)
+    case["label_rule"] = "drawdown_constrained" if use_drawdown_constraint else "endpoint_only"
     case["labeled_at"] = datetime.now(datetime.now().astimezone().tzinfo).isoformat()
 
     return case

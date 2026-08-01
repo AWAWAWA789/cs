@@ -608,6 +608,69 @@ export const trainingApi = {
   },
 };
 
+/** 侦察机制 API（阶段 C+E：watchlist/采集/告警/自动标注）。 */
+export const scoutApi = {
+  /** 加入关注列表。 */
+  watchlistAdd(goodId: string, goodName = "", threshold = 0.6): Promise<unknown> {
+    return request<unknown>(
+      "/scout/watchlist/add",
+      { good_id: goodId, good_name: goodName, threshold },
+      { method: "POST" },
+    );
+  },
+
+  /** 列出全部关注品。 */
+  watchlistList(signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>("/scout/watchlist/list", {}, { signal });
+  },
+
+  /** 移除关注品。 */
+  watchlistRemove(goodId: string): Promise<unknown> {
+    return request<unknown>(
+      `/scout/watchlist/${goodId}`,
+      {},
+      { method: "DELETE" },
+    );
+  },
+
+  /** 触发 watchlist 内全部品的当日库存快照采集。 */
+  collectInventory(force = false): Promise<unknown> {
+    return request<unknown>(
+      "/scout/collect-inventory",
+      { force },
+      { method: "POST" },
+    );
+  },
+
+  /** 查看近 7 日采集成功率与缺失品。 */
+  inventoryStatus(signal?: AbortSignal): Promise<unknown> {
+    return request<unknown>("/scout/inventory-status", {}, { signal });
+  },
+
+  /** 扫描 watchlist + 触发告警。 */
+  runScan(alertThreshold = 0.6, deltaThreshold = 0.15): Promise<unknown> {
+    return request<unknown>(
+      "/scout/run-scan",
+      { alert_threshold: alertThreshold, delta_threshold: deltaThreshold },
+      { method: "POST" },
+    );
+  },
+
+  /** 查询告警列表。 */
+  alerts(date?: string): Promise<unknown> {
+    return request<unknown>("/scout/alerts", date ? { date } : {});
+  },
+
+  /** 自动标注到期案例。 */
+  autoLabel(category = "rifle", horizon = 30): Promise<unknown> {
+    return request<unknown>(
+      "/scout/auto-label",
+      { category, horizon, use_drawdown_constraint: true },
+      { method: "POST" },
+    );
+  },
+};
+
 // ── Aggregate export ──────────────────────────────────────
 
 export const api = {
@@ -622,6 +685,7 @@ export const api = {
   rank: rankApi,
   accumulation: accumulationApi,
   training: trainingApi,
+  scout: scoutApi,
 };
 
 /** Type guard for ApiClientError. */

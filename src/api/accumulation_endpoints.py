@@ -448,18 +448,36 @@ async def analyze_fused(
     # ── K线行为评分 ──
     if kline_df is not None and len(kline_df) >= 10:
         from src.scenario_engine.accumulation_detector import detect_accumulation, fuse_scores
-        kline_result = detect_accumulation(kline_df, sub_index=f"单品#{good_id}", period=period)
+        # 查案例库规模供置信度计算
+        case_count: int | None = None
+        try:
+            from src.scenario_engine.case_store import case_count as _case_count
+            stats = _case_count(settings.cache_path, "rifle")
+            case_count = stats.get("labeled", 0)
+        except Exception:
+            pass
+        kline_result = detect_accumulation(
+            kline_df, sub_index=f"单品#{good_id}", period=period,
+            cache_root=settings.cache_path, category="rifle",
+            case_count=case_count,
+        )
         kline_score = kline_result.get("accumulation_score", 0.0)
         kline_signals = kline_result.get("signals", {})
         kline_features = kline_result.get("features", {})
         kline_description = kline_result.get("description", "")
         duration_bars = kline_result.get("duration_bars", 0)
+        feature_mode = kline_result.get("feature_mode", "FULL")
+        weights_source = kline_result.get("weights_source", "empirical")
+        kline_confidence = kline_result.get("confidence", 0.5)
     else:
         kline_score = 0.0
         kline_signals = {}
         kline_features = {}
         kline_description = "K线数据不足"
         duration_bars = 0
+        feature_mode = "DEGRADED"
+        weights_source = "empirical"
+        kline_confidence = 0.2
 
     # ── 库存行为评分 ──
     from src.scenario_engine.inventory_signals import (
@@ -506,6 +524,9 @@ async def analyze_fused(
         "kline_signals": kline_signals,
         "inventory_signals": inventory_signals,
         "kline_features": kline_features,
+        "feature_mode": feature_mode,
+        "weights_source": weights_source,
+        "confidence": kline_confidence,
         "inventory_stats": {
             "top3_concentration": inv_result["top3_concentration"],
             "total_hold": inv_result["total_hold"],
@@ -520,6 +541,40 @@ async def analyze_fused(
     }
 
     _FUSED_CACHE.set(cache_key, result)
+
+    # D2: 实时分析自动入案例库（飞轮启动）
+    # 异步写入，不阻塞响应
+    try:
+        import asyncio
+        from datetime import datetime, timezone
+        from src.scenario_engine.case_store import save_case
+
+        case = {
+            "case_id": f"rifle_{good_id}_{int(datetime.now(timezone.utc).timestamp())}",
+            "good_id": good_id,
+            "good_name": "",  # 由前端补全
+            "category": "rifle",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "period": period,
+            "features": kline_features,
+            "feature_mode": feature_mode,
+            "weights_source": weights_source,
+            "kline_score": kline_score,
+            "inventory_score": inventory_score,
+            "inventory_features": inventory_signals,
+            "fused_score": fused["fused_score"],
+            "pattern": pattern,
+            "phase": fused["phase"],
+            "duration_bars": duration_bars,
+            "evidence": evidence,
+            "label": None,  # 待事后标注
+        }
+        asyncio.create_task(
+            asyncio.to_thread(save_case, case, settings.cache_path, "rifle")
+        )
+    except Exception as exc:
+        LOGGER.debug("auto-save case failed (non-blocking): %s", exc)
+
     return result
 
 

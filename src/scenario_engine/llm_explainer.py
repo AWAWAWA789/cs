@@ -51,9 +51,12 @@ def _build_prompt(
     fused_data: dict[str, Any],
     similar_cases: list[dict[str, Any]] | None = None,
 ) -> str:
-    """构建 LLM prompt。
+    """构建 LLM prompt（F3 增强：双轨对比 + 校准要求）。
 
-    严格约束输出格式，控制 token 消耗。
+    F3 升级：
+    - 相似案例 ≥3 才喂 LLM（避免噪声，由 explain_fused 控制）
+    - prompt 增加双轨对比结构化模板
+    - 要求 LLM 输出置信度时基于历史命中率校准
     """
     parts = [
         "你是 CS:GO 饰品市场的主力资金分析师。基于以下双轨吸货分析数据，给出简洁归因。",
@@ -68,6 +71,22 @@ def _build_prompt(
         f"- 阶段: {fused_data.get('phase', '')}",
         f"- 持续K线数: {fused_data.get('duration_bars', 0)}",
     ]
+
+    # F3: 数据源透明化
+    feature_mode = fused_data.get("feature_mode", "")
+    weights_source = fused_data.get("weights_source", "")
+    confidence = fused_data.get("confidence", "")
+    if feature_mode or weights_source:
+        parts.append("")
+        parts.append("## 数据源与置信度")
+        if feature_mode:
+            mode_desc = {"FULL": "完整OHLC（6项规则）", "CLOSE_ONLY": "仅收盘价（4项规则降级）",
+                         "DEGRADED": "数据不足"}.get(feature_mode, feature_mode)
+            parts.append(f"- K线数据模式: {feature_mode} ({mode_desc})")
+        if weights_source:
+            parts.append(f"- 权重来源: {weights_source} ({'训练产物' if weights_source == 'trained' else '经验值'})")
+        if confidence != "":
+            parts.append(f"- 系统置信度: {confidence}")
 
     # 库存统计
     inv_stats = fused_data.get("inventory_stats", {})
@@ -91,15 +110,20 @@ def _build_prompt(
         for e in evidence:
             parts.append(f"- {e}")
 
-    # 历史相似案例
-    if similar_cases:
+    # F3: 历史相似案例（≥3 才展示，避免单案例噪声）
+    if similar_cases and len(similar_cases) >= 3:
         parts.extend(["", "## 历史相似案例（top-3）"])
         for i, c in enumerate(similar_cases[:3], 1):
             ret = c.get("future_return_30d")
             ret_str = f"{ret*100:.1f}%" if ret is not None else "未知"
+            dd = c.get("max_drawdown_30d")
+            dd_str = f"{dd*100:.1f}%" if dd is not None else "未知"
+            inv_s = c.get("inventory_score", 0)
+            fused_s = c.get("fused_score", c.get("kline_score", 0))
             parts.append(
                 f"{i}. {c.get('good_name', '')} ({c.get('timestamp', '')[:10]}) "
-                f"评分 {c.get('kline_score', 0):.2f} → 后30天 {ret_str} [{c.get('label', '')}]"
+                f"融合 {fused_s:.2f}/K线 {c.get('kline_score', 0):.2f}/库存 {inv_s:.2f} "
+                f"→ 后30天 {ret_str} (回撤 {dd_str}) [{c.get('label', '')}]"
             )
 
     # K线子分
@@ -107,16 +131,22 @@ def _build_prompt(
     if kline_signals:
         parts.extend(["", "## K线子分明细"])
         for k, v in kline_signals.items():
-            parts.append(f"- {k}: {v:.3f}")
+            try:
+                parts.append(f"- {k}: {float(v):.3f}")
+            except (TypeError, ValueError):
+                parts.append(f"- {k}: {v}")
 
     parts.extend([
         "",
         "## 任务",
         "用一段话（不超过 150 字）给出归因：",
         "1. 主力在做什么（吸货/出货/观望）",
-        "2. K线与库存是否相互印证",
-        "3. 如有相似案例，参考历史走势",
-        "4. 给出置信度判断（高/中/低）",
+        "2. K线与库存是否相互印证（双轨一致性）",
+        "3. 如有相似案例，参考历史走势给出预期",
+        "4. 给出置信度判断（高/中/低），并说明依据：",
+        "   - 高：双轨一致 + 相似案例命中率 ≥60%",
+        "   - 中：单轨明显或相似案例命中 40-60%",
+        "   - 低：双轨矛盾或无相似案例",
         "",
         "直接输出归因文本，不要加标题或分点。",
     ])

@@ -286,43 +286,145 @@ def add_consolidation_features(df: pd.DataFrame, window: int = 20) -> pd.DataFra
     return result
 
 
+def detect_feature_mode(df: pd.DataFrame) -> str:
+    """检测 DataFrame 可支持的特征模式。
+
+    - ``FULL``：含真实 open/high/low/close（可计算 ATR/swing 等所有特征）
+    - ``CLOSE_ONLY``：仅有 close（或 high==low==close，伪造 OHLC），降级为 3 项特征
+    - ``DEGRADED``：连 close 都不完整，无法分析
+
+    判定逻辑：
+    1. 缺 close → DEGRADED
+    2. 缺 open/high/low 任一，或 high/low 恒等于 close → CLOSE_ONLY
+    3. 否则 → FULL
+    """
+    if "close" not in df.columns or len(df) == 0:
+        return "DEGRADED"
+    if not all(col in df.columns for col in ("open", "high", "low")):
+        return "CLOSE_ONLY"
+    # 检测是否伪造：high/low 与 close 完全相同（伪 OHLC 的标志）
+    # 容差比较避免浮点误差
+    high_eq_close = bool((df["high"] - df["close"]).abs().max() < 1e-9)
+    low_eq_close = bool((df["low"] - df["close"]).abs().max() < 1e-9)
+    if high_eq_close and low_eq_close:
+        return "CLOSE_ONLY"
+    return "FULL"
+
+
+def add_close_only_features(df: pd.DataFrame, window: int = 20) -> pd.DataFrame:
+    """仅基于收盘价的降级特征集（CLOSE_ONLY 模式）。
+
+    替代伪造 OHLC 的 True Range ATR / swing 检测，使用纯收盘价统计量：
+    - close_volatility：收盘价日收益率标准差（归一化）
+    - close_consolidation：收盘价在窗口内的振幅评分
+    - close_trend：收盘价短期线性趋势斜率
+
+    Args:
+        df: 含 close 列的 DataFrame
+        window: 计算窗口
+
+    Returns:
+        原 df 增加 close_volatility / close_consolidation / close_trend 列
+    """
+    result = df.copy()
+    close = result["close"]
+
+    # 收盘价日收益率波动率（归一化到 0-1，越高越波动）
+    returns = close.pct_change()
+    vol_std = returns.rolling(window=max(2, window // 2), min_periods=1).std()
+    result["close_volatility"] = np.nan_to_num(
+        vol_std.clip(0.0, 0.1) * 10.0, nan=0.0
+    ).clip(0.0, 1.0)
+
+    # 收盘价横盘评分：窗口内振幅越小越横盘（与 add_consolidation_features 同口径）
+    rolling_high = close.rolling(window=window, min_periods=1).max()
+    rolling_low = close.rolling(window=window, min_periods=1).min()
+    rolling_mean = close.rolling(window=window, min_periods=1).mean()
+    amplitude = pd.Series(
+        np.nan_to_num(
+            (rolling_high - rolling_low) / rolling_mean.replace(0.0, np.nan),
+            nan=0.0,
+        ).clip(0.0, 5.0),
+        index=close.index,
+    )
+    result["close_consolidation"] = (1.0 - amplitude).clip(0.0, 1.0)
+
+    # 收盘价短期趋势斜率：近 window/2 收盘价线性回归斜率（正=上升）
+    half = max(2, window // 2)
+    slopes = pd.Series(0.0, index=close.index)
+    for i in range(half, len(close)):
+        seg = close.iloc[i - half:i + 1].values
+        if len(seg) >= 2 and not np.any(np.isnan(seg)):
+            x = np.arange(len(seg), dtype=float)
+            slope = np.polyfit(x, seg, 1)[0]
+            slopes.iloc[i] = slope
+    # 归一化斜率：按收盘价均值百分比
+    mean_close = float(close.mean()) if len(close) > 0 else 1.0
+    result["close_trend"] = np.nan_to_num(
+        (slopes / mean_close) * 100.0, nan=0.0
+    ).clip(-1.0, 1.0)
+
+    return result
+
+
 def compute_accumulation_features(df: pd.DataFrame) -> pd.DataFrame:
     """计算全部吸货特征。
 
-    输入 DataFrame 需含 open/high/low/close 列，可选 volume 列。
-    返回增加所有吸货特征列的 DataFrame。
+    自动检测数据模式：
+    - FULL：含真实 OHLC → 计算 6 项完整特征
+    - CLOSE_ONLY：仅收盘价 → 计算 price_position + close_* 降级特征
+    - DEGRADED：数据不足 → 返回原 df，下游会判 0 分
 
-    特征列表：
-    - price_position: 价格在窗口中的位置（0=最低, 1=最高）
-    - distance_to_low: 距低点比例
-    - atr_percent: ATR 占价格百分比
-    - volatility_regime: 波动率体制（0=低, 1=中, 2=高）
-    - volume_ma / volume_ratio / volume_trend: 成交量特征（如有 volume）
-    - volume_price_divergence: 量价背离指数
-    - bottom_rising: 底部抬高评分
-    - consolidation_score: 横盘评分
-    - consolidation_bars: 横盘持续 K 线数
+    输入 DataFrame 需含 close 列，FULL 模式还需 open/high/low。
+    返回增加吸货特征列的 DataFrame，并新增 ``feature_mode`` 元信息列。
     """
     result = df.copy()
+    mode = detect_feature_mode(result)
+    result.attrs["feature_mode"] = mode
+
+    if mode == "DEGRADED":
+        return result
+
+    # 公共特征：price_position（任何模式都能算）
     result = add_price_position_features(result)
-    result = add_volatility_features(result)
-    result = add_volume_features(result)
-    result = add_price_divergence_features(result)
-    result = add_swing_trend_features(result)
-    result = add_consolidation_features(result)
+
+    if mode == "FULL":
+        result = add_volatility_features(result)
+        result = add_volume_features(result)
+        result = add_price_divergence_features(result)
+        result = add_swing_trend_features(result)
+        result = add_consolidation_features(result)
+    else:  # CLOSE_ONLY
+        result = add_close_only_features(result)
+        # 占位：填充 FULL 模式独有列为 0，避免下游 KeyError
+        for col in ("atr_percent", "volatility_regime", "volume_ratio",
+                    "volume_trend", "volume_price_divergence",
+                    "bottom_rising", "consolidation_score", "consolidation_bars"):
+            if col not in result.columns:
+                result[col] = 0.0
+
     return result
 
 
 def get_latest_features(df: pd.DataFrame) -> dict[str, float]:
     """获取最新一根 K 线的吸货特征值。
 
+    自动按 feature_mode 输出对应特征集：
+    - FULL：10 项完整特征
+    - CLOSE_ONLY：price_position + close_volatility/consolidation/trend
+    - DEGRADED：空字典
+
     Args:
         df: 经 compute_accumulation_features 处理后的 DataFrame。
 
     Returns:
-        特征名到值的字典。
+        特征名到值的字典，含 ``feature_mode`` 元信息键。
     """
-    feature_cols = [
+    mode = df.attrs.get("feature_mode", "FULL")
+    if mode == "DEGRADED" or len(df) == 0:
+        return {"feature_mode": mode}
+
+    full_cols = [
         "price_position",
         "distance_to_low",
         "atr_percent",
@@ -334,10 +436,24 @@ def get_latest_features(df: pd.DataFrame) -> dict[str, float]:
         "consolidation_score",
         "consolidation_bars",
     ]
-    result = {}
+    close_only_cols = [
+        "price_position",
+        "distance_to_low",
+        "close_volatility",
+        "close_consolidation",
+        "close_trend",
+    ]
+    cols = full_cols if mode == "FULL" else close_only_cols
+    result: dict[str, float] = {"feature_mode": mode}
     last_row = df.iloc[-1]
-    for col in feature_cols:
+    for col in cols:
         if col in df.columns:
             val = last_row[col]
-            result[col] = float(val) if not np.isnan(float(val)) else 0.0
+            try:
+                fval = float(val)
+                result[col] = 0.0 if np.isnan(fval) else fval
+            except (TypeError, ValueError):
+                result[col] = 0.0
+        else:
+            result[col] = 0.0
     return result

@@ -216,7 +216,10 @@ async def build_cases(req: BuildCasesRequest) -> dict[str, Any]:
     candidates = load_candidates(settings.cache_path, req.category)
     name_map = {c["good_id"]: c.get("name", "") for c in candidates}
 
+    from src.data.inventory_snapshot import load_snapshot_for_date
+
     total_cases = 0
+    cases_with_inventory = 0
     for good_id in cached_good_ids:
         df = load_item_ohlc(good_id, req.period, settings.cache_path, req.category)
         if df is None or len(df) < 60:
@@ -231,7 +234,49 @@ async def build_cases(req: BuildCasesRequest) -> dict[str, Any]:
             ts = window.iloc[-1].get("timestamp")
             ts_str = str(ts) if ts is not None else ""
 
-            result = detect_accumulation(window, sub_index=f"{req.category}#{good_id}", period=req.period)
+            result = detect_accumulation(
+                window, sub_index=f"{req.category}#{good_id}", period=req.period,
+                cache_root=settings.cache_path, category=req.category,
+            )
+            feature_mode = result.get("feature_mode", "FULL")
+
+            # D1: 尝试加载该时点的库存快照（如有）
+            inv_features: dict[str, Any] = {}
+            inventory_score = 0.0
+            try:
+                # ts 可能是 pandas Timestamp 或字符串
+                ts_date = None
+                if hasattr(ts, "strftime"):
+                    ts_date = ts.strftime("%Y%m%d")
+                elif ts_str:
+                    # 兼容 ISO 格式
+                    import datetime as _dt
+                    try:
+                        ts_date = _dt.datetime.fromisoformat(
+                            str(ts_str).replace("Z", "+00:00")
+                        ).strftime("%Y%m%d")
+                    except Exception:
+                        ts_date = None
+                if ts_date:
+                    snap = load_snapshot_for_date(good_id, ts_date, settings.cache_path)
+                    if snap:
+                        inv_features = {
+                            "top3_concentration": snap.get("top3_concentration", 0.0),
+                            "total_hold": snap.get("total_hold", 0),
+                            "net_inflow_7d": snap.get("net_inflow_7d", 0),
+                            "active_holder_count": snap.get("active_holder_count", 0),
+                            "holder_total": snap.get("holder_total", 0),
+                            "concentration": snap.get("concentration", 0.0),
+                            "net_inflow": snap.get("net_inflow", 0.0),
+                            "holder_activity": snap.get("holder_activity", 0.0),
+                        }
+                        inventory_score = float(snap.get("inventory_score", 0.0))
+            except Exception as exc:
+                LOGGER.debug("build-cases load snapshot good_id=%s: %s", good_id, exc)
+
+            if inv_features:
+                cases_with_inventory += 1
+
             cases.append({
                 "case_id": f"{req.category}_{good_id}_{i}",
                 "good_id": good_id,
@@ -240,7 +285,10 @@ async def build_cases(req: BuildCasesRequest) -> dict[str, Any]:
                 "timestamp": ts_str,
                 "period": req.period,
                 "features": result.get("features", {}),
+                "feature_mode": feature_mode,
                 "kline_score": result.get("accumulation_score", 0.0),
+                "inventory_features": inv_features,
+                "inventory_score": inventory_score,
                 "signals": result.get("signals", {}),
                 "duration_bars": result.get("duration_bars", 0),
                 "label": None,  # 待标注
@@ -252,12 +300,16 @@ async def build_cases(req: BuildCasesRequest) -> dict[str, Any]:
 
     latency_ms = (time.perf_counter() - start) * 1000
     record_request("/training/build-cases", latency_ms, error=False)
-    LOGGER.info("build-cases: %d items → %d cases (%.0fms)", len(cached_good_ids), total_cases, latency_ms)
+    LOGGER.info(
+        "build-cases: %d items → %d cases (with_inv=%d) (%.0fms)",
+        len(cached_good_ids), total_cases, cases_with_inventory, latency_ms,
+    )
 
     return {
         "category": req.category,
         "items_processed": len(cached_good_ids),
         "cases_built": total_cases,
+        "cases_with_inventory": cases_with_inventory,
         "step_days": req.step_days,
         "latency_ms": round(latency_ms, 2),
     }

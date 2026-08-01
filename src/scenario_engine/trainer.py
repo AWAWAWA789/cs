@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,11 @@ from sklearn.preprocessing import StandardScaler
 from src.api.logging import get_logger
 
 LOGGER = get_logger("csqaq.trainer")
+
+
+def _now_iso() -> str:
+    """当前 UTC ISO 时间戳。"""
+    return datetime.now(timezone.utc).isoformat()
 
 # 特征列顺序（与 detect_accumulation 输出对齐）
 FEATURE_KEYS = [
@@ -156,8 +162,10 @@ def train_rule_weights(
         "positive_count": int((y == 1).sum()),
         "negative_count": int((y == 0).sum()),
         "feature_names": feature_names,
+        "feature_mode": "FULL",  # 训练数据集已含真实 OHLC → FULL
         "scaler_mean": scaler.mean_.tolist(),
         "scaler_scale": scaler.scale_.tolist(),
+        "trained_at": _now_iso(),
     }
 
     # 落盘
