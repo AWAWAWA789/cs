@@ -265,18 +265,23 @@ def add_consolidation_features(df: pd.DataFrame, window: int = 20) -> pd.DataFra
     rolling_low = close.rolling(window=window, min_periods=1).min()
     rolling_mean = close.rolling(window=window, min_periods=1).mean()
 
-    amplitude = np.nan_to_num(
-        (rolling_high - rolling_low) / rolling_mean.replace(0.0, np.nan), nan=0.0
-    ).clip(0.0, 5.0)
+    # 转回 Series 以便 groupby 操作（np.nan_to_num 会返回 ndarray）
+    amplitude = pd.Series(
+        np.nan_to_num(
+            (rolling_high - rolling_low) / rolling_mean.replace(0.0, np.nan),
+            nan=0.0,
+        ).clip(0.0, 5.0),
+        index=close.index,
+    )
 
     # 振幅越小，横盘评分越高
     result["consolidation_score"] = (1.0 - amplitude).clip(0.0, 1.0)
 
     # 横盘持续天数：连续低振幅的 K 线数
     low_amplitude = amplitude < 0.05  # 5% 以下算低振幅
-    # 用累计计数
+    # 用累计计数（在 Series 上操作）
     groups = (~low_amplitude).cumsum()
-    result["consolidation_bars"] = low_amplitude.groupby(groups).cumsum()
+    result["consolidation_bars"] = low_amplitude.astype(int).groupby(groups).cumsum()
 
     return result
 
