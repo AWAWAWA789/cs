@@ -523,6 +523,70 @@ async def analyze_fused(
     return result
 
 
+@router.get("/explain-fused")
+async def explain_fused_endpoint(
+    good_id: str = Query(..., description="饰品 good_id"),
+    period: str = Query("1day", description="K线周期"),
+    include_similar: bool = Query(True, description="是否检索历史相似案例喂给 LLM"),
+) -> dict[str, Any]:
+    """LLM 归因：对双轨融合分析结果生成人话解释。
+
+    流程：
+    1. 调 analyze-fused 获取双轨融合数据（命中缓存则秒回）
+    2. 可选调 case_retriever 检索历史相似案例
+    3. 喂给 LLM 生成归因文本（LLM 不可用时降级模板）
+
+    返回融合分析 + LLM 归因 + 相似案例。
+    """
+    start = time.perf_counter()
+
+    # 1. 获取融合分析数据（复用 analyze-fused 逻辑）
+    fused_data = await analyze_fused(
+        good_id=good_id, period=period,
+        platform=1, key="sell_price", include_team=True,
+    )
+
+    # 2. 检索历史相似案例（可选）
+    similar_cases: list[dict[str, Any]] = []
+    similar_hit_rate: float | None = None
+    if include_similar:
+        try:
+            from src.scenario_engine.case_retriever import retrieve_similar
+            settings = Settings()
+            sim_result = retrieve_similar(
+                good_id=good_id, category="rifle",
+                period=period, cache_root=settings.cache_path, top_k=3,
+            )
+            similar_cases = sim_result.get("similar_cases", [])
+            similar_hit_rate = sim_result.get("hit_rate")
+        except Exception as exc:
+            LOGGER.warning("similar cases fetch failed: %s", exc)
+
+    # 3. LLM 归因
+    from src.scenario_engine.llm_explainer import explain_fused, is_llm_available
+    explanation = explain_fused(fused_data, similar_cases, use_llm=True)
+
+    latency_ms = (time.perf_counter() - start) * 1000
+    record_request("/accumulation/explain-fused", latency_ms, error=False)
+    LOGGER.info(
+        "explain-fused good_id=%s: %s source=%s (%.0fms)",
+        good_id, explanation.get("source"), explanation.get("model"), latency_ms,
+    )
+
+    return {
+        "good_id": good_id,
+        "period": period,
+        "fused_data": fused_data,
+        "explanation": explanation["explanation"],
+        "explanation_source": explanation["source"],
+        "llm_model": explanation.get("model"),
+        "llm_available": is_llm_available(),
+        "similar_cases": similar_cases,
+        "similar_hit_rate": similar_hit_rate,
+        "latency_ms": round(latency_ms, 2),
+    }
+
+
 @router.get("/team-analysis")
 async def team_analysis(
     good_id: str = Query(..., description="种子饰品 good_id"),

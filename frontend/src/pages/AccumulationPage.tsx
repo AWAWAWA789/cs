@@ -19,6 +19,10 @@ import type {
   ItemTrend,
   FusedAccumulationResponse,
   FusionPattern,
+  ExplainFusedResponse,
+  SimilarCase,
+  BackfillStatus,
+  TrainingStats,
   TeamAnalysisResponse,
   TeamRelatedItem,
   TeamHolderCross,
@@ -352,6 +356,233 @@ function FusedAnalysisPanel({ data }: { data: FusedAccumulationResponse }) {
           )}
         </div>
       </Card>
+    </div>
+  );
+}
+
+/** LLM 归因面板（双轨融合分析 + 历史相似案例 + 大模型归因）。 */
+function LlmExplanationPanel({ data }: { data: ExplainFusedResponse }) {
+  const isLLM = data.explanation_source === "llm";
+  const cases = data.similar_cases;
+  const hitRate = data.similar_hit_rate;
+
+  return (
+    <div className="space-y-4">
+      {/* LLM 归因文本 */}
+      <Card
+        title="LLM 归因"
+        subtitle={isLLM ? `大模型 (${data.llm_model}) 生成` : "模板降级（未配置 LLM_API_KEY）"}
+      >
+        <div
+          className={`rounded-lg border-l-4 p-4 text-sm leading-relaxed ${
+            isLLM
+              ? "border-blue-400 bg-blue-50/30 text-ink-primary"
+              : "border-amber-400 bg-amber-50/30 text-ink-secondary"
+          }`}
+        >
+          {data.explanation}
+        </div>
+        {!data.llm_available && (
+          <p className="mt-3 text-xs text-ink-muted">
+            提示：配置环境变量 <code className="rounded bg-surface-hover px-1">LLM_API_KEY</code>、
+            <code className="rounded bg-surface-hover px-1">LLM_BASE_URL</code>、
+            <code className="rounded bg-surface-hover px-1">LLM_MODEL</code>
+            可启用大模型归因（支持 OpenAI 兼容 API）。
+          </p>
+        )}
+      </Card>
+
+      {/* 历史相似案例 */}
+      <Card
+        title="历史相似案例"
+        subtitle={
+          hitRate !== null
+            ? `Top-${cases.length} 相似案例 · 历史命中率 ${formatPercent(hitRate, 1)}`
+            : `Top-${cases.length} 相似案例 · 暂无标注`
+        }
+      >
+        {cases.length === 0 ? (
+          <EmptyState
+            title="暂无相似案例"
+            description="案例库未训练或未构建。请到「训练中心」执行：回填 → 构建案例 → 标注 → 训练。"
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-surface-border text-left text-xs text-ink-muted">
+                  <th className="px-3 py-2 font-medium">时间</th>
+                  <th className="px-3 py-2 font-medium">标的</th>
+                  <th className="px-3 py-2 text-right font-medium">评分</th>
+                  <th className="px-3 py-2 text-center font-medium">标签</th>
+                  <th className="px-3 py-2 text-right font-medium">后30天</th>
+                  <th className="px-3 py-2 text-right font-medium">相似度</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-border">
+                {cases.map((c: SimilarCase) => {
+                  const ret = c.future_return_30d;
+                  const labelVariant = c.label === "positive" ? "bull" : c.label === "negative" ? "bear" : "neutral";
+                  return (
+                    <tr key={c.case_id} className="transition-colors hover:bg-surface-hover">
+                      <td className="px-3 py-2 text-xs text-ink-muted">
+                        {c.timestamp ? c.timestamp.slice(0, 10) : "-"}
+                      </td>
+                      <td className="px-3 py-2 font-medium text-ink-primary">{c.good_name || c.good_id}</td>
+                      <td className="px-3 py-2 text-right">
+                        <span style={{ color: scoreColor(c.kline_score) }}>
+                          {formatPercent(c.kline_score, 1)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <Badge variant={labelVariant}>{c.label || "-"}</Badge>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {ret !== null ? (
+                          <span style={{ color: ret >= 0 ? "#16a34a" : "#dc2626" }}>
+                            {ret >= 0 ? "+" : ""}
+                            {formatPercent(ret, 1)}
+                          </span>
+                        ) : (
+                          <span className="text-ink-muted">-</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right text-ink-secondary">
+                        {formatPercent(1 - c.distance, 1)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/** 训练中心面板（回填编排 + 训练统计）。 */
+function TrainingCenterPanel({
+  status,
+  stats,
+  onBackfillCandidates,
+  onBackfillOhlc,
+  onBuildCases,
+  onLabelCases,
+  onTrain,
+  loading,
+  lastResult,
+}: {
+  status: BackfillStatus | null;
+  stats: TrainingStats | null;
+  onBackfillCandidates: () => void;
+  onBackfillOhlc: () => void;
+  onBuildCases: () => void;
+  onLabelCases: () => void;
+  onTrain: () => void;
+  loading: string | null;
+  lastResult: string | null;
+}) {
+  return (
+    <div className="space-y-4">
+      {/* 训练流水线操作 */}
+      <Card title="训练流水线" subtitle="步枪千百战单品 · 两年的历史训练">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onBackfillCandidates}
+            loading={loading === "backfillCandidates"}
+            disabled={loading !== null}
+          >
+            1. 采集候选池
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onBackfillOhlc}
+            loading={loading === "backfillOhlc"}
+            disabled={loading !== null}
+          >
+            2. 回填两年日线
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onBuildCases}
+            loading={loading === "buildCases"}
+            disabled={loading !== null}
+          >
+            3. 构建案例库
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onLabelCases}
+            loading={loading === "labelCases"}
+            disabled={loading !== null}
+          >
+            4. 标注案例
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onTrain}
+            loading={loading === "train"}
+            disabled={loading !== null}
+            className="sm:col-span-2"
+          >
+            5. 训练权重 + 构建索引
+          </Button>
+        </div>
+        {lastResult && (
+          <div className="mt-3 rounded-lg bg-surface-hover p-3 text-xs text-ink-secondary">
+            <span className="font-medium text-ink-primary">最近结果：</span>
+            {lastResult}
+          </div>
+        )}
+      </Card>
+
+      {/* 回填状态 */}
+      {status && (
+        <Card title="回填状态" subtitle="已采集与已落盘样本量">
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard label="候选品数" value={status.candidates_total} hint="步枪千百战" />
+            <StatCard label="已落盘 OHLC" value={status.ohlc_cached} hint="两年日线 parquet" />
+            <StatCard
+              label="完成率"
+              value={
+                status.candidates_total > 0
+                  ? formatPercent(status.ohlc_cached / status.candidates_total, 1)
+                  : "0%"
+              }
+              hint="已落盘 / 候选品"
+            />
+          </div>
+        </Card>
+      )}
+
+      {/* 训练统计 */}
+      {stats && (
+        <Card title="训练统计" subtitle={stats.trained ? "已训练" : "未训练"}>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatCard label="案例总数" value={stats.total_cases} hint="滑动切片" />
+            <StatCard label="已标注" value={stats.labeled_cases} hint="含正/负/中性" />
+            <StatCard
+              label="命中率"
+              value={stats.hit_rate !== null ? formatPercent(stats.hit_rate, 1) : "-"}
+              hint="positive 占比"
+              color={stats.hit_rate !== null && stats.hit_rate >= 0.6 ? "bull" : "neutral"}
+            />
+            <StatCard
+              label="正样本"
+              value={stats.label_distribution.positive ?? 0}
+              hint={`负 ${stats.label_distribution.negative ?? 0} · 中 ${stats.label_distribution.neutral ?? 0}`}
+            />
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -993,6 +1224,42 @@ export default function AccumulationPage() {
     teamTrigger > 0 && mode === "item" && goodIdInput.trim() !== "",
   );
 
+  // LLM 归因：按钮触发（依赖融合分析结果，串行调用）
+  const [explainTrigger, setExplainTrigger] = useState(0);
+  const explain = useAsync(
+    (signal) => api.accumulation.explainFused(goodIdInput, period, true, signal),
+    [goodIdInput, explainTrigger, period],
+    explainTrigger > 0 && mode === "item" && goodIdInput.trim() !== "",
+  );
+
+  // 训练中心：状态 + 统计（页面加载即拉取，掌握训练进度）
+  const trainingStatus = useAsync(
+    (signal) => api.training.backfillStatus("rifle", signal),
+    [],
+  );
+  const trainingStats = useAsync(
+    (signal) => api.training.stats("rifle", signal),
+    [],
+  );
+  // 训练流水线操作 loading 状态
+  const [trainingLoading, setTrainingLoading] = useState<string | null>(null);
+  const [trainingResult, setTrainingResult] = useState<string | null>(null);
+
+  const runTrainingStep = async (step: string, fn: () => Promise<unknown>) => {
+    setTrainingLoading(step);
+    try {
+      const result = await fn();
+      setTrainingResult(JSON.stringify(result));
+      // 操作后刷新状态
+      trainingStatus.refetch();
+      trainingStats.refetch();
+    } catch (err) {
+      setTrainingResult(`失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setTrainingLoading(null);
+    }
+  };
+
   // 种子品历史栈：记录用户切换过的种子品，便于回溯二次分析路径
   const [seedHistory, setSeedHistory] = useState<Array<{ goodId: string; name: string }>>([]);
 
@@ -1294,6 +1561,46 @@ export default function AccumulationPage() {
         </section>
       )}
 
+      {/* LLM 归因（仅单品模式，按钮触发，依赖融合分析） */}
+      {mode === "item" && goodIdInput.trim() !== "" && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-ink-secondary">LLM 归因</h2>
+              <p className="mt-0.5 text-xs text-ink-muted">
+                大模型解读双轨融合 + 历史相似案例，输出人话归因（建议先执行融合分析）
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setExplainTrigger((c) => c + 1)}
+              loading={explain.loading}
+            >
+              生成归因
+            </Button>
+          </div>
+          {explain.loading ? (
+            <Card>
+              <Spinner className="py-10" />
+            </Card>
+          ) : explain.error ? (
+            <Card>
+              <ErrorState message={explain.error} onRetry={() => setExplainTrigger((c) => c + 1)} />
+            </Card>
+          ) : explain.data ? (
+            <LlmExplanationPanel data={explain.data} />
+          ) : (
+            <Card>
+              <EmptyState
+                title="点击「生成归因」"
+                description="将结合双轨融合分析与历史相似案例，由大模型生成归因文本。"
+              />
+            </Card>
+          )}
+        </section>
+      )}
+
       {/* 单品库存监控数据（仅单品模式，先看数据不加算法） */}
       {mode === "item" && goodIdInput.trim() !== "" && (
         <section className="space-y-4">
@@ -1522,6 +1829,45 @@ export default function AccumulationPage() {
           )}
         </div>
       </Card>
+
+      {/* 训练中心：步枪千百战历史训练流水线 */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-ink-secondary">训练中心</h2>
+          <p className="mt-0.5 text-xs text-ink-muted">
+            步枪千百战单品历史训练：采集 → 回填两年日线 → 构建案例库 → 标注 → 训练权重
+          </p>
+        </div>
+        {trainingStatus.error ? (
+          <Card>
+            <ErrorState message={trainingStatus.error} onRetry={() => trainingStatus.refetch()} />
+          </Card>
+        ) : (
+          <TrainingCenterPanel
+            status={trainingStatus.data ?? null}
+            stats={trainingStats.data ?? null}
+            onBackfillCandidates={() =>
+              runTrainingStep("backfillCandidates", () =>
+                api.training.backfillCandidates("rifle", 300, 2500, 20),
+              )
+            }
+            onBackfillOhlc={() =>
+              runTrainingStep("backfillOhlc", () => api.training.backfillOhlc("rifle", 730))
+            }
+            onBuildCases={() =>
+              runTrainingStep("buildCases", () => api.training.buildCases("rifle", "1day", 7))
+            }
+            onLabelCases={() =>
+              runTrainingStep("labelCases", () =>
+                api.training.labelCases("rifle", 30, 0.15, -0.1),
+              )
+            }
+            onTrain={() => runTrainingStep("train", () => api.training.train("rifle"))}
+            loading={trainingLoading}
+            lastResult={trainingResult}
+          />
+        )}
+      </section>
     </div>
   );
 }

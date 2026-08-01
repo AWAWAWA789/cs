@@ -439,6 +439,61 @@ export interface FusedAccumulationResponse {
   cached?: boolean;
 }
 
+// ── LLM 归因（GET /accumulation/explain-fused） ─────────
+
+/** 历史相似案例项。 */
+export interface SimilarCase {
+  case_id: string;
+  good_id: string;
+  good_name: string;
+  timestamp: string;
+  kline_score: number;
+  label: string;
+  future_return_30d: number | null;
+  max_drawdown_30d: number | null;
+  distance: number;
+}
+
+/** LLM 归因响应。 */
+export interface ExplainFusedResponse {
+  good_id: string;
+  period: string;
+  fused_data: FusedAccumulationResponse;
+  /** 归因文本。 */
+  explanation: string;
+  /** 归因来源：llm 或 template。 */
+  explanation_source: "llm" | "template";
+  /** LLM 模型名（template 时为 null）。 */
+  llm_model: string | null;
+  /** LLM 是否可用。 */
+  llm_available: boolean;
+  similar_cases: SimilarCase[];
+  similar_hit_rate: number | null;
+  latency_ms: number;
+}
+
+// ── 历史训练编排（/training/*） ─────────────────────────
+
+/** 回填状态。 */
+export interface BackfillStatus {
+  category: string;
+  candidates_total: number;
+  ohlc_cached: number;
+  cached_good_ids: string[];
+  cache_root: string;
+}
+
+/** 训练统计。 */
+export interface TrainingStats {
+  category: string;
+  total_cases: number;
+  labeled_cases: number;
+  label_distribution: Record<string, number>;
+  hit_rate: number | null;
+  rule_weights: Record<string, unknown> | null;
+  trained: boolean;
+}
+
 // ── 跨品主力团队识别（吸货页面用） ──────────────────────
 
 /** 关联品：被多个种子主力共同持有的其他饰品。 */

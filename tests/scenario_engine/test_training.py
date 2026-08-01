@@ -257,3 +257,114 @@ class TestTrainer:
         cases = [_make_case("c1", "1", "2024-03-01", label=None)]
         result = build_case_index(cases, tmp_cache, "rifle")
         assert result["built"] is False
+
+
+# ── llm_explainer 测试 ────────────────────────────────────
+
+
+from src.scenario_engine.llm_explainer import (
+    _build_prompt,
+    _fallback_explanation,
+    explain_fused,
+    is_llm_available,
+)
+
+
+def _make_fused_data(pattern: str = "strong", fused_score: float = 0.75) -> dict:
+    """构造双轨融合分析数据。"""
+    return {
+        "good_id": "12345",
+        "period": "1day",
+        "fused_score": fused_score,
+        "kline_score": 0.7,
+        "inventory_score": 0.8,
+        "pattern": pattern,
+        "phase": "accumulation",
+        "duration_bars": 45,
+        "inventory_stats": {
+            "top3_concentration": 0.65,
+            "total_hold": 12000,
+            "net_inflow_7d": 1500,
+            "active_holder_count": 8,
+            "holder_total": 12,
+            "team_confidence": 0.55,
+        },
+        "evidence": ["TOP3 集中度 65%", "近7日净流入 1500", "底部抬高"],
+        "kline_signals": {
+            "price_position": 0.6,
+            "consolidation": 0.7,
+        },
+    }
+
+
+class TestLlmExplainer:
+    def test_is_llm_available_no_key(self, monkeypatch):
+        """无 API key 时 is_llm_available 返回 False。"""
+        monkeypatch.delenv("LLM_API_KEY", raising=False)
+        assert is_llm_available() is False
+
+    def test_build_prompt_contains_key_data(self):
+        """prompt 包含核心字段。"""
+        data = _make_fused_data()
+        prompt = _build_prompt(data)
+        assert "12345" in prompt  # good_id
+        assert "strong" in prompt  # pattern
+        assert "TOP3 集中度" in prompt
+        assert "证据链" in prompt
+
+    def test_build_prompt_with_similar_cases(self):
+        """prompt 包含历史相似案例。"""
+        data = _make_fused_data()
+        cases = [
+            {
+                "good_name": "AK-47 | 红线",
+                "timestamp": "2024-03-15",
+                "kline_score": 0.68,
+                "future_return_30d": 0.18,
+                "label": "positive",
+            }
+        ]
+        prompt = _build_prompt(data, cases)
+        assert "AK-47" in prompt
+        assert "历史相似案例" in prompt
+
+    def test_fallback_high_score(self):
+        """高评分降级模板。"""
+        data = _make_fused_data(fused_score=0.75)
+        text = _fallback_explanation(data)
+        assert "主力吸货信号明确" in text
+
+    def test_fallback_low_score(self):
+        """低评分降级模板。"""
+        data = _make_fused_data(fused_score=0.2)
+        text = _fallback_explanation(data)
+        assert "主力出货信号明显" in text
+
+    def test_fallback_no_evidence(self):
+        """无证据链时降级模板。"""
+        data = {"pattern": "none", "fused_score": 0.4, "evidence": []}
+        text = _fallback_explanation(data)
+        assert "none" in text
+
+    def test_explain_fused_template_when_no_llm(self, monkeypatch):
+        """无 LLM 配置时降级模板。"""
+        monkeypatch.delenv("LLM_API_KEY", raising=False)
+        result = explain_fused(_make_fused_data(), use_llm=True)
+        assert result["source"] == "template"
+        assert result["explanation"]
+        assert result["model"] is None
+
+    def test_explain_fused_forced_template(self):
+        """use_llm=False 强制模板。"""
+        result = explain_fused(_make_fused_data(), use_llm=False)
+        assert result["source"] == "template"
+
+    def test_explain_fused_caches_result(self, monkeypatch):
+        """相同输入命中缓存。"""
+        monkeypatch.delenv("LLM_API_KEY", raising=False)
+        data = _make_fused_data()
+        first = explain_fused(data, use_llm=False)
+        second = explain_fused(data, use_llm=False)
+        # 缓存命中：两次返回相同归因
+        assert first["explanation"] == second["explanation"]
+

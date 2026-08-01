@@ -25,6 +25,9 @@ import type {
   AccumulationStatusResponse,
   ItemInventoryResponse,
   FusedAccumulationResponse,
+  ExplainFusedResponse,
+  BackfillStatus,
+  TrainingStats,
   TeamAnalysisResponse,
 } from "../types/api";
 
@@ -498,6 +501,111 @@ export const accumulationApi = {
       { signal },
     );
   },
+
+  /** LLM 归因：对双轨融合结果生成人话解释 + 历史相似案例。 */
+  explainFused(
+    goodId: string,
+    period = "1day",
+    includeSimilar = true,
+    signal?: AbortSignal,
+  ): Promise<ExplainFusedResponse> {
+    return request<ExplainFusedResponse>(
+      "/accumulation/explain-fused",
+      { good_id: goodId, period, include_similar: includeSimilar },
+      { signal },
+    );
+  },
+};
+
+/** 历史训练编排 API。 */
+export const trainingApi = {
+  /** 采集步枪候选池 + 价格筛选 + 落盘 JSON。 */
+  backfillCandidates(category = "rifle", priceMin = 300, priceMax = 2500, maxPages = 20): Promise<unknown> {
+    return request<unknown>(
+      "/training/backfill-candidates",
+      { category, price_min: priceMin, price_max: priceMax, max_pages: maxPages },
+      { method: "POST" },
+    );
+  },
+
+  /** 批量回填两年日线到 Parquet。 */
+  backfillOhlc(category = "rifle", periodDays = 730, limit?: number): Promise<unknown> {
+    return request<unknown>(
+      "/training/backfill-ohlc",
+      { category, period_days: periodDays, limit },
+      { method: "POST" },
+    );
+  },
+
+  /** 查看已回填的样本量。 */
+  backfillStatus(category = "rifle", signal?: AbortSignal): Promise<BackfillStatus> {
+    return request<BackfillStatus>(
+      "/training/backfill-status",
+      { category },
+      { signal },
+    );
+  },
+
+  /** 从已回填数据构建案例库（滑动切片）。 */
+  buildCases(category = "rifle", period = "1day", stepDays = 7): Promise<unknown> {
+    return request<unknown>(
+      "/training/build-cases",
+      { category, period, step_days: stepDays },
+      { method: "POST" },
+    );
+  },
+
+  /** 事后回看标注案例。 */
+  labelCases(
+    category = "rifle",
+    horizon = 30,
+    positiveThreshold = 0.15,
+    negativeThreshold = -0.10,
+  ): Promise<unknown> {
+    return request<unknown>(
+      "/training/label-cases",
+      {
+        category,
+        horizon,
+        positive_threshold: positiveThreshold,
+        negative_threshold: negativeThreshold,
+      },
+      { method: "POST" },
+    );
+  },
+
+  /** 训练规则权重 + 构建案例索引。 */
+  train(category = "rifle"): Promise<unknown> {
+    return request<unknown>(
+      "/training/train",
+      { category },
+      { method: "POST" },
+    );
+  },
+
+  /** 在线检索历史相似案例。 */
+  similarCases(
+    goodId: string,
+    category = "rifle",
+    period = "1day",
+    topK = 5,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    return request<unknown>(
+      "/training/similar-cases",
+      { good_id: goodId, category, period, top_k: topK },
+      { signal },
+    );
+  },
+
+  /** 训练统计：案例数、标注分布、命中率、当前权重。 */
+  stats(category = "rifle", signal?: AbortSignal): Promise<TrainingStats> {
+    return request<TrainingStats>(
+      "/training/stats",
+      { category },
+      { signal },
+    );
+  },
 };
 
 // ── Aggregate export ──────────────────────────────────────
@@ -513,6 +621,7 @@ export const api = {
   item: itemApi,
   rank: rankApi,
   accumulation: accumulationApi,
+  training: trainingApi,
 };
 
 /** Type guard for ApiClientError. */
