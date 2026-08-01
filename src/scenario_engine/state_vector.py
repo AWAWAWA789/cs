@@ -86,10 +86,16 @@ def _add_moving_average_features(df: pd.DataFrame) -> pd.DataFrame:
     close = result["close"]
     result["sma20"] = close.rolling(window=20, min_periods=1).mean()
     result["sma50"] = close.rolling(window=50, min_periods=1).mean()
-    result["price_vs_sma20"] = ((close - result["sma20"]) / result["sma20"]).clip(-2.0, 2.0)
-    result["price_vs_sma50"] = ((close - result["sma50"]) / result["sma50"]).clip(-2.0, 2.0)
-    result["sma20_vs_sma50"] = (
-        (result["sma20"] - result["sma50"]) / result["sma50"]
+    # ``.clip()`` does NOT suppress inf, so guard the division by zero (SMA=0
+    # on degenerate / extremely short series) with nan_to_num before clipping.
+    result["price_vs_sma20"] = np.nan_to_num(
+        (close - result["sma20"]) / result["sma20"], nan=0.0, posinf=2.0, neginf=-2.0
+    ).clip(-2.0, 2.0)
+    result["price_vs_sma50"] = np.nan_to_num(
+        (close - result["sma50"]) / result["sma50"], nan=0.0, posinf=2.0, neginf=-2.0
+    ).clip(-2.0, 2.0)
+    result["sma20_vs_sma50"] = np.nan_to_num(
+        (result["sma20"] - result["sma50"]) / result["sma50"], nan=0.0, posinf=1.0, neginf=-1.0
     ).clip(-1.0, 1.0)
     return result
 
@@ -131,12 +137,12 @@ def _add_swing_position_features(df: pd.DataFrame) -> pd.DataFrame:
     result["last_swing_low"] = last_swing_low
     result["last_swing_high"] = last_swing_high
 
-    result["distance_to_swing_low"] = (
-        (close - last_swing_low) / last_swing_low
-    ).clip(-1.0, 1.0).fillna(0.0)
-    result["distance_to_swing_high"] = (
-        (close - last_swing_high) / last_swing_high
-    ).clip(-1.0, 1.0).fillna(0.0)
+    result["distance_to_swing_low"] = np.nan_to_num(
+        (close - last_swing_low) / last_swing_low, nan=0.0, posinf=1.0, neginf=-1.0
+    ).clip(-1.0, 1.0)
+    result["distance_to_swing_high"] = np.nan_to_num(
+        (close - last_swing_high) / last_swing_high, nan=0.0, posinf=1.0, neginf=-1.0
+    ).clip(-1.0, 1.0)
 
     swing_range = (last_swing_high - last_swing_low).abs().replace(0.0, np.nan)
     result["swing_position_ratio"] = (
@@ -196,7 +202,9 @@ def compute_state_vector(
     result = add_trend_strength_features(result)
     result["adx_normalized"] = (result["adx"] / 100.0).clip(0.0, 1.0)
     result["di_plus_minus_diff"] = (result["di_plus"] - result["di_minus"]).clip(-100.0, 100.0)
-    result["atr_percent"] = (result["atr"] / result["close"] * 100.0).fillna(0.0)
+    result["atr_percent"] = np.nan_to_num(
+        result["atr"] / result["close"] * 100.0, nan=0.0, posinf=0.0, neginf=0.0
+    )
 
     result = _add_bollinger_features(result)
     result = _add_volatility_regime(result)

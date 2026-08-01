@@ -146,7 +146,7 @@ export default function Dashboard() {
               {alerts.map((alert, idx) => (
                 <li
                   key={`${alert.metric}-${idx}`}
-                  className="flex items-center justify-between py-3"
+                  className="flex items-center justify-between py-3 transition-colors hover:bg-surface-hover"
                 >
                   <div className="flex items-center gap-3">
                     <Badge variant={alert.severity === "critical" ? "bear" : "neutral"}>

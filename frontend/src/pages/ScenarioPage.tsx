@@ -17,7 +17,7 @@ import {
 } from "../lib/format";
 import type { Scenario, OhlcBar } from "../types/api";
 import { useGlobalStore } from "../store/globalStore";
-import ReactECharts from "echarts-for-react";
+import { EChart } from "../components/EChart";
 
 /** 方向标签到 Badge 颜色变体的映射。 */
 const DIRECTION_BADGE: Record<Scenario["direction_label"], "bull" | "bear" | "neutral"> = {
@@ -334,7 +334,7 @@ export default function ScenarioPage() {
         ) : ohlcBars.length === 0 ? (
           <EmptyState title="暂无K线数据" description="请尝试切换标的或周期。" />
         ) : (
-          <ReactECharts option={ohlcOption} style={{ height: 420, width: "100%" }} />
+          <EChart option={ohlcOption} style={{ height: 420, width: "100%" }} />
         )}
       </Card>
 
@@ -412,7 +412,7 @@ export default function ScenarioPage() {
               </thead>
               <tbody className="divide-y divide-surface-border">
                 {history.data.matches.map((m, idx) => (
-                  <tr key={idx} className="hover:bg-surface-hover">
+                  <tr key={idx} className="transition-colors hover:bg-surface-hover">
                     <td className="px-3 py-2 text-ink-secondary">{formatDate(m.neighbor_timestamp)}</td>
                     <td className="px-3 py-2 text-right text-ink-primary">
                       {m.distance.toFixed(4)}

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import ReactECharts from "echarts-for-react";
+import { EChart } from "../components/EChart";
 import { Card } from "../components/ui/Card";
 import { Badge, Spinner, EmptyState, ErrorState } from "../components/ui/misc";
 import { Select } from "../components/ui/Select";
@@ -227,7 +227,7 @@ function Sparkline({
   if (!points || points.length < 2) {
     return <span className="text-xs text-ink-muted">--</span>;
   }
-  return <ReactECharts option={option} style={{ height, width }} />;
+  return <EChart option={option} style={{ height, width }} />;
 }
 
 /** 分页器：总条数 + 上一页/下一页 + 当前页码。 */

@@ -8,6 +8,7 @@ deterministic synthetic dataset when no API token is available.
 
 from __future__ import annotations
 
+import hashlib
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -17,13 +18,18 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from src.api.cache import SCENARIO_CACHE
+from src.api.cache import SCENARIO_CACHE, TTLCache
 from src.api.client import CSQAQClient
 from src.api.endpoints import get_current_data_init, get_sub_kline
 from src.api.logging import get_logger, log_request
 from src.api.monitoring import record_request
 from src.config import Settings
-from src.data.cache import cache_file_path, load as load_cache, save as save_cache
+from src.data.cache import (
+    cache_file_path,
+    invalidate_mem_cache,
+    load_cached as load_cache,
+    save as save_cache,
+)
 from src.data.pipeline import filter_from_2024, normalize_kline
 from src.scenario_engine.scenario_generator import generate_scenarios
 from src.scenario_engine.similarity_search import find_similar_states
@@ -34,6 +40,14 @@ LOGGER = get_logger("csqaq.scenario_api")
 
 
 router = APIRouter(prefix="/scenario", tags=["scenario"])
+
+# Response-level caches for /history, /templates, /meta. These endpoints do
+# not mutate state and their inputs are bounded, so we can cache the entire
+# serialisable response for a short TTL. ``/scenario/generate`` already has
+# its own dedicated ScenarioCache; the caches below mirror that pattern.
+HISTORY_CACHE: TTLCache = TTLCache(ttl_seconds=120.0)
+TEMPLATES_CACHE: TTLCache = TTLCache(ttl_seconds=120.0)
+META_CACHE: TTLCache = TTLCache(ttl_seconds=60.0)
 
 # Supported K-line periods. The API accepts human-friendly aliases and
 # normalises them to the internal names used elsewhere in the project.
@@ -151,11 +165,16 @@ def _synthetic_ohlc(sub_index: str, period: str, n: int = _MIN_BARS) -> pd.DataF
     """Generate deterministic synthetic OHLC data for tests / demo mode.
 
     The series is seeded from ``sub_index`` and ``period`` so repeated calls
-    for the same inputs return identical data. The data ends at the current
-    date so the UI always shows up-to-date timestamps.
+    for the same inputs return identical data — including across process
+    restarts. The data ends at the current date so the UI always shows
+    up-to-date timestamps.
     """
-    seed = int(hash(f"{sub_index}:{period}")) % (2**31)
-    rng = np.random.default_rng(abs(seed))
+    # Use a stable hash (sha256) so the seed does not depend on Python's
+    # randomized PYTHONHASHSEED, which would otherwise make the synthetic
+    # series change after every server restart.
+    digest = hashlib.sha256(f"{sub_index}:{period}".encode("utf-8")).digest()
+    seed = int.from_bytes(digest[:8], "big") % (2**31)
+    rng = np.random.default_rng(seed)
     price = 100.0 * np.exp(np.cumsum(rng.normal(0.0, 0.01, n)))
 
     # Determine frequency from period and end at today's date.
@@ -180,7 +199,9 @@ def _synthetic_ohlc(sub_index: str, period: str, n: int = _MIN_BARS) -> pd.DataF
     return df
 
 
-def _load_ohlc(sub_index: str, period: str, *, force_refresh: bool = False) -> pd.DataFrame:
+def _load_ohlc(
+    sub_index: str, period: str, *, force_refresh: bool = False
+) -> tuple[pd.DataFrame, str]:
     """Load OHLC data from cache, API, or synthetic fallback.
 
     Args:
@@ -189,10 +210,20 @@ def _load_ohlc(sub_index: str, period: str, *, force_refresh: bool = False) -> p
         force_refresh: Ignore the local cache and attempt a fresh fetch.
 
     Returns:
-        A DataFrame with ``timestamp``, ``open``, ``high``, ``low``, ``close``.
+        ``(df, data_source)`` where ``df`` has columns ``timestamp``,
+        ``open``, ``high``, ``low``, ``close`` and ``data_source`` is one of
+        ``"real"`` (fresh from API or fresh cache), ``"stale_cache"`` (cached
+        data older than the freshness window, used as fallback) or
+        ``"synthetic"`` (deterministic demo data — never persisted as real
+        cache, so downstream endpoints can flag it to the UI).
     """
     settings = Settings()
     cache_path = cache_file_path(sub_index, period, settings.cache_path)
+
+    # Drop any in-memory parquet entry when the caller explicitly asked for
+    # a refresh — otherwise the TTL layer would mask the freshly fetched data.
+    if force_refresh:
+        invalidate_mem_cache(cache_path)
 
     # Load existing cache (may be stale but still usable as fallback).
     cached_df: pd.DataFrame | None = None
@@ -205,7 +236,7 @@ def _load_ohlc(sub_index: str, period: str, *, force_refresh: bool = False) -> p
                 last_ts = last_ts.tz_localize("UTC")
             age = pd.Timestamp.now(tz="UTC") - last_ts
             if age <= pd.Timedelta(days=3):
-                return filter_from_2024(cached_df)
+                return filter_from_2024(cached_df), "real"
             LOGGER.info("Cache stale for %s/%s (last bar %s old), refreshing", sub_index, period, age)
 
     # Attempt a real fetch only when an API token is configured.
@@ -215,26 +246,28 @@ def _load_ohlc(sub_index: str, period: str, *, force_refresh: bool = False) -> p
             sub_index_id = settings.sub_index_id or _resolve_sub_index_id(client, sub_index)
             raw = get_sub_kline(client, sub_index_id, period, skip_rate_limit=True)
             df = normalize_kline(raw)
-            save_cache(df, cache_path)
-            return filter_from_2024(df)
+            save_cache(df, cache_path)  # also invalidates the in-memory entry
+            return filter_from_2024(df), "real"
         except Exception as exc:
             LOGGER.warning("API fetch failed for %s/%s: %s", sub_index, period, exc)
             # If we have stale cached data, return it instead of synthetic data.
             if cached_df is not None:
                 LOGGER.info("Falling back to stale cache for %s/%s", sub_index, period)
-                return filter_from_2024(cached_df)
+                return filter_from_2024(cached_df), "stale_cache"
 
-    # Only use synthetic data when no cached data exists at all.
+    # Only use synthetic data when no cached data exists at all. Synthetic
+    # data is NOT persisted to the real cache path — otherwise the freshness
+    # check above would treat it as fresh real data on the next call.
     df = _synthetic_ohlc(sub_index, period)
-    save_cache(df, cache_path)
-    return df
+    return df, "synthetic"
 
 
 def _run_generate(sub_index: str, period: str) -> dict[str, Any]:
     """Execute the scenario generator and wrap the result with metadata."""
-    df = _load_ohlc(sub_index, period)
+    df, data_source = _load_ohlc(sub_index, period)
     if len(df) < _MIN_BARS:
         df = _synthetic_ohlc(sub_index, period)
+        data_source = "synthetic"
 
     start = time.perf_counter()
     result = generate_scenarios({period: df})
@@ -245,9 +278,22 @@ def _run_generate(sub_index: str, period: str) -> dict[str, Any]:
         "period": period,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "generation_time_ms": round(elapsed * 1000, 3),
+        "data_source": data_source,
         "scenarios": result["scenarios"],
         "per_period": result.get("per_period", {}),
     }
+
+
+def _history_cache_key(sub_index: str, period: str, method: str, n_neighbors: int) -> str:
+    """Build a stable cache key for the ``/history`` response cache."""
+    return f"history|{sub_index}|{period}|{method}|{n_neighbors}"
+
+
+def _templates_cache_key(sub_index: str, period: str, min_confidence: float) -> str:
+    """Build a stable cache key for the ``/templates`` response cache."""
+    # Round to 2 decimals so 0.5 and 0.5001 collapse to the same entry — the
+    # caller-visible result is identical for any finer granularity.
+    return f"templates|{sub_index}|{period}|{round(min_confidence, 2)}"
 
 
 @router.get("/generate")
@@ -261,6 +307,11 @@ def generate(
 
     if refresh:
         SCENARIO_CACHE.invalidate(sub_index, period)
+        # Refresh must also drop the derived response caches so callers see
+        # the freshly regenerated similarity / template matches. These have
+        # short TTLs anyway, but refresh is rare so a full clear is cheap.
+        HISTORY_CACHE.invalidate_all()
+        TEMPLATES_CACHE.invalidate_all()
 
     cached = SCENARIO_CACHE.get(sub_index, period)
     if cached is not None:
@@ -325,7 +376,7 @@ def ohlc(
     period = _normalize_period(period)
     start = time.perf_counter()
     try:
-        df = _load_ohlc(sub_index, period)
+        df, data_source = _load_ohlc(sub_index, period)
     except Exception as exc:
         latency_ms = (time.perf_counter() - start) * 1000
         record_request("/scenario/ohlc", latency_ms, error=True)
@@ -342,25 +393,42 @@ def ohlc(
     )
     record_request("/scenario/ohlc", latency_ms, error=False)
 
-    records = []
-    for _, row in df.iterrows():
-        ts = row["timestamp"]
-        if isinstance(ts, pd.Timestamp):
-            ts = ts.isoformat()
-        records.append(
-            {
-                "timestamp": ts,
-                "open": round(float(row["open"]), 6),
-                "high": round(float(row["high"]), 6),
-                "low": round(float(row["low"]), 6),
-                "close": round(float(row["close"]), 6),
-            }
-        )
+    # Vectorised serialisation — ``df.iterrows()`` was the slow path here:
+    # each row materialised a Series and was boxed back into Python floats.
+    # Pulling the columns as numpy arrays and converting the timestamp
+    # column via ``tolist()`` (which returns Timestamp objects directly,
+    # without per-row Series boxing) avoids the per-row overhead for the
+    # typical 300-1000 bar payloads.
+    #
+    # Timestamps keep the canonical ``isoformat()`` output (e.g.
+    # ``2024-01-01T00:00:00+00:00``) so downstream consumers — including the
+    # frontend — see the exact same string format as before.
+    timestamps = [
+        t.isoformat() if hasattr(t, "isoformat") else str(t)
+        for t in df["timestamp"].tolist()
+    ]
+
+    opens = np.round(df["open"].to_numpy(dtype=float), 6)
+    highs = np.round(df["high"].to_numpy(dtype=float), 6)
+    lows = np.round(df["low"].to_numpy(dtype=float), 6)
+    closes = np.round(df["close"].to_numpy(dtype=float), 6)
+
+    records = [
+        {
+            "timestamp": ts,
+            "open": float(o),
+            "high": float(h),
+            "low": float(l),
+            "close": float(c),
+        }
+        for ts, o, h, l, c in zip(timestamps, opens, highs, lows, closes)
+    ]
 
     return {
         "sub_index": sub_index,
         "period": period,
         "count": len(records),
+        "data_source": data_source,
         "ohlc": records,
     }
 
@@ -380,7 +448,20 @@ def history(
 ) -> dict[str, Any]:
     """Return historically similar market states for the current window."""
     period = _normalize_period(period)
-    df = _load_ohlc(sub_index, period)
+    cache_key = _history_cache_key(sub_index, period, method, n_neighbors)
+    cached = HISTORY_CACHE.get(cache_key)
+    if cached is not None:
+        log_request(
+            LOGGER,
+            endpoint="/scenario/history",
+            sub_index=sub_index,
+            period=period,
+            cached=True,
+            extra={"method": method},
+        )
+        return {**cached, "cached": True}
+
+    df, data_source = _load_ohlc(sub_index, period)
 
     start = time.perf_counter()
     try:
@@ -409,12 +490,15 @@ def history(
         extra={"method": method, "match_count": len(matches)},
     )
     record_request("/scenario/history", latency_ms, error=False)
-    return {
+    payload = {
         "sub_index": sub_index,
         "period": period,
         "method": method,
+        "data_source": data_source,
         "matches": matches,
     }
+    HISTORY_CACHE.set(cache_key, payload)
+    return {**payload, "cached": False}
 
 
 @router.post("/history")
@@ -436,7 +520,20 @@ def templates(
 ) -> dict[str, Any]:
     """Return the currently matched classic pattern templates."""
     period = _normalize_period(period)
-    df = _load_ohlc(sub_index, period)
+    cache_key = _templates_cache_key(sub_index, period, min_confidence)
+    cached = TEMPLATES_CACHE.get(cache_key)
+    if cached is not None:
+        log_request(
+            LOGGER,
+            endpoint="/scenario/templates",
+            sub_index=sub_index,
+            period=period,
+            cached=True,
+            extra={"min_confidence": min_confidence},
+        )
+        return {**cached, "cached": True}
+
+    df, data_source = _load_ohlc(sub_index, period)
 
     start = time.perf_counter()
     try:
@@ -465,12 +562,15 @@ def templates(
         extra={"min_confidence": min_confidence, "match_count": len(matches)},
     )
     record_request("/scenario/templates", latency_ms, error=False)
-    return {
+    payload = {
         "sub_index": sub_index,
         "period": period,
         "min_confidence": min_confidence,
+        "data_source": data_source,
         "matches": matches,
     }
+    TEMPLATES_CACHE.set(cache_key, payload)
+    return {**payload, "cached": False}
 
 
 @router.post("/templates")
@@ -562,7 +662,16 @@ def meta() -> dict[str, Any]:
 
     Tries to fetch the real sub-index list from the CSQAQ API first.
     Falls back to scanning local cache files, then to a built-in default list.
+
+    Cached for 60s: the sub-index list rarely changes and a cold ``meta``
+    call may hit the API or scan the cache directory, both of which add
+    latency that the UI does not need to pay on every page load.
     """
+    cached = META_CACHE.get("meta")
+    if cached is not None:
+        record_request("/scenario/meta", 0.0, error=False)
+        return cached
+
     start = time.perf_counter()
     settings = Settings()
     discovered: set[str] = set()
@@ -599,8 +708,10 @@ def meta() -> dict[str, Any]:
 
     latency_ms = (time.perf_counter() - start) * 1000
     record_request("/scenario/meta", latency_ms, error=False)
-    return {
+    payload = {
         "available_sub_indices": sorted(discovered),
         "supported_periods": sorted(SUPPORTED_PERIODS),
         "default_period": "1day",
     }
+    META_CACHE.set("meta", payload)
+    return payload

@@ -44,6 +44,11 @@ def _native_dtw_distance(
     The band width ``radius`` restricts how far the alignment path can stray
     from the diagonal, giving robustness to small offsets without excessive
     computation.
+
+    ``a`` and ``b`` are assumed to be already Z-score normalised — the public
+    ``dtw_distance`` wrapper handles normalisation, and the internal
+    ``dtw_search`` loop normalises the query once and reuses it across all
+    candidates via :func:`_dtw_distance_normalized`.
     """
     a = np.asarray(a, dtype=float).ravel()
     b = np.asarray(b, dtype=float).ravel()
@@ -53,14 +58,40 @@ def _native_dtw_distance(
     cost = np.full((n + 1, m + 1), inf)
     cost[0, 0] = 0.0
 
+    # Precompute the full pairwise |a_i - b_j| matrix in one vectorised call
+    # so the inner loop only does array lookups instead of recomputing abs
+    # for every (i, j). For the typical 20-bar window this is a small (20x20)
+    # array — negligible memory, but it removes Python-level abs work from the
+    # tight double loop.
+    dist_matrix = np.abs(a[:, None] - b[None, :])
+
     for i in range(1, n + 1):
         j_min = max(1, i - radius)
         j_max = min(m, i + radius)
         for j in range(j_min, j_max + 1):
-            dist = abs(a[i - 1] - b[j - 1])
+            dist = dist_matrix[i - 1, j - 1]
             cost[i, j] = dist + min(cost[i - 1, j], cost[i, j - 1], cost[i - 1, j - 1])
 
     return float(cost[n, m])
+
+
+def _dtw_distance_normalized(
+    q_norm: np.ndarray,
+    c_norm: np.ndarray,
+    radius: int = 3,
+) -> float:
+    """DTW distance between two already-normalised series.
+
+    This is the inner kernel used by :func:`dtw_search` so the query series is
+    normalised exactly once and reused for every candidate, instead of the
+    public :func:`dtw_distance` wrapper re-normalising the query on every call.
+    """
+    if _FASTDTW_AVAILABLE:
+        distance, _ = fastdtw(
+            q_norm, c_norm, radius=radius, dist=lambda x, y: abs(float(x) - float(y))
+        )
+        return float(distance)
+    return _native_dtw_distance(q_norm, c_norm, radius=radius)
 
 
 def dtw_distance(
@@ -83,11 +114,7 @@ def dtw_distance(
     """
     q = _normalize_series(np.asarray(query, dtype=float))
     c = _normalize_series(np.asarray(candidate, dtype=float))
-
-    if _FASTDTW_AVAILABLE:
-        distance, _ = fastdtw(q, c, radius=radius, dist=lambda x, y: abs(float(x) - float(y)))
-        return float(distance)
-    return _native_dtw_distance(q, c, radius=radius)
+    return _dtw_distance_normalized(q, c, radius=radius)
 
 
 def dtw_search(
@@ -128,6 +155,13 @@ def dtw_search(
     if last_valid_start < 0:
         return []
 
+    # Normalise the query exactly once. The previous implementation called
+    # ``dtw_distance(query, candidate)`` per candidate, which re-normalised
+    # the query on every call — pure waste given the query is constant for
+    # the whole search. Pre-normalising also lets us reuse the (small)
+    # pairwise distance matrix construction inside the native kernel.
+    query_norm = _normalize_series(query_series)
+
     candidates = []
     for start in range(0, last_valid_start + 1, step):
         end = start + window - 1
@@ -135,7 +169,8 @@ def dtw_search(
             # Exclude overlapping windows to avoid trivial matches.
             continue
         candidate = close[start : end + 1]
-        distance = dtw_distance(query_series, candidate, radius=radius)
+        candidate_norm = _normalize_series(candidate)
+        distance = _dtw_distance_normalized(query_norm, candidate_norm, radius=radius)
         candidates.append((distance, start, end))
 
     if not candidates:

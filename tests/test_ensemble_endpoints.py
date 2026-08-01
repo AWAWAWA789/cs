@@ -20,7 +20,7 @@ def client(monkeypatch):
         "close": close,
     })
     from src.api import ensemble_endpoints
-    monkeypatch.setattr(ensemble_endpoints, "_load_ohlc", lambda sub_index, period: df)
+    monkeypatch.setattr(ensemble_endpoints, "_load_ohlc", lambda sub_index, period, **kwargs: (df, "real"))
     from run_scenario_server import app
     return TestClient(app)
 

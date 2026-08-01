@@ -105,7 +105,7 @@ def equity(
     period = _normalize_period(period)
     start = time.perf_counter()
     try:
-        df = _load_ohlc(sub_index, period)
+        df, _ = _load_ohlc(sub_index, period)
         payload = _run_backtest(df)
     except Exception as exc:
         latency_ms = (time.perf_counter() - start) * 1000
@@ -156,7 +156,7 @@ def mvp_backtest(
     period = _normalize_period(period)
     start = time.perf_counter()
     try:
-        df = _load_ohlc(sub_index, period)
+        df, _ = _load_ohlc(sub_index, period)
         df_with_signals = generate_signals(
             df,
             SignalParams(

@@ -64,7 +64,7 @@ def run_ensemble(
     period = _normalize_period(period)
     start = time.perf_counter()
     try:
-        df = _load_ohlc(sub_index, period)
+        df, _ = _load_ohlc(sub_index, period)
 
         pullback_signals = generate_signals(
             df, SignalParams(use_smart_money=True, use_trend_following=False)

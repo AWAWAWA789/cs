@@ -112,9 +112,25 @@ def _compute_price_levels(
     target: float | None,
     stop_loss: float | None,
 ) -> dict[str, float | None]:
-    """补全关键价位：如候选未提供，则基于最近 Swing 与 ATR 估算。"""
+    """补全关键价位：如候选未提供，则基于最近 Swing 与 ATR 估算。
+
+    使用真实 ATR（True Range）而非 ``close.diff`` 近似，避免低估波幅导致
+    止损/目标过窄。同时强制方向一致性：看涨情景的 target 必须高于现价、
+    stop_loss 必须低于现价；看跌情景反之。避免出现"看涨情景目标价低于
+    现价"或"止损价穿越目标价"的尴尬展示。
+    """
     close = float(df["close"].iloc[-1])
-    atr = float(df["close"].diff().abs().rolling(window=20, min_periods=1).mean().iloc[-1])
+    # True Range = max(H-L, |H - 前收|, |L - 前收|)，比 close.diff 更准确。
+    prev_close = df["close"].shift(1)
+    tr = pd.concat(
+        [
+            df["high"] - df["low"],
+            (df["high"] - prev_close).abs(),
+            (df["low"] - prev_close).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+    atr = float(tr.rolling(window=20, min_periods=1).mean().iloc[-1])
     if atr <= 0 or np.isnan(atr):
         atr = close * 0.01
 
@@ -126,11 +142,17 @@ def _compute_price_levels(
         resistance = resistance if resistance is not None else recent_high
         target = target if target is not None else close + (close - support) * 1.5
         stop_loss = stop_loss if stop_loss is not None else support - 0.5 * atr
+        # 强制上行空间与止损合理性。
+        target = max(float(target), close + 1.0 * atr)
+        stop_loss = min(float(stop_loss), close - 0.5 * atr)
     elif direction < 0:
         resistance = resistance if resistance is not None else recent_high
         support = support if support is not None else recent_low
         target = target if target is not None else close - (resistance - close) * 1.5
         stop_loss = stop_loss if stop_loss is not None else resistance + 0.5 * atr
+        # 强制下行空间与止损合理性。
+        target = min(float(target), close - 1.0 * atr)
+        stop_loss = max(float(stop_loss), close + 0.5 * atr)
     else:
         support = support if support is not None else recent_low
         resistance = resistance if resistance is not None else recent_high
@@ -138,10 +160,10 @@ def _compute_price_levels(
         stop_loss = stop_loss if stop_loss is not None else support - 0.5 * atr
 
     return {
-        "support": round(support, 6),
-        "resistance": round(resistance, 6),
-        "target": round(target, 6),
-        "stop_loss": round(stop_loss, 6),
+        "support": round(float(support), 6),
+        "resistance": round(float(resistance), 6),
+        "target": round(float(target), 6),
+        "stop_loss": round(float(stop_loss), 6),
     }
 
 

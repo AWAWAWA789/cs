@@ -96,6 +96,7 @@ def _format_result(
     neighbor_index: int,
     distance: float,
     state_columns: list[str],
+    similarity: float | None = None,
 ) -> dict[str, Any]:
     """Build a single neighbour result dictionary."""
     row = df.iloc[neighbor_index]
@@ -106,6 +107,8 @@ def _format_result(
         "distance": float(distance),
         "state": {col: float(row[col]) for col in state_columns},
     }
+    if similarity is not None:
+        result["similarity"] = round(float(similarity), 6)
     if ts_col:
         result["query_timestamp"] = str(df[ts_col].iloc[query_index])
         result["neighbor_timestamp"] = str(row[ts_col])
@@ -197,8 +200,22 @@ def knn_search(
         distances = all_distances[order]
         indices = order
 
+    # Map raw L2 distances to an interpretable 0-1 similarity so the API can
+    # expose a meaningful "相似度" alongside the opaque raw distance. sigma is
+    # the median of the returned neighbours' distances, so the median match
+    # gets similarity ≈ exp(-1) ≈ 0.37 and the closest match gets a higher value.
+    positive_distances = distances[distances > 0]
+    sigma = float(np.median(positive_distances)) if positive_distances.size > 0 else 1.0
+    if sigma <= 0:
+        sigma = 1.0
+
     results = []
     for local_idx, dist in zip(indices, distances):
         global_idx = int(candidate_indices[local_idx])
-        results.append(_format_result(df, query_index, global_idx, dist, state_columns))
+        similarity = float(np.exp(-float(dist) / sigma))
+        results.append(
+            _format_result(
+                df, query_index, global_idx, dist, state_columns, similarity=similarity
+            )
+        )
     return results

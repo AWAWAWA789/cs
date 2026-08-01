@@ -34,7 +34,7 @@ def test_settings_has_sensible_defaults(monkeypatch):
     assert s.base_url == "https://api.csqaq.com/api/v1"
     assert s.cache_path == "./data/cache"
     assert s.sub_index_id == ""
-    assert s.sub_index_name == "手套"
+    assert s.sub_index_name == "饰品指数"
     assert s.default_period == "4hour"
 
 

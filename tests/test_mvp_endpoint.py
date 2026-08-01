@@ -23,7 +23,7 @@ def client(monkeypatch):
     })
 
     from src.api import backtest_endpoints
-    monkeypatch.setattr(backtest_endpoints, "_load_ohlc", lambda sub_index, period: df)
+    monkeypatch.setattr(backtest_endpoints, "_load_ohlc", lambda sub_index, period, **kwargs: (df, "real"))
 
     from run_scenario_server import app
     return TestClient(app)

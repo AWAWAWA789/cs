@@ -34,7 +34,11 @@ def app(monkeypatch):
     # Always use deterministic synthetic data so tests never hit the network.
     import src.api.scenario_endpoints as endpoints
 
-    monkeypatch.setattr(endpoints, "_load_ohlc", lambda sub_index, period, **kwargs: _make_ohlc())
+    monkeypatch.setattr(
+        endpoints,
+        "_load_ohlc",
+        lambda sub_index, period, **kwargs: (_make_ohlc(), "real"),
+    )
 
     fast_app = FastAPI()
     fast_app.include_router(scenario_router)

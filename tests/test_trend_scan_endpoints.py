@@ -22,7 +22,7 @@ def client(monkeypatch):
         "close": close,
     })
     from src.api import trend_scan_endpoints
-    monkeypatch.setattr(trend_scan_endpoints, "_load_ohlc", lambda sub_index, period: df)
+    monkeypatch.setattr(trend_scan_endpoints, "_load_ohlc", lambda sub_index, period, **kwargs: (df, "real"))
     from run_scenario_server import app
     return TestClient(app)
 

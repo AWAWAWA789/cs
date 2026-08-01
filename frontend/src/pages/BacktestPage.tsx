@@ -12,7 +12,7 @@ import {
 } from "../lib/format";
 import type { EquityPoint, TradeRecord } from "../types/api";
 import { useGlobalStore } from "../store/globalStore";
-import ReactECharts from "echarts-for-react";
+import { EChart } from "../components/EChart";
 
 /** 品牌主色（与 tailwind brand-600 一致）。 */
 const BRAND_COLOR = "#2563eb";
@@ -108,7 +108,7 @@ function TradesTable({ trades }: { trades: TradeRecord[] }) {
           {trades.map((t, idx) => (
             <tr
               key={idx}
-              className="border-b border-surface-border last:border-0 hover:bg-surface-hover"
+              className="border-b border-surface-border last:border-0 transition-colors hover:bg-surface-hover"
             >
               <td className="px-3 py-2 text-ink-secondary">{idx + 1}</td>
               <td className="px-3 py-2 text-ink-secondary">{formatDate(t.entry_time)}</td>
@@ -238,7 +238,7 @@ export default function BacktestPage() {
         ) : equityCurve.length === 0 ? (
           <EmptyState title="暂无权益数据" description="未返回任何权益曲线点位。" />
         ) : (
-          <ReactECharts option={equityOption} style={{ height: 380, width: "100%" }} />
+          <EChart option={equityOption} style={{ height: 380, width: "100%" }} />
         )}
       </Card>
 

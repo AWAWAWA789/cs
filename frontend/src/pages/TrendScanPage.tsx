@@ -8,7 +8,7 @@ import { api, pollScanTask } from "../lib/api";
 import { formatPercent, formatNumber } from "../lib/format";
 import type { TaskInfo, ScanResult, ScanResultItem } from "../types/api";
 import { useGlobalStore } from "../store/globalStore";
-import ReactECharts from "echarts-for-react";
+import { EChart } from "../components/EChart";
 
 /** 扫描生命周期阶段。 */
 type ScanPhase = "idle" | "scanning" | "done" | "error";
@@ -220,7 +220,7 @@ export default function TrendScanPage() {
             {result.all_results.length === 0 ? (
               <EmptyState title="暂无扫描数据" description="本次扫描未产生任何结果。" />
             ) : (
-              <ReactECharts
+              <EChart
                 option={buildScatterOption(result.all_results)}
                 style={{ height: 380, width: "100%" }}
               />
@@ -249,7 +249,7 @@ export default function TrendScanPage() {
                   </thead>
                   <tbody className="divide-y divide-surface-border">
                     {result.top_10.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-surface-hover">
+                      <tr key={idx} className="transition-colors hover:bg-surface-hover">
                         <td className="px-3 py-2 font-medium text-ink-primary">{idx + 1}</td>
                         <td
                           className={`px-3 py-2 font-medium ${

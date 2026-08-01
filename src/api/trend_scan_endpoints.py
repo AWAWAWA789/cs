@@ -61,7 +61,7 @@ def _run_scan(
     progress_cb,
 ) -> dict[str, Any]:
     """Execute the full parameter scan. Runs in a background thread."""
-    df = _load_ohlc(sub_index, period)
+    df, _ = _load_ohlc(sub_index, period)
     grid = _param_grid()
     total = len(grid)
     results: list[dict[str, Any]] = []
