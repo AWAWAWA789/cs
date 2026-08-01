@@ -39,7 +39,7 @@
           "right": "N2",
           "base": "N1",
           "min_ratio": 0.0,
-          "max_ratio": 0.03
+          "max_ratio": 0.06
         },
         {
           "type": "breakout",
@@ -103,7 +103,7 @@
           "right": "N2",
           "base": "N1",
           "min_ratio": 0.0,
-          "max_ratio": 0.03
+          "max_ratio": 0.06
         },
         {
           "type": "breakout",

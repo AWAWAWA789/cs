@@ -6,7 +6,7 @@ import { useAsync } from "../hooks/useAsync";
 import { formatPercent, formatNumber, formatDate } from "../lib/format";
 import type { EnsembleResponse, StrategyResult } from "../types/api";
 import { useGlobalStore } from "../store/globalStore";
-import ReactECharts from "echarts-for-react";
+import { EChart } from "../components/EChart";
 
 /** 策略 key 到中文展示名的映射。 */
 const STRATEGY_LABELS: Record<string, string> = {
@@ -192,7 +192,7 @@ export default function EnsemblePage() {
                     return (
                       <tr
                         key={row.key}
-                        className="border-b border-surface-border last:border-0 hover:bg-surface-hover"
+                        className="border-b border-surface-border last:border-0 transition-colors hover:bg-surface-hover"
                       >
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2">
@@ -240,7 +240,7 @@ export default function EnsemblePage() {
         ) : !overlayOption ? (
           <EmptyState title="暂无权益数据" description="未返回任何策略权益曲线。" />
         ) : (
-          <ReactECharts option={overlayOption} style={{ height: 400, width: "100%" }} />
+          <EChart option={overlayOption} style={{ height: 400, width: "100%" }} />
         )}
       </Card>
     </div>

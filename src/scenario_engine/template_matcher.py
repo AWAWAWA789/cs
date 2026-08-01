@@ -148,67 +148,74 @@ def _find_last_matching_subsequence(
     return matched
 
 
+# ── AST compilation cache for template formulas ───────────────
+# ``_safe_eval`` is on the hot path of template matching: every structural /
+# price / projection condition that references a formula re-evaluates the same
+# expression string once per candidate bar. The expression strings are fixed
+# (they come from JSON template files), so we cache the *compiled code object*
+# per unique string. This skips ``ast.parse`` + the validation walk + the
+# Python-level recursive ``_eval_node`` on every call after the first, falling
+# back to C-level bytecode evaluation via ``eval()``.
+_COMPILED_FORMULA_CACHE: dict[str, Any] = {}
+
+# Builtins exposed to compiled template formulas. Restricting to these three
+# means a malicious or malformed template formula cannot reach arbitrary
+# attributes — the AST validation already rejects disallowed nodes, but the
+# restricted globals add a second layer of defence at evaluation time.
+_SAFE_BUILTINS = {"min": min, "max": max, "abs": abs}
+
+# AST node types allowed in template formulas. Kept in sync with the
+# operations the safe eval supported historically.
+_ALLOWED_AST_NODES = (
+    ast.Expression,
+    ast.BinOp,
+    ast.UnaryOp,
+    ast.Call,
+    ast.Name,
+    ast.Constant,
+    ast.Load,
+    ast.Add,
+    ast.Sub,
+    ast.Mult,
+    ast.Div,
+    ast.USub,
+    ast.UAdd,
+)
+
+
+def _validate_formula_ast(tree: ast.AST, expr: str) -> None:
+    """Walk the parsed AST and reject any disallowed node type."""
+    for node in ast.walk(tree):
+        if not isinstance(node, _ALLOWED_AST_NODES):
+            raise TemplateError(f"Disallowed syntax in formula: {expr!r}")
+        # Function calls are restricted to min / max / abs.
+        if isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name) or node.func.id not in {"min", "max", "abs"}:
+                raise TemplateError(f"Disallowed function call in formula: {expr!r}")
+
+
 def _safe_eval(expr: str, ctx: dict[str, float]) -> float:
     """安全地计算公式表达式。
 
     允许的节点：常量、变量、加减乘除、以及 ``min`` / ``max`` / ``abs`` 调用。
+    表达式字符串首次出现时被解析、校验并编译为 code object 缓存，后续调用
+    直接对缓存字节码求值，跳过重复的解析与递归求值开销。
     """
-    tree = ast.parse(expr, mode="eval")
-
-    allowed_nodes = (
-        ast.Expression,
-        ast.BinOp,
-        ast.UnaryOp,
-        ast.Call,
-        ast.Name,
-        ast.Constant,
-        ast.Load,
-        ast.Add,
-        ast.Sub,
-        ast.Mult,
-        ast.Div,
-        ast.USub,
-        ast.UAdd,
-    )
-    for node in ast.walk(tree):
-        if not isinstance(node, allowed_nodes):
-            raise TemplateError(f"Disallowed syntax in formula: {expr!r}")
-
-    def _eval_node(node: ast.AST) -> float:
-        if isinstance(node, ast.Constant):
-            return float(node.value)
-        if isinstance(node, ast.Name):
-            if node.id not in ctx:
-                raise TemplateError(f"Unknown variable {node.id!r} in formula {expr!r}")
-            return float(ctx[node.id])
-        if isinstance(node, ast.BinOp):
-            left = _eval_node(node.left)
-            right = _eval_node(node.right)
-            if isinstance(node.op, ast.Add):
-                return left + right
-            if isinstance(node.op, ast.Sub):
-                return left - right
-            if isinstance(node.op, ast.Mult):
-                return left * right
-            if isinstance(node.op, ast.Div):
-                if right == 0:
-                    return float("inf")
-                return left / right
-        if isinstance(node, ast.UnaryOp):
-            operand = _eval_node(node.operand)
-            if isinstance(node.op, ast.USub):
-                return -operand
-            if isinstance(node.op, ast.UAdd):
-                return operand
-        if isinstance(node, ast.Call):
-            if not isinstance(node.func, ast.Name) or node.func.id not in {"min", "max", "abs"}:
-                raise TemplateError(f"Disallowed function call in formula: {expr!r}")
-            args = [_eval_node(arg) for arg in node.args]
-            builtin = __builtins__.get(node.func.id) if isinstance(__builtins__, dict) else getattr(__builtins__, node.func.id)
-            return builtin(*args)
-        raise TemplateError(f"Unsupported node in formula: {expr!r}")
-
-    return _eval_node(tree.body)
+    code = _COMPILED_FORMULA_CACHE.get(expr)
+    if code is None:
+        tree = ast.parse(expr, mode="eval")
+        _validate_formula_ast(tree, expr)
+        code = compile(tree, "<template_formula>", "eval")
+        _COMPILED_FORMULA_CACHE[expr] = code
+    # ``__builtins__`` restricted to min/max/abs; ctx supplies all variables.
+    try:
+        return float(eval(code, {"__builtins__": _SAFE_BUILTINS}, ctx))
+    except ZeroDivisionError:
+        # Match historical behaviour: division by zero yields +inf, which
+        # ``_evaluate_projection`` later sanitises to ``None``.
+        return float("inf")
+    except NameError as exc:
+        raise TemplateError(f"Unknown variable in formula {expr!r}: {exc}") from exc
 
 
 def _resolve_value(value: str | float | int, ctx: dict[str, float]) -> float:
@@ -456,17 +463,27 @@ def _evaluate_conditions(
 
 
 def _evaluate_projection(template: dict[str, Any], ctx: dict[str, float]) -> dict[str, Any]:
-    """计算模板的支撑、阻力、目标位与止损。"""
+    """计算模板的支撑、阻力、目标位与止损。
+
+    投影公式可能因除零等边界情况返回 ``inf`` / ``-inf`` / ``nan``（例如
+    ``_safe_eval`` 对除零返回 ``float("inf")``）。这些非有限值若直接透传到
+    API 响应，前端会显示 "Infinity" / "NaN"。这里统一转换为 ``None``。
+    """
+    import math
+
     projection = template.get("projection", {})
     result: dict[str, Any] = {}
     for key in ("support", "resistance", "target", "stop_loss"):
         formula = projection.get(key)
         if isinstance(formula, (int, float)):
-            result[key] = float(formula)
+            value = float(formula)
         elif isinstance(formula, str):
-            result[key] = _safe_eval(formula, ctx)
+            value = _safe_eval(formula, ctx)
         else:
-            result[key] = None
+            value = None
+        if value is not None and not math.isfinite(float(value)):
+            value = None
+        result[key] = value
     result["suggestion"] = projection.get("suggestion", "neutral")
     result["probability_prior"] = projection.get("probability_prior", 0.5)
     return result
@@ -518,8 +535,20 @@ def _match_single_template(
     direction_hint = template.get("direction", "both")
     matches: list[dict[str, Any]] = []
 
+    # Incremental event pointer — events is sorted by idx (built in row
+    # order), so as ``i`` advances we extend ``historical_events`` by moving
+    # the pointer forward instead of re-filtering the whole list each
+    # iteration. The old ``[e for e in events if e["idx"] <= i]`` was O(E)
+    # per bar, making the whole loop O(N*E) ≈ O(N^2). Downstream code only
+    # reads ``historical_events`` (``_append_synthetic_events`` returns a
+    # new list, ``_find_last_matching_subsequence`` is read-only), so
+    # appending to the same list across iterations is safe.
+    event_ptr = 0
+    historical_events: list[dict[str, Any]] = []
     for i in range(start_index, len(feat_df)):
-        historical_events = [e for e in events if e["idx"] <= i]
+        while event_ptr < len(events) and events[event_ptr]["idx"] <= i:
+            historical_events.append(events[event_ptr])
+            event_ptr += 1
         if len(historical_events) < needed - 1:
             # 至少还需要一个当前 K 线作为合成事件
             continue

@@ -222,7 +222,7 @@ export default function MonitoringPage() {
                 return (
                   <li
                     key={`${alert.metric}-${idx}`}
-                    className="flex flex-wrap items-center justify-between gap-2 py-3"
+                    className="flex flex-wrap items-center justify-between gap-2 py-3 transition-colors hover:bg-surface-hover"
                   >
                     <div className="flex items-center gap-3">
                       <Badge variant={sev.variant}>{sev.label}</Badge>

@@ -62,18 +62,32 @@ def _similarity_candidates(
     """从历史相似性结果中提取方向候选。
 
     根据未来 5 根 K 线收益率的方向与幅度打分，最多返回 ``max_candidates`` 个。
+
+    相似度置信度使用 ``exp(-distance / sigma)`` 映射到 (0, 1]，其中 ``sigma``
+    取本批候选距离的中位数。这样可避免旧的 ``1 - distance`` 公式在 z-score
+    归一化的 15 维状态向量上几乎恒为 0（典型最近邻距离 3-6），导致相似性
+    轨道对融合完全没有贡献。
     """
     if not similarity_results:
         return []
 
+    top = similarity_results[:max_candidates]
+    positive_distances = [float(r.get("distance", 0.0)) for r in top if float(r.get("distance", 0.0)) > 0]
+    sigma = float(np.median(positive_distances)) if positive_distances else 1.0
+    if sigma <= 0:
+        sigma = 1.0
+
     candidates: list[dict[str, Any]] = []
-    for r in similarity_results[:max_candidates]:
-        ret = r.get("future_return_5") or r.get("future_return_7", 0.0)
+    for r in top:
+        # 显式 None 判断：避免 ``or`` 把恰好为 0.0 的 5 日收益当作假值而
+        # 错误地回退到 7 日收益，导致方向误判。
+        ret = r.get("future_return_5")
         if ret is None:
-            continue
+            ret = r.get("future_return_7", 0.0)
+        ret = float(ret)
         direction = _direction_to_int(ret)
-        distance = r.get("distance", 1.0)
-        confidence = max(0.0, 1.0 - float(distance))
+        distance = float(r.get("distance", 0.0))
+        confidence = float(np.exp(-distance / sigma))
         candidates.append(
             {
                 "source": "similarity",
@@ -82,6 +96,7 @@ def _similarity_candidates(
                 "raw_score": abs(ret) * confidence,
                 "future_return": ret,
                 "distance": distance,
+                "similarity": confidence,
             }
         )
     return candidates

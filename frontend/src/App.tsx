@@ -28,6 +28,37 @@ function PageLoader() {
 }
 
 /**
+ * 路由切换时播放淡入动画的容器。
+ *
+ * 用 location.pathname 作为 key，路由变化时 React 会卸载旧子树、挂载新子树，
+ * 新挂载的 div 重新触发 ``animate-fade-in`` CSS 动画，给页面切换增加平滑过渡，
+ * 在功能演示场景下观感更连贯。
+ */
+function AnimatedRoutes() {
+  const location = useLocation();
+  return (
+    <div key={location.pathname} className="animate-fade-in">
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/scenario" element={<ScenarioPage />} />
+          <Route path="/backtest" element={<BacktestPage />} />
+          <Route path="/ensemble" element={<EnsemblePage />} />
+          <Route path="/trend-scan" element={<TrendScanPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/data" element={<DataPage />} />
+          <Route path="/monitoring" element={<MonitoringPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/ranking" element={<RankingPage />} />
+          <Route path="/item/:goodId" element={<ItemDetailPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+    </div>
+  );
+}
+
+/**
  * URL 状态同步组件：
  * 1. 挂载时从 URL hash query 读取 sub/period 等参数，覆盖全局 store。
  * 2. 全局 store 变化时将参数写回 URL hash（支持分享链接与刷新保持）。
@@ -76,22 +107,7 @@ export default function App() {
       <HashRouter>
         <UrlStateSync />
         <Layout>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/scenario" element={<ScenarioPage />} />
-              <Route path="/backtest" element={<BacktestPage />} />
-              <Route path="/ensemble" element={<EnsemblePage />} />
-              <Route path="/trend-scan" element={<TrendScanPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/data" element={<DataPage />} />
-              <Route path="/monitoring" element={<MonitoringPage />} />
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="/ranking" element={<RankingPage />} />
-              <Route path="/item/:goodId" element={<ItemDetailPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+          <AnimatedRoutes />
         </Layout>
       </HashRouter>
     </ErrorBoundary>

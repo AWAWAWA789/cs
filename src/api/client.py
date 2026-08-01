@@ -53,6 +53,13 @@ class CSQAQClient:
     MAX_RETRIES: int = 3
     RETRY_BASE_DELAY: float = 3.0  # base delay for 429 retry backoff
     RATE_LIMIT_PENALTY: float = 3.0  # extra cooldown applied after a 429
+    # Hard cap on how long a single request will block waiting for the
+    # shared rate-limit slot. Without this, a burst of concurrent callers
+    # can stack their reserved slots arbitrarily far into the future, so a
+    # single HTTP request would block for tens of seconds. Hitting the cap
+    # surfaces a 429 to the caller immediately instead of stalling the
+    # request thread (and any upstream HTTP timeout).
+    MAX_WAIT: float = 30.0
 
     # ── Shared session ──────────────────────────────────────────
     # A single requests.Session is shared across all CSQAQClient instances
@@ -112,6 +119,16 @@ class CSQAQClient:
                 # thread queues after us instead of waking up at the
                 # same moment and causing a 429.
                 wait = earliest - now
+                if wait > self.MAX_WAIT:
+                    # Total wait would exceed the cap — fail fast instead of
+                    # blocking the request thread for tens of seconds. We do
+                    # NOT reserve a slot here (we are not going to sleep),
+                    # so the next caller's wait computation is unaffected.
+                    raise CSQAQAPIError(
+                        f"Rate-limit wait {wait:.1f}s exceeds cap {self.MAX_WAIT:.1f}s "
+                        f"for {path}; backing off",
+                        code=429,
+                    )
                 if path == "/sys/bind_local_ip":
                     _global_last_bind_ip_time = earliest
                 else:

@@ -34,7 +34,7 @@ def app(monkeypatch):
 
     import src.api.backtest_endpoints as backtest_endpoints
 
-    monkeypatch.setattr(backtest_endpoints, "_load_ohlc", lambda sub_index, period, **kwargs: _make_ohlc())
+    monkeypatch.setattr(backtest_endpoints, "_load_ohlc", lambda sub_index, period, **kwargs: (_make_ohlc(), "real"))
 
     fast_app = FastAPI()
     fast_app.include_router(backtest_router)

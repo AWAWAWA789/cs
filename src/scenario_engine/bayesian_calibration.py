@@ -220,6 +220,21 @@ def calibrate_probabilities(
     posteriors = unnorm_posterior / evidence
     calibrated = _temperature_scale(posteriors, temperature)
 
+    # 总证据样本量：用于向前端暴露"校准可信度"。当历史相似片段不足时，
+    # 后验主要反映先验，概率分布会偏均匀，前端可据此提示"校准数据不足"。
+    total_evidence_samples = sum(
+        int(histogram.get(_scenario_key(c), {}).get("total", 0)
+            if histogram.get(_scenario_key(c))
+            else histogram.get(_label_for_direction(_direction_to_int(c.get("direction", 0))), {}).get("total", 0))
+        for c in candidates
+    )
+    if total_evidence_samples >= 20:
+        calibration_confidence = "adequate"
+    elif total_evidence_samples >= 5:
+        calibration_confidence = "limited"
+    else:
+        calibration_confidence = "low"
+
     calibrated_candidates: list[dict[str, Any]] = []
     for cand, prior, likelihood, posterior, cal_prob in zip(
         candidates, priors, likelihoods, posteriors, calibrated
@@ -231,6 +246,7 @@ def calibrate_probabilities(
         record["posterior"] = round(float(posterior), 6)
         record["calibrated_probability"] = round(float(cal_prob), 6)
         record["probability"] = record["calibrated_probability"]
+        record["calibration_confidence"] = calibration_confidence
         calibrated_candidates.append(record)
 
     return calibrated_candidates

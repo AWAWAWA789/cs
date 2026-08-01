@@ -19,8 +19,10 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.types import Scope
 
 from src.api.backtest_endpoints import router as backtest_router
 from src.api.data_endpoints import router as data_router
@@ -33,11 +35,34 @@ from src.api.scenario_endpoints import router as scenario_router
 from src.api.trend_scan_endpoints import router as trend_scan_router
 
 
+class CacheControlStaticFiles(StaticFiles):
+    """``StaticFiles`` that sets a long ``Cache-Control`` header on hashed assets.
+
+    Vite emits content-hashed filenames (``assets/index-<hash>.js``) so the
+    bytes at a given URL never change. Browsers can safely cache them for a
+    year. ``index.html`` itself is left to its default (no long cache) so
+    users pick up new deploys immediately.
+    """
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        response = await super().get_response(path, scope)
+        # Only cache the immutable hashed assets under /assets/. The HTML
+        # entrypoint must remain uncached so new deploys are picked up.
+        if path.startswith("assets/") and response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 app = FastAPI(
     title="CSQAQ Glove Quant Scenario API",
     description="Algorithmic scenario generation, similarity search, template matching, backtest visualization and monitoring.",
     version="0.20.0",
 )
+
+# GZip compresses JSON responses (OHLC payloads, scenario blobs, equity
+# curves) which are highly compressible text. minimum_size matches the
+# starlette default to skip trivially small payloads.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,7 +84,11 @@ app.include_router(rank_router)
 
 frontend_dir = Path(__file__).parent / "frontend" / "dist"
 if frontend_dir.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+    app.mount(
+        "/",
+        CacheControlStaticFiles(directory=str(frontend_dir), html=True),
+        name="frontend",
+    )
 else:
 
     @app.get("/")
@@ -75,4 +104,13 @@ else:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("run_scenario_server:app", host="0.0.0.0", port=8000, reload=False)
+    # Multiple workers improve throughput under concurrent demo traffic and
+    # are safe because every endpoint is stateless (caches are per-process
+    # TTL caches, which is fine for demo-grade load).
+    uvicorn.run(
+        "run_scenario_server:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False,
+        workers=2,
+    )

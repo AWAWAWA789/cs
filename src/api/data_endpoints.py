@@ -70,7 +70,7 @@ def refresh_data(request: RefreshRequest) -> dict[str, Any]:
     """Force refresh cached data for a sub-index and period."""
     period = _normalize_period(request.period)
     try:
-        df = _load_ohlc(request.sub_index, period, force_refresh=True)
+        df, data_source = _load_ohlc(request.sub_index, period, force_refresh=True)
         bar_count = len(df)
     except HTTPException:
         raise
@@ -89,5 +89,6 @@ def refresh_data(request: RefreshRequest) -> dict[str, Any]:
         "period": period,
         "success": True,
         "bar_count": bar_count,
+        "data_source": data_source,
         "message": f"已刷新 {bar_count} 根K线数据",
     }

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useParams } from "react-router-dom";
-import ReactECharts from "echarts-for-react";
+import { EChart } from "../components/EChart";
 import { Card, StatCard } from "../components/ui/Card";
 import { Badge, Spinner, EmptyState, ErrorState } from "../components/ui/misc";
 import { Select } from "../components/ui/Select";
@@ -655,7 +655,7 @@ export default function ItemDetailPage() {
               description="该指标在所选平台与周期下暂无数据。"
             />
           ) : (
-            <ReactECharts option={chartOption} style={{ height: 380, width: "100%" }} />
+            <EChart option={chartOption} style={{ height: 380, width: "100%" }} />
           )}
         </Card>
       </section>
@@ -674,7 +674,7 @@ export default function ItemDetailPage() {
               description="该饰品暂无存世量历史记录。"
             />
           ) : (
-            <ReactECharts option={supplyOption} style={{ height: 320, width: "100%" }} />
+            <EChart option={supplyOption} style={{ height: 320, width: "100%" }} />
           )}
         </Card>
       </section>
