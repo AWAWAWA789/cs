@@ -405,24 +405,24 @@ export default function ScenarioPage() {
               <thead>
                 <tr className="border-b border-surface-border text-left text-xs text-ink-muted">
                   <th className="px-3 py-2 font-medium">日期</th>
-                  <th className="px-3 py-2 text-right font-medium">相似度</th>
-                  <th className="px-3 py-2 text-right font-medium">未来收益</th>
-                  {history.data.matches[0]?.label && (
-                    <th className="px-3 py-2 font-medium">标签</th>
-                  )}
+                  <th className="px-3 py-2 text-right font-medium">距离</th>
+                  <th className="px-3 py-2 text-right font-medium">5日收益</th>
+                  <th className="px-3 py-2 text-right font-medium">7日收益</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-border">
                 {history.data.matches.map((m, idx) => (
                   <tr key={idx} className="hover:bg-surface-hover">
-                    <td className="px-3 py-2 text-ink-secondary">{formatDate(m.date)}</td>
+                    <td className="px-3 py-2 text-ink-secondary">{formatDate(m.neighbor_timestamp)}</td>
                     <td className="px-3 py-2 text-right text-ink-primary">
-                      {formatPercent(m.similarity)}
+                      {m.distance.toFixed(4)}
                     </td>
-                    <td className={`px-3 py-2 text-right font-semibold ${m.future_return >= 0 ? "text-bull" : "text-bear"}`}>
-                      {formatPercent(m.future_return)}
+                    <td className={`px-3 py-2 text-right font-semibold ${m.future_return_5 !== null && m.future_return_5 >= 0 ? "text-bull" : "text-bear"}`}>
+                      {m.future_return_5 !== null ? formatPercent(m.future_return_5) : "—"}
                     </td>
-                    {m.label && <td className="px-3 py-2 text-ink-muted">{m.label}</td>}
+                    <td className={`px-3 py-2 text-right font-semibold ${m.future_return_7 !== null && m.future_return_7 >= 0 ? "text-bull" : "text-bear"}`}>
+                      {m.future_return_7 !== null ? formatPercent(m.future_return_7) : "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -439,13 +439,32 @@ export default function ScenarioPage() {
               <div key={idx} className="flex items-start justify-between rounded-lg border border-surface-border px-4 py-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-ink-primary">{t.name}</span>
+                    <span className="text-sm font-medium text-ink-primary">{t.template_name}</span>
                     <Badge variant={t.direction === "bullish" ? "bull" : t.direction === "bearish" ? "bear" : "neutral"}>
                       {directionLabel(t.direction as "bullish" | "bearish" | "neutral")}
                     </Badge>
+                    {t.matched_timestamp && (
+                      <span className="text-xs text-ink-muted">{formatDateShort(t.matched_timestamp)}</span>
+                    )}
                   </div>
-                  {t.description && (
-                    <p className="mt-1 text-xs text-ink-muted">{t.description}</p>
+                  {t.suggestion && (
+                    <p className="mt-1 text-xs text-ink-muted">{t.suggestion}</p>
+                  )}
+                  {(t.support !== null || t.resistance !== null || t.target !== null || t.stop_loss !== null) && (
+                    <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                      {t.support !== null && (
+                        <span className="text-bull">支撑 {formatPrice(t.support)}</span>
+                      )}
+                      {t.resistance !== null && (
+                        <span className="text-bear">阻力 {formatPrice(t.resistance)}</span>
+                      )}
+                      {t.target !== null && (
+                        <span className="text-ink-secondary">目标 {formatPrice(t.target)}</span>
+                      )}
+                      {t.stop_loss !== null && (
+                        <span className="text-ink-muted">止损 {formatPrice(t.stop_loss)}</span>
+                      )}
+                    </div>
                   )}
                 </div>
                 <span className="ml-3 shrink-0 text-sm font-semibold text-ink-primary">

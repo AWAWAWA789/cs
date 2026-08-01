@@ -48,10 +48,14 @@ export interface OhlcResponse {
 }
 
 export interface SimilarityMatch {
-  date: string;
-  similarity: number;
-  future_return: number;
-  label?: string;
+  query_index: number;
+  neighbor_index: number;
+  distance: number;
+  state: Record<string, number>;
+  query_timestamp?: string;
+  neighbor_timestamp?: string;
+  future_return_5: number | null;
+  future_return_7: number | null;
 }
 
 export interface HistoryResponse {
@@ -62,10 +66,17 @@ export interface HistoryResponse {
 }
 
 export interface TemplateMatch {
-  name: string;
-  confidence: number;
+  template_name: string;
+  matched_index: number;
+  matched_timestamp: string | null;
   direction: string;
-  description?: string;
+  confidence: number;
+  support: number | null;
+  resistance: number | null;
+  target: number | null;
+  stop_loss: number | null;
+  suggestion: string;
+  probability_prior: number;
 }
 
 export interface TemplatesResponse {
